@@ -82,6 +82,43 @@ class UxNextTest {
         assertTrue(ids.none { TestData.state(it).isRead })
     }
 
+    /** U04 (category round trip in the card grid): each category keeps its own place; nothing is marked read. */
+    @Test
+    fun cardGridKeepsEachCategoryPositionAcrossTabSwitches() {
+        TestData.reset()
+        val seeded = TestData.seedCategories(listOf("Alpha", "Beta"), perCategory = 60)
+        runBlocking { TestData.container.settings.setListMode(ListMode.CARD) }
+        val alpha = seeded.keys.elementAt(0)
+        val beta = seeded.keys.elementAt(1)
+        launch()
+        waitForTag("category_pager")
+        fun inPage(scope: String, tag: String) = compose.onNode(hasTestTag(tag) and hasAnyAncestor(hasTestTag("page_$scope")))
+        fun waitInPage(scope: String, tag: String) = compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag(tag) and hasAnyAncestor(hasTestTag("page_$scope"))).fetchSemanticsNodes().isNotEmpty()
+        }
+        val a = "category:$alpha"
+        val b = "category:$beta"
+        compose.onNodeWithTag("tab_$a").performClick()
+        waitInPage(a, "article_list")
+        inPage(a, "article_list").performScrollToIndex(40)
+        val alphaAnchor = seeded.getValue(alpha)[40]
+        inPage(a, "article_$alphaAnchor").assertIsDisplayed()
+
+        compose.onNodeWithTag("tab_$b").performClick()
+        waitInPage(b, "article_list")
+        inPage(b, "article_list").performScrollToIndex(15)
+        val betaAnchor = seeded.getValue(beta)[15]
+        inPage(b, "article_$betaAnchor").assertIsDisplayed()
+
+        compose.onNodeWithTag("tab_$a").performClick()
+        waitInPage(a, "article_$alphaAnchor")
+        inPage(a, "article_$alphaAnchor").assertIsDisplayed()
+        compose.onNodeWithTag("tab_$b").performClick()
+        waitInPage(b, "article_$betaAnchor")
+        inPage(b, "article_$betaAnchor").assertIsDisplayed()
+        assertTrue(seeded.values.flatten().none { TestData.state(it).isRead })
+    }
+
     // U06: confirmation for http:// articles
 
     @Test
