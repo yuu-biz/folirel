@@ -19,3 +19,16 @@ __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
+
+# Agent / editor tooling that is local to one machine or one working session.
+# Shared agent files (AGENTS.md, CLAUDE.md, .claude/skills/, .claude/settings.json, .mcp.json) may be committed
+# only if they hold general project conventions: no work status, no machine paths, no personal preferences.
+CLAUDE.local.md
+AGENTS.local.md
+.claude/settings.local.json
+.claude/worktrees/
+.mcp.local.json
+.orca/
+.cursor/
+.codex/
+local-docs/
