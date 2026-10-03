@@ -1,6 +1,7 @@
 package io.github.yuubiz.feeddeck.sync
 
 import io.github.yuubiz.feeddeck.backend.BackendSynchronizer
+import io.github.yuubiz.feeddeck.backend.FeedResult
 import io.github.yuubiz.feeddeck.backend.RefreshProgress
 import io.github.yuubiz.feeddeck.backend.RefreshReason
 import io.github.yuubiz.feeddeck.backend.RefreshReport
@@ -48,7 +49,39 @@ data class RefreshState(
     fun latestFor(scope: RefreshScope): RequestStatus? = requests.lastOrNull { it.scope == scope }
 
     val latestFinished: RequestStatus? get() = requests.filter { !it.running }.maxByOrNull { it.finishedAt ?: 0 }
+
+    /**
+     * What became of the feeds [request] did not fetch because their address changed meanwhile (V31-C02). The request
+     * itself stays history: it did not leave them unfinished. Their present state is what the requests made after it say:
+     * the latest decisive result of each feed decides (failed / not reached / fine), a running request for that feed
+     * means it is being fetched now, and when no later request covers a feed it has not been fetched since the change.
+     * Only feeds this request replaced are considered, so a failure of any other feed is never reported here.
+     */
+    fun replacedNow(request: RequestStatus): ReplacedNow {
+        val replaced = request.report?.perFeed.orEmpty().filterValues { it.result == FeedResult.REPLACED }.keys
+        val later = requests.filter { it.id > request.id }
+        var failed = 0
+        var unreached = 0
+        var inProgress = 0
+        for (feedId in replaced) {
+            if (later.any { it.running && (it.scope as? RefreshScope.Feeds)?.feedIds?.contains(feedId) == true }) {
+                inProgress++
+                continue
+            }
+            val result = later.asReversed().firstNotNullOfOrNull { r ->
+                r.takeIf { !it.running }?.report?.perFeed?.get(feedId)?.result?.takeIf { it != FeedResult.REPLACED && it != FeedResult.INACTIVE }
+            }
+            when {
+                result == FeedResult.FAILED -> failed++
+                result == null || result.unfinished || result == FeedResult.BACKOFF || result == FeedResult.OFFLINE || result == FeedResult.HTTP_DISABLED -> unreached++
+            }
+        }
+        return ReplacedNow(failed, unreached, inProgress)
+    }
 }
+
+/** The present state of the feeds a request did not fetch because their address changed meanwhile. */
+data class ReplacedNow(val failed: Int = 0, val unreached: Int = 0, val inProgress: Int = 0)
 
 /**
  * Single entry point for every refresh (manual, import, startup, periodic).

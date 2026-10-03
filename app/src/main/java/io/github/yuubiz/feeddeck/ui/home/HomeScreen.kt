@@ -874,16 +874,21 @@ private fun StatusBar(
         if (own != null && !own.running && own.report == null) add(stringResource(R.string.status_interrupted))
         if (report != null && report.total > 0) {
             val results = report.perFeed.values
+            // Feeds this request left to the request that followed an address change: their present state counts here,
+            // the request itself (history) does not (V31-C02).
+            val replacedNow = refresh.replacedNow(own)
+            val failedCount = report.failed.size + replacedNow.failed
+            val notReached = report.notAttempted + replacedNow.unreached
             val ok = results.count { it.result == FeedResult.UPDATED || it.result == FeedResult.NOT_MODIFIED }
             val waiting = results.count { it.result == FeedResult.BACKOFF || it.result == FeedResult.OFFLINE }
             // An all-clear result shows nothing (no permanent "9 feeds: OK 9 · failed 0 ..." line); only what needs
             // attention is listed, with its count.
             val parts = buildList {
-                if (report.failed.isNotEmpty() || waiting > 0 || report.notAttempted > 0 || report.httpPending > 0) {
+                if (failedCount > 0 || waiting > 0 || notReached > 0 || report.httpPending > 0) {
                     if (ok > 0) add(stringResource(R.string.status_part_ok, ok))
-                    if (report.failed.isNotEmpty()) add(stringResource(R.string.status_part_failed, report.failed.size))
+                    if (failedCount > 0) add(stringResource(R.string.status_part_failed, failedCount))
                     if (waiting > 0) add(stringResource(R.string.status_part_waiting, waiting))
-                    if (report.notAttempted > 0) add(stringResource(R.string.status_part_not_reached, report.notAttempted))
+                    if (notReached > 0) add(stringResource(R.string.status_part_not_reached, notReached))
                     if (report.httpPending > 0) add(stringResource(R.string.status_part_http, report.httpPending))
                 }
             }
@@ -891,7 +896,7 @@ private fun StatusBar(
             val storage = report.failed.values.count { it == FetchError.STORAGE }
             if (storage > 0) add(pluralStringResource(R.plurals.status_storage_failed, storage, storage))
             if (report.deferredConstraint > 0 && report.offline && !offline) add(stringResource(R.string.status_deferred_offline))
-            showRetry = (report.notAttempted > 0 || report.failed.isNotEmpty()) && !refresh.running
+            showRetry = (notReached > 0 || failedCount > 0) && !refresh.running
         }
     }
     if (lines.isEmpty()) return

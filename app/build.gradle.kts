@@ -13,8 +13,15 @@ android {
         applicationId = "io.github.yuubiz.feeddeck"
         minSdk = 28
         targetSdk = 37
-        versionCode = 4
-        versionName = "0.3.1"
+        versionCode = 5
+        versionName = "0.3.2"
+        // Shown in Settings > About so a build can be traced to its source ("-dirty" = uncommitted changes).
+        val gitCommit = try {
+            providers.exec { commandLine("git", "describe", "--always", "--dirty", "--abbrev=7") }.standardOutput.asText.get().trim()
+        } catch (e: Exception) {
+            "unknown"
+        }
+        buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

@@ -286,7 +286,7 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Un
             item { Header(stringResource(R.string.settings_about)) }
             item {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                    Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE))
+                    Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE, BuildConfig.GIT_COMMIT))
                     Text(stringResource(R.string.settings_local_note), style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.settings_licenses), style = MaterialTheme.typography.bodySmall)
                 }

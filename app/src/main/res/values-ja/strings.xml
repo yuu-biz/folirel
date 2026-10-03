@@ -194,7 +194,7 @@
     <string name="settings_unmetered">自動更新は非従量制ネットワークのみ</string>
     <string name="settings_unmetered_note">OSの従量制判定に従います。厳密なWi-Fi判定ではありません。</string>
     <string name="settings_update">更新</string>
-    <string name="settings_version">バージョン %1$s (%2$d)</string>
+    <string name="settings_version">バージョン %1$s (%2$d) · ビルド %3$s</string>
     <string name="sort_newest">新しい順</string>
     <string name="sort_oldest">古い順</string>
     <string name="status_deferred_offline">オフラインのため未更新</string>

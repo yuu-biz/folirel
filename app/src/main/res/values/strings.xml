@@ -195,7 +195,7 @@
     <string name="settings_unmetered">Automatic updates on unmetered networks only</string>
     <string name="settings_unmetered_note">Uses the system\'s metered flag; not a strict Wi-Fi check.</string>
     <string name="settings_update">Updates</string>
-    <string name="settings_version">Version %1$s (%2$d)</string>
+    <string name="settings_version">Version %1$s (%2$d) · build %3$s</string>
     <string name="sort_newest">Newest first</string>
     <string name="sort_oldest">Oldest first</string>
     <string name="status_deferred_offline">Not updated (was offline)</string>
