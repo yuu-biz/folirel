@@ -321,8 +321,9 @@ fun HomeScreen(
                     onRefresh = { requestRefresh() },
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    val page: @Composable (ArticleScope) -> Unit = { pageScope ->
+                    val page: @Composable (ArticleScope, Boolean) -> Unit = { pageScope, isCurrent ->
                         ScopePage(
+                            isCurrent = isCurrent,
                             vm = vm,
                             pageScope = pageScope,
                             selection = selection,
@@ -339,7 +340,7 @@ fun HomeScreen(
                         !structure.loaded -> Unit
                         structure.feeds.isEmpty() -> NoSubscriptions(nav.importOpml, nav.addFeed)
                         pagerMode -> CategoryPager(vm, pages, selection.scope, page)
-                        else -> page(selection.scope)
+                        else -> page(selection.scope, true)
                     }
                 }
             }
@@ -393,7 +394,7 @@ fun HomeScreen(
  * Not circular. Only the visible page (and its neighbour while swiping) is composed and queries the DB.
  */
 @Composable
-private fun CategoryPager(vm: HomeViewModel, pages: List<ArticleScope>, selected: ArticleScope, page: @Composable (ArticleScope) -> Unit) {
+private fun CategoryPager(vm: HomeViewModel, pages: List<ArticleScope>, selected: ArticleScope, page: @Composable (ArticleScope, Boolean) -> Unit) {
     val pagerState = rememberPagerState(initialPage = pages.indexOf(selected).coerceAtLeast(0)) { pages.size }
     val selectedIndex = pages.indexOf(selected)
     LaunchedEffect(selectedIndex, pages) {
@@ -413,12 +414,14 @@ private fun CategoryPager(vm: HomeViewModel, pages: List<ArticleScope>, selected
         key = { index -> pages.getOrNull(index)?.encode() ?: "page-$index" },
         modifier = Modifier.fillMaxSize().testTag("category_pager"),
     ) { index ->
-        page(pages.getOrNull(index) ?: ArticleScope.All)
+        // Only the settled page counts as "shown"; a pre-composed neighbour must not consume new-article markers.
+        page(pages.getOrNull(index) ?: ArticleScope.All, index == pagerState.settledPage)
     }
 }
 
 @Composable
 private fun ScopePage(
+    isCurrent: Boolean,
     vm: HomeViewModel,
     pageScope: ArticleScope,
     selection: Selection,
@@ -445,6 +448,7 @@ private fun ScopePage(
                 actions = actions,
                 newIds = newIds,
                 newestFirst = selection.sort == SortOrder.NEWEST,
+                isCurrent = isCurrent,
             )
         }
     }
@@ -460,6 +464,7 @@ private fun ArticleList(
     actions: ArticleActions,
     newIds: Set<String>,
     newestFirst: Boolean,
+    isCurrent: Boolean,
 ) {
     val items = state.items
     // Restore from this list's own anchor (article id + offset); if it is gone, use the nearest remaining article.
@@ -480,7 +485,8 @@ private fun ArticleList(
         }
     }
     // New articles count as seen once they are on screen, judged on this list's own state (REV-02 / N06).
-    LaunchedEffect(listState) {
+    LaunchedEffect(listState, isCurrent) {
+        if (!isCurrent) return@LaunchedEffect
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? String } }.collect { visible ->
             vm.markNewSeen(visible.filter { it in currentNew })
         }
