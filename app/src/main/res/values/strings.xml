@@ -84,6 +84,9 @@
     <string name="http_allow_message">Unencrypted http:// feeds and images can be read or altered on the network. Allow fetching them? HTTPS certificate checks stay unchanged.</string>
     <string name="http_allow_title">Allow unencrypted HTTP?</string>
     <string name="http_open_confirm">Open this time</string>
+    <string name="http_open_dont_ask">Do not ask again before opening http:// articles</string>
+    <string name="settings_confirm_http_open">Confirm before opening http:// articles</string>
+    <string name="settings_confirm_http_open_note">Only this app\'s own question before the browser opens. Feed and image downloads over HTTP are controlled by the setting below, and the browser keeps its own warnings.</string>
     <string name="http_open_message">This article uses an unencrypted http:// address. Open it anyway?</string>
     <string name="http_open_title">Unencrypted page</string>
     <string name="import_added_memberships">Category memberships to add</string>
@@ -185,8 +188,8 @@
     <string name="settings_local_note">Local RSS reader. Data stays on this device; uninstalling removes it. OPML export is not a full backup.</string>
     <string name="settings_open">Opening articles</string>
     <string name="settings_open_note">Opening an article never marks it as read.</string>
-    <string name="settings_show_images">Show thumbnails</string>
-    <string name="settings_show_images_note">When off, no images are downloaded.</string>
+    <string name="settings_show_images">Show thumbnails and source icons</string>
+    <string name="settings_show_images_note">When off, no thumbnails or source icons are downloaded or shown (icons already saved stay hidden). Icons are looked up once per feed from the feed or its own site, never from a third-party service.</string>
     <string name="settings_text_size">Text size</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_unmetered">Automatic updates on unmetered networks only</string>
@@ -349,7 +352,6 @@
     <string name="status_interrupted">Last update was interrupted</string>
     <string name="status_other_refresh">Another update is running</string>
     <string name="status_other_refresh_progress">Another update %1$d/%2$d</string>
-    <string name="status_result">Feeds: %1$d · OK %2$d · failed %3$d · waiting %4$d · not reached %5$d · HTTP %6$d</string>
     <string name="summary_counts">Feeds: %1$d · last result OK %2$d · failed %3$d · HTTP pending %4$d · waiting %5$d · unfinished %6$d</string>
     <string name="summary_http">Feeds still on http://: %1$d. They are not fetched unless HTTP is allowed.</string>
     <string name="summary_never_fetched">Never fetched: %1$d</string>
@@ -360,4 +362,17 @@
         <item quantity="other">Every %d minutes</item>
     </plurals>
     <string name="https_reason_redirect_unconfirmed">Redirected to another site; not confirmed as the same feed (allowing HTTP lets the check compare)</string>
+    <string name="settings_card_columns">Columns in large card style</string>
+    <string name="card_columns_auto">Automatic (by screen width and text size)</string>
+    <string name="card_columns_n">%1$d columns</string>
+    <string name="settings_card_columns_note">If the chosen number of columns would make headlines too narrow to read (small window, large text), fewer columns are used. Text is never shrunk to keep columns.</string>
+    <string name="settings_card_columns_now">Right now this screen shows %1$d column(s).</string>
+    <string name="settings_card_columns_reduced">(Your choice of %1$d columns does not fit here, so it is reduced.)</string>
+    <string name="status_result_compact">%1$d feeds: %2$s</string>
+    <string name="status_part_ok">OK %1$d</string>
+    <string name="status_part_failed">failed %1$d</string>
+    <string name="status_part_waiting">waiting %1$d</string>
+    <string name="status_part_not_reached">not reached %1$d</string>
+    <string name="status_part_http">HTTP held %1$d</string>
+    <string name="status_part_separator">" · "</string>
 </resources>

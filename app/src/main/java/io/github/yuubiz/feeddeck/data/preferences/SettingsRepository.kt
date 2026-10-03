@@ -25,6 +25,8 @@ data class AppSettings(
     val theme: ThemeMode = ThemeMode.SYSTEM,
     val listMode: ListMode = ListMode.MAGAZINE,
     val textScale: Float = 1.0f,
+    /** Columns of the card list: 0 = automatic by width and text size, otherwise 1..3 (reduced when they do not fit). */
+    val cardColumns: Int = 0,
     val showImages: Boolean = true,
     val browserMode: BrowserMode = BrowserMode.CUSTOM_TABS,
     /** Periodic update interval in minutes; 0 = off. Default 2 hours. */
@@ -33,6 +35,12 @@ data class AppSettings(
     val startupRefresh: Boolean = true,
     val unmeteredOnly: Boolean = true,
     val allowHttp: Boolean = false,
+    /**
+     * Ask before opening an http:// article in the browser. Off only after "don't ask again" was ticked in that
+     * dialog or the switch was turned off in settings. Independent from [allowHttp] (feed/image downloads) and
+     * from the browser's own checks.
+     */
+    val confirmHttpOpen: Boolean = true,
     val onboardingDone: Boolean = false,
     val lastScope: ArticleScope = ArticleScope.All,
     val lastFilter: ReadFilter = ReadFilter.ALL,
@@ -51,6 +59,7 @@ data class AppSettings(
         val LEGACY_INTERVAL_HOURS = listOf(0, 1, 2, 6, 12, 24)
         val RETENTION_LIMITS = listOf(0, 1_000, 3_000, 5_000, 10_000, 30_000)
         val IMAGE_CACHE_MB = listOf(64, 128, 256, 512)
+        val CARD_COLUMNS = listOf(0, 1, 2, 3)
     }
 }
 
@@ -59,6 +68,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val theme = stringPreferencesKey("theme")
         val listMode = stringPreferencesKey("list_mode")
         val textScale = floatPreferencesKey("text_scale")
+        val cardColumns = intPreferencesKey("card_columns")
         val showImages = booleanPreferencesKey("show_images")
         val browserMode = stringPreferencesKey("browser_mode")
         /** v0.1 key (hours). Read only for migration; never written. */
@@ -69,6 +79,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val imageCacheMb = intPreferencesKey("image_cache_mb")
         val unmeteredOnly = booleanPreferencesKey("unmetered_only")
         val allowHttp = booleanPreferencesKey("allow_http")
+        val confirmHttpOpen = booleanPreferencesKey("confirm_http_open")
         val onboardingDone = booleanPreferencesKey("onboarding_done")
         val lastScope = stringPreferencesKey("last_scope")
         val lastFilter = stringPreferencesKey("last_filter")
@@ -82,6 +93,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             theme = enumOr(p[Keys.theme], defaults.theme),
             listMode = enumOr(p[Keys.listMode], defaults.listMode),
             textScale = p[Keys.textScale]?.takeIf { it in AppSettings.TEXT_SCALES } ?: defaults.textScale,
+            cardColumns = p[Keys.cardColumns]?.takeIf { it in AppSettings.CARD_COLUMNS } ?: defaults.cardColumns,
             showImages = p[Keys.showImages] ?: defaults.showImages,
             browserMode = enumOr(p[Keys.browserMode], defaults.browserMode),
             refreshIntervalMinutes = intervalMinutes(p),
@@ -89,6 +101,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             startupRefresh = p[Keys.startupRefresh] ?: (intervalMinutes(p) > 0),
             unmeteredOnly = p[Keys.unmeteredOnly] ?: defaults.unmeteredOnly,
             allowHttp = p[Keys.allowHttp] ?: defaults.allowHttp,
+            confirmHttpOpen = p[Keys.confirmHttpOpen] ?: defaults.confirmHttpOpen,
             onboardingDone = p[Keys.onboardingDone] ?: defaults.onboardingDone,
             lastScope = ArticleScope.decode(p[Keys.lastScope]),
             lastFilter = enumOr(p[Keys.lastFilter], defaults.lastFilter),
@@ -110,6 +123,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setTheme(value: ThemeMode) = store.edit { it[Keys.theme] = value.name }
     suspend fun setListMode(value: ListMode) = store.edit { it[Keys.listMode] = value.name }
     suspend fun setTextScale(value: Float) = store.edit { it[Keys.textScale] = value }
+    suspend fun setCardColumns(value: Int) = store.edit { it[Keys.cardColumns] = value }
     suspend fun setShowImages(value: Boolean) = store.edit { it[Keys.showImages] = value }
     suspend fun setBrowserMode(value: BrowserMode) = store.edit { it[Keys.browserMode] = value.name }
     suspend fun setRefreshIntervalMinutes(minutes: Int) = store.edit { it[Keys.refreshMinutes] = minutes }
@@ -118,6 +132,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setImageCacheMb(value: Int) = store.edit { it[Keys.imageCacheMb] = value }
     suspend fun setUnmeteredOnly(value: Boolean) = store.edit { it[Keys.unmeteredOnly] = value }
     suspend fun setAllowHttp(value: Boolean) = store.edit { it[Keys.allowHttp] = value }
+    suspend fun setConfirmHttpOpen(value: Boolean) = store.edit { it[Keys.confirmHttpOpen] = value }
     suspend fun setOnboardingDone(value: Boolean) = store.edit { it[Keys.onboardingDone] = value }
     suspend fun setLastScope(value: ArticleScope) = store.edit { it[Keys.lastScope] = value.encode() }
     suspend fun setLastFilter(value: ReadFilter) = store.edit { it[Keys.lastFilter] = value.name }

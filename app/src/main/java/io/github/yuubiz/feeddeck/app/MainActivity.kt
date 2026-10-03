@@ -28,9 +28,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.yuubiz.feeddeck.data.preferences.AppSettings
+import io.github.yuubiz.feeddeck.ui.home.FeedIconStore
 import io.github.yuubiz.feeddeck.ui.home.HomeNavigation
 import io.github.yuubiz.feeddeck.ui.home.HomeScreen
 import io.github.yuubiz.feeddeck.ui.home.HomeViewModel
+import io.github.yuubiz.feeddeck.ui.home.ProvideFeedIcons
 import io.github.yuubiz.feeddeck.ui.onboarding.OnboardingNext
 import io.github.yuubiz.feeddeck.ui.onboarding.OnboardingScreen
 import io.github.yuubiz.feeddeck.ui.settings.SettingsScreen
@@ -45,8 +47,12 @@ import io.github.yuubiz.feeddeck.ui.subscriptions.SubscriptionEvents
 import io.github.yuubiz.feeddeck.ui.subscriptions.SubscriptionsScreen
 import io.github.yuubiz.feeddeck.ui.subscriptions.SubscriptionsViewModel
 import io.github.yuubiz.feeddeck.ui.theme.FeedDeckTheme
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,8 +62,12 @@ class MainActivity : ComponentActivity() {
             val settings by container.settings.settings.collectAsStateWithLifecycle(initialValue = null as AppSettings?)
             val current = settings ?: return@setContent // render nothing until preferences are loaded
             FeedDeckTheme(current.theme, current.textScale) {
-                Surface(Modifier.fillMaxSize()) {
-                    AppNavigation(container, current)
+                val iconStore = remember { FeedIconStore { feedId -> container.feedIcons.png(feedId) } }
+                val iconVersions = remember { flow { emit(container.subscriptions.ensureLocalAccount()) }.flatMapLatest { container.feedIcons.observeVersions(it) } }
+                ProvideFeedIcons(iconStore, iconVersions, enabled = current.showImages) {
+                    Surface(Modifier.fillMaxSize()) {
+                        AppNavigation(container, current)
+                    }
                 }
             }
         }

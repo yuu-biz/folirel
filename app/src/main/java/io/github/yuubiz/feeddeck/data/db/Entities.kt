@@ -219,3 +219,67 @@ data class FeedHttpsMigrationEntity(
     val httpsUrl: String,
     val migratedAt: Long,
 )
+
+/** State of the source icon of one feed. */
+enum class IconStatus {
+    /** Not looked up yet (or the feed's declared icon changed). */
+    PENDING,
+
+    /** [FeedIconEntity.png] holds the icon. */
+    OK,
+
+    /** Looked up; the site has no usable icon. The initial letter is shown. */
+    NONE,
+
+    /** Network trouble or a blocked address; retried later. */
+    FAILED,
+}
+
+/**
+ * Source icon of a feed (v3, UX-ICON): resolved once per feed, normalized to a small PNG, cached here with the
+ * time of the next lookup. Written by the icon coordinator and, for [declaredUrl], by [FeedStore]. Never part of the
+ * fetch result of a feed: a failed icon lookup is not a feed failure.
+ */
+@Entity(
+    tableName = "feed_icons",
+    foreignKeys = [ForeignKey(entity = FeedEntity::class, parentColumns = ["id"], childColumns = ["feedId"])],
+)
+data class FeedIconEntity(
+    @PrimaryKey val feedId: String,
+    /** Icon URL the feed document declares (absolute), if any. A change makes the lookup run again. */
+    val declaredUrl: String? = null,
+    /** [IconStatus] name. */
+    val status: String,
+    /** Where the stored icon came from: FEED, HTML, FAVICON or BANNER (a wide logo, used only as a last resort). */
+    val sourceKind: String? = null,
+    val sourceUrl: String? = null,
+    /** Normalized PNG, at most [MAX_SIDE_PX] on the long side. */
+    val png: ByteArray? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    val resolvedAt: Long? = null,
+    val nextAttemptAt: Long = 0,
+    val failureCount: Int = 0,
+) {
+    companion object {
+        const val MAX_SIDE_PX = 96
+    }
+}
+
+/**
+ * A feed's fetch URL that was changed by the user to a discovered new address (v3, SUB-DISCOVERY). The feed row
+ * (id, categories, articles, reading state) is kept; the registered URL stays the re-import identity and every
+ * recorded old/new address maps back to this feed, so importing an older OPML does not create a duplicate.
+ */
+@Entity(
+    tableName = "feed_url_moves",
+    foreignKeys = [ForeignKey(entity = FeedEntity::class, parentColumns = ["id"], childColumns = ["feedId"])],
+    indices = [Index(value = ["feedId"]), Index(value = ["fromUrl"]), Index(value = ["toUrl"])],
+)
+data class FeedUrlMoveEntity(
+    @PrimaryKey val id: String,
+    val feedId: String,
+    val fromUrl: String,
+    val toUrl: String,
+    val movedAt: Long,
+)

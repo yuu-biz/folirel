@@ -58,6 +58,7 @@ import io.github.yuubiz.feeddeck.data.repository.ArticleRepository
 import io.github.yuubiz.feeddeck.data.repository.RetentionManager
 import io.github.yuubiz.feeddeck.data.repository.RetentionPreview
 import io.github.yuubiz.feeddeck.model.ListMode
+import io.github.yuubiz.feeddeck.ui.home.CardGridLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -158,6 +159,14 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Un
             }
             item {
                 Choice(
+                    stringResource(R.string.settings_card_columns),
+                    AppSettings.CARD_COLUMNS.map { it to if (it == 0) stringResource(R.string.card_columns_auto) else stringResource(R.string.card_columns_n, it) },
+                    s.cardColumns,
+                ) { vm.update { setCardColumns(it) } }
+            }
+            item { CardColumnsNote(s.cardColumns) }
+            item {
+                Choice(
                     stringResource(R.string.settings_text_size),
                     AppSettings.TEXT_SCALES.map { it to "×$it" },
                     s.textScale,
@@ -174,6 +183,11 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Un
                 ) { vm.update { setBrowserMode(it) } }
             }
             item { Note(stringResource(R.string.settings_open_note)) }
+            item {
+                Toggle(stringResource(R.string.settings_confirm_http_open), stringResource(R.string.settings_confirm_http_open_note), s.confirmHttpOpen, Modifier.testTag("confirm_http_open")) { v ->
+                    vm.update { setConfirmHttpOpen(v) }
+                }
+            }
 
             item { Header(stringResource(R.string.settings_update)) }
             item {
@@ -352,4 +366,17 @@ private fun intervalLabel(minutes: Int): String = when {
     minutes == 0 -> stringResource(R.string.interval_off)
     minutes < 60 -> pluralStringResource(R.plurals.interval_minutes, minutes, minutes)
     else -> pluralStringResource(R.plurals.interval_hours, minutes / 60, minutes / 60)
+}
+
+/** What the column choice means on this screen right now, including when the choice is reduced to fit. */
+@Composable
+private fun CardColumnsNote(preference: Int) {
+    val widthDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.toFloat()
+    val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+    val columns = CardGridLayout.columns(widthDp, fontScale, preference)
+    Note(stringResource(R.string.settings_card_columns_note))
+    Note(
+        stringResource(R.string.settings_card_columns_now, columns.count) +
+            if (columns.corrected) " " + stringResource(R.string.settings_card_columns_reduced, preference) else "",
+    )
 }

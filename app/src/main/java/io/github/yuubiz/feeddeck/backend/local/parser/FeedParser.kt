@@ -84,6 +84,7 @@ object FeedParser {
             siteUrl = resolveUrl(channel.base, channel.childText("", "link")),
             entries = dedupe(entries),
             rawEntryCount = entries.size,
+            iconUrl = channel.child("", "image")?.let { resolveUrl(it.base, it.childText("", "url")) },
         )
     }
 
@@ -112,6 +113,7 @@ object FeedParser {
             siteUrl = channel?.let { resolveUrl(it.base, it.childText(RSS1, "link")) },
             entries = dedupe(entries),
             rawEntryCount = entries.size,
+            iconUrl = root.child(RSS1, "image")?.let { resolveUrl(it.base, it.childText(RSS1, "url")) },
         )
     }
 
@@ -145,6 +147,8 @@ object FeedParser {
             siteUrl = atomAlternateLink(root),
             entries = dedupe(entries),
             rawEntryCount = entries.size,
+            // atom:icon is meant to be square; atom:logo is usually a wide banner, so it is only the second choice.
+            iconUrl = listOf("icon", "logo").firstNotNullOfOrNull { n -> root.child(ATOM, n)?.let { resolveUrl(it.base, it.text) } },
         )
     }
 

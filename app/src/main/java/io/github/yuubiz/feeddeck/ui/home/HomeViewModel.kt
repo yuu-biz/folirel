@@ -221,6 +221,11 @@ class HomeViewModel(
         viewModelScope.launch { settingsRepository.setSortOrder(next) }
     }
 
+    /** "Open" in the http:// dialog with the box ticked. Cancelling never calls this, so nothing is saved then. */
+    fun stopAskingBeforeHttpOpen() {
+        viewModelScope.launch { settingsRepository.setConfirmHttpOpen(false) }
+    }
+
     fun setListMode(mode: ListMode) {
         viewModelScope.launch { settingsRepository.setListMode(mode) }
     }

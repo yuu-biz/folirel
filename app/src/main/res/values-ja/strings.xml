@@ -83,6 +83,9 @@
     <string name="http_allow_message">暗号化されていないhttp://のフィードと画像は、通信経路で盗み見や改ざんの可能性があります。取得を許可しますか？HTTPSの証明書検証は変わりません。</string>
     <string name="http_allow_title">暗号化されていないHTTPを許可しますか？</string>
     <string name="http_open_confirm">今回は開く</string>
+    <string name="http_open_dont_ask">今後、http://の記事を開く前に確認しない</string>
+    <string name="settings_confirm_http_open">http://の記事を開く前に確認</string>
+    <string name="settings_confirm_http_open_note">ブラウザを開く前のこのアプリ独自の確認だけです。HTTPのフィード・画像の取得は下の設定で別に管理され、ブラウザ自身の警告も残ります。</string>
     <string name="http_open_message">この記事は暗号化されていないhttp://のアドレスです。開きますか？</string>
     <string name="http_open_title">暗号化されていないページ</string>
     <string name="import_added_memberships">追加するカテゴリ所属</string>
@@ -184,8 +187,8 @@
     <string name="settings_local_note">ローカルRSSリーダーです。データは端末内にあり、アンインストールで消えます。OPML出力は完全なバックアップではありません。</string>
     <string name="settings_open">記事を開く方法</string>
     <string name="settings_open_note">記事を開いても既読にはなりません。</string>
-    <string name="settings_show_images">サムネイルを表示</string>
-    <string name="settings_show_images_note">オフのときは画像を一切取得しません。</string>
+    <string name="settings_show_images">サムネイルと配信元アイコンを表示</string>
+    <string name="settings_show_images_note">オフのときは、サムネイルも配信元アイコンも取得・表示しません（保存済みのアイコンも非表示）。アイコンはフィード本体か配信元サイトから1フィードにつき一度だけ調べ、外部のファビコンサービスは使いません。</string>
     <string name="settings_text_size">文字サイズ</string>
     <string name="settings_theme">テーマ</string>
     <string name="settings_unmetered">自動更新は非従量制ネットワークのみ</string>
@@ -341,7 +344,6 @@
     <string name="status_interrupted">前回の更新は中断されました</string>
     <string name="status_other_refresh">別の更新を実行中</string>
     <string name="status_other_refresh_progress">別の更新 %1$d/%2$d</string>
-    <string name="status_result">%1$dフィード：正常%2$d・失敗%3$d・待機%4$d・未取得%5$d・HTTP保留%6$d</string>
     <string name="summary_counts">%1$dフィード・前回結果 正常%2$d・失敗%3$d・HTTP保留%4$d・待機%5$d・未完了%6$d</string>
     <string name="summary_http">%1$d件のフィードがhttp://のままです。HTTPを許可しない限り取得しません。</string>
     <string name="summary_never_fetched">一度も取得できていない: %1$d件</string>
@@ -351,4 +353,17 @@
         <item quantity="other">%d分ごと</item>
     </plurals>
     <string name="https_reason_redirect_unconfirmed">別のサイトへ転送され、同じフィードか確認できない（HTTPを許可すると比較して判定）</string>
+    <string name="settings_card_columns">大きなカードの列数</string>
+    <string name="card_columns_auto">自動（画面幅と文字サイズに合わせる）</string>
+    <string name="card_columns_n">%1$d列</string>
+    <string name="settings_card_columns_note">選んだ列数だと見出しが読めないほど狭くなる場合（小さなウィンドウ、大きな文字）は、列数を減らします。列数を保つために文字を縮小することはありません。</string>
+    <string name="settings_card_columns_now">この画面では現在%1$d列で表示します。</string>
+    <string name="settings_card_columns_reduced">（選択した%1$d列はここでは収まらないため減らしています。）</string>
+    <string name="status_result_compact">%1$dフィード：%2$s</string>
+    <string name="status_part_ok">正常%1$d</string>
+    <string name="status_part_failed">失敗%1$d</string>
+    <string name="status_part_waiting">待機%1$d</string>
+    <string name="status_part_not_reached">未取得%1$d</string>
+    <string name="status_part_http">HTTP保留%1$d</string>
+    <string name="status_part_separator">・</string>
 </resources>

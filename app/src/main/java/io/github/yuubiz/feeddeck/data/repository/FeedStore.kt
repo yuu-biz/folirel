@@ -9,6 +9,8 @@ import io.github.yuubiz.feeddeck.data.db.ArticleStateEntity
 import io.github.yuubiz.feeddeck.data.db.FeedDiagnosticsEntity
 import io.github.yuubiz.feeddeck.data.db.FeedEntity
 import io.github.yuubiz.feeddeck.data.db.FeedFetchStateEntity
+import io.github.yuubiz.feeddeck.data.db.FeedIconEntity
+import io.github.yuubiz.feeddeck.data.db.IconStatus
 import io.github.yuubiz.feeddeck.model.FetchError
 import io.github.yuubiz.feeddeck.model.NormalizedFeed
 import java.time.Clock
@@ -55,6 +57,7 @@ class FeedStore(
     private val subscriptions = db.subscriptionDao()
     private val articles = db.articleDao()
     private val diagnostics = db.diagnosticsDao()
+    private val icons = db.iconDao()
 
     suspend fun feed(feedId: String): FeedEntity? = subscriptions.feed(feedId)
 
@@ -102,6 +105,9 @@ class FeedStore(
         // Re-check right before applying: an unsubscribe/pause during the fetch wins.
         if (current == null || !current.isSubscribed || current.isPaused) return@withTransaction ApplyResult.SkippedInactive
         subscriptions.updateFeedMetadata(feedId, feed.title ?: current.feedTitle, feed.siteUrl ?: current.siteUrl)
+        // Only the icon URL the feed declares is recorded here; looking it up is the icon coordinator's job.
+        icons.insertIgnore(FeedIconEntity(feedId = feedId, declaredUrl = feed.iconUrl, status = IconStatus.PENDING.name))
+        icons.changeDeclared(feedId, feed.iconUrl)
         var updated = 0
         var skippedPruned = 0
         val insertedIds = ArrayList<String>()

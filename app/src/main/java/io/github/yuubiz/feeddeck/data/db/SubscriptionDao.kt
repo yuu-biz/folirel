@@ -47,6 +47,24 @@ interface SubscriptionDao {
     @Query("SELECT * FROM feed_https_migrations WHERE feedId = :feedId")
     fun observeHttpsMigration(feedId: String): Flow<FeedHttpsMigrationEntity?>
 
+    // URL moves chosen by the user after a discovery (v3)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertUrlMove(row: FeedUrlMoveEntity)
+
+    @Query("SELECT m.* FROM feed_url_moves m JOIN feeds f ON f.id = m.feedId WHERE f.accountId = :accountId ORDER BY m.movedAt, m.id")
+    suspend fun urlMoves(accountId: String): List<FeedUrlMoveEntity>
+
+    @Query("SELECT * FROM feed_url_moves WHERE feedId = :feedId ORDER BY movedAt DESC, id DESC")
+    fun observeUrlMoves(feedId: String): Flow<List<FeedUrlMoveEntity>>
+
+    /** After the fetch URL changed: the errors and waits of the old address do not apply to the new one. */
+    @Query(
+        "UPDATE feed_fetch_state SET lastErrorCode = NULL, failureCount = 0, nextEligibleAt = NULL, retryAfterUntil = NULL " +
+            "WHERE feedId = :feedId",
+    )
+    suspend fun clearFetchFailure(feedId: String): Int
+
     @Query("SELECT * FROM feeds WHERE id = :id")
     fun observeFeed(id: String): Flow<FeedEntity?>
 

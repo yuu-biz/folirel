@@ -7,6 +7,11 @@ data class NormalizedFeed(
     val entries: List<NormalizedEntry>,
     /** item/entry elements in the document before duplicate keys were merged (diagnostics). */
     val rawEntryCount: Int = entries.size,
+    /**
+     * Icon the feed itself declares (Atom icon/logo, RSS image url), resolved to an absolute http(s) URL. Only a
+     * hint for the source icon (UX-ICON); never fetched by the feed parser.
+     */
+    val iconUrl: String? = null,
 )
 
 data class NormalizedEntry(
@@ -35,4 +40,10 @@ object Limits {
     const val OPML_MAX_OUTLINES = 10_000
     const val OPML_MAX_FEED_CANDIDATES = 5_000
     const val IMAGE_MAX_BYTES = 8L * 1024 * 1024
+
+    /** Site page read for icon links and feed alternates (the rest of a larger page is ignored). */
+    const val SITE_PAGE_MAX_BYTES = 512L * 1024
+
+    /** One icon file; a larger file is skipped, not downscaled. */
+    const val ICON_MAX_BYTES = 256L * 1024
 }

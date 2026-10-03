@@ -2,7 +2,9 @@ package io.github.yuubiz.feeddeck.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,10 +17,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -30,6 +37,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -72,11 +80,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -159,7 +169,7 @@ fun HomeScreen(
         when (val check = browser.check(row.linkUrl)) {
             BrowserLauncher.LinkCheck.Missing -> scope.launch { snackbar.showSnackbar(messages.noUrl) }
             BrowserLauncher.LinkCheck.Unsafe -> scope.launch { snackbar.showSnackbar(messages.unsafeUrl) }
-            is BrowserLauncher.LinkCheck.Ok -> if (!check.isHttps) {
+            is BrowserLauncher.LinkCheck.Ok -> if (!check.isHttps && settings.confirmHttpOpen) {
                 httpConfirmUrl = check.url
                 httpConfirmMode = mode
             } else if (browser.open(context, check.url, mode) == BrowserLauncher.OpenResult.NO_BROWSER) {
@@ -360,19 +370,15 @@ fun HomeScreen(
         )
     }
     httpConfirmUrl?.let { url ->
-        AlertDialog(
-            onDismissRequest = { httpConfirmUrl = null },
-            title = { Text(stringResource(R.string.http_open_title)) },
-            text = { Text(stringResource(R.string.http_open_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    httpConfirmUrl = null
-                    if (browser.open(context, url, httpConfirmMode) == BrowserLauncher.OpenResult.NO_BROWSER) {
-                        scope.launch { snackbar.showSnackbar(messages.noBrowser) }
-                    }
-                }) { Text(stringResource(R.string.http_open_confirm)) }
+        HttpOpenDialog(
+            onOpen = { dontAskAgain ->
+                httpConfirmUrl = null
+                if (dontAskAgain) vm.stopAskingBeforeHttpOpen()
+                if (browser.open(context, url, httpConfirmMode) == BrowserLauncher.OpenResult.NO_BROWSER) {
+                    scope.launch { snackbar.showSnackbar(messages.noBrowser) }
+                }
             },
-            dismissButton = { TextButton(onClick = { httpConfirmUrl = null }) { Text(stringResource(R.string.cancel)) } },
+            onDismiss = { httpConfirmUrl = null },
         )
     }
     summaryFor?.let { row ->
@@ -386,6 +392,40 @@ fun HomeScreen(
             }
         }
     }
+}
+
+/**
+ * Confirmation before opening an http:// article. The "don't ask again" box starts unticked every time; it is
+ * saved only through [onOpen], never by cancelling. It concerns this dialog only: feed/image HTTP downloads and the
+ * browser's own warnings are unaffected.
+ */
+@Composable
+private fun HttpOpenDialog(onOpen: (dontAskAgain: Boolean) -> Unit, onDismiss: () -> Unit) {
+    var dontAskAgain by rememberSaveable { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.http_open_title)) },
+        text = {
+            Column {
+                Text(stringResource(R.string.http_open_message))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .toggleable(value = dontAskAgain, role = Role.Checkbox, onValueChange = { dontAskAgain = it })
+                        .testTag("http_open_dont_ask"),
+                ) {
+                    Checkbox(checked = dontAskAgain, onCheckedChange = null)
+                    Text(stringResource(R.string.http_open_dont_ask), modifier = Modifier.padding(start = 8.dp))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onOpen(dontAskAgain) }, modifier = Modifier.testTag("http_open_confirm")) { Text(stringResource(R.string.http_open_confirm)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss, modifier = Modifier.testTag("http_open_cancel")) { Text(stringResource(R.string.cancel)) } },
+    )
 }
 
 /**
@@ -444,6 +484,7 @@ private fun ScopePage(
                 state = list,
                 mode = settings.listMode,
                 showImages = settings.showImages,
+                cardColumns = settings.cardColumns,
                 imageLoader = imageLoader,
                 actions = actions,
                 newIds = newIds,
@@ -454,12 +495,39 @@ private fun ScopePage(
     }
 }
 
+/** Scroll position of the article list, the same operations for the column list and the card grid. */
+private interface ScrollHandle {
+    /** The underlying Compose state object; effects restart when it changes. */
+    val owner: Any
+    val firstIndex: Int
+    val firstOffset: Int
+    val visibleKeys: List<Any>
+    suspend fun scrollTo(index: Int)
+}
+
+private class ListScroll(private val s: LazyListState) : ScrollHandle {
+    override val owner: Any get() = s
+    override val firstIndex: Int get() = s.firstVisibleItemIndex
+    override val firstOffset: Int get() = s.firstVisibleItemScrollOffset
+    override val visibleKeys: List<Any> get() = s.layoutInfo.visibleItemsInfo.map { it.key }
+    override suspend fun scrollTo(index: Int) = s.scrollToItem(index)
+}
+
+private class GridScroll(private val s: LazyGridState) : ScrollHandle {
+    override val owner: Any get() = s
+    override val firstIndex: Int get() = s.firstVisibleItemIndex
+    override val firstOffset: Int get() = s.firstVisibleItemScrollOffset
+    override val visibleKeys: List<Any> get() = s.layoutInfo.visibleItemsInfo.map { it.key }
+    override suspend fun scrollTo(index: Int) = s.scrollToItem(index)
+}
+
 @Composable
 private fun ArticleList(
     vm: HomeViewModel,
     state: ArticlesState,
     mode: ListMode,
     showImages: Boolean,
+    cardColumns: Int,
     imageLoader: ImageLoader,
     actions: ArticleActions,
     newIds: Set<String>,
@@ -467,39 +535,74 @@ private fun ArticleList(
     isCurrent: Boolean,
 ) {
     val items = state.items
+    val useGrid = mode == ListMode.CARD
     // Restore from this list's own anchor (article id + offset); if it is gone, use the nearest remaining article.
-    val listState = remember(state.key) {
+    // Switching list style, rotating or resizing the window keeps the same article near the top.
+    val start = remember(state.key, useGrid) {
         val anchor = vm.anchorFor(state.key)
         val index = anchor?.let { a ->
             items.indexOfFirst { it.id == a.articleId }.takeIf { it >= 0 }
                 ?: items.indexOfFirst { if (newestFirst) it.sortAt <= a.sortAt else it.sortAt >= a.sortAt }.takeIf { it >= 0 }
                 ?: (items.size - 1)
         } ?: 0
-        LazyListState(index.coerceAtLeast(0), if (anchor != null && items.getOrNull(index)?.id == anchor.articleId) anchor.offset else 0)
+        index.coerceAtLeast(0) to (if (anchor != null && items.getOrNull(index)?.id == anchor.articleId) anchor.offset else 0)
+    }
+    val scroll: ScrollHandle
+    val gridState: LazyGridState?
+    val listState: LazyListState?
+    if (useGrid) {
+        gridState = remember(state.key) { LazyGridState(start.first, start.second) }
+        listState = null
+        scroll = GridScroll(gridState)
+    } else {
+        listState = remember(state.key) { LazyListState(start.first, start.second) }
+        gridState = null
+        scroll = ListScroll(listState)
     }
     val currentItems by rememberUpdatedState(items)
     val currentNew by rememberUpdatedState(newIds)
-    LaunchedEffect(listState, state.key) {
-        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }.collect { (index, offset) ->
+    val currentScroll by rememberUpdatedState(scroll)
+    LaunchedEffect(scroll.owner, state.key) {
+        snapshotFlow { currentScroll.firstIndex to currentScroll.firstOffset }.collect { (index, offset) ->
             currentItems.getOrNull(index)?.let { vm.saveAnchor(ListAnchor(state.key, it.id, it.sortAt, offset)) }
         }
     }
     // New articles count as seen once they are on screen, judged on this list's own state (REV-02 / N06).
-    LaunchedEffect(listState, isCurrent) {
+    LaunchedEffect(scroll.owner, isCurrent) {
         if (!isCurrent) return@LaunchedEffect
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? String } }.collect { visible ->
+        snapshotFlow { currentScroll.visibleKeys.mapNotNull { it as? String } }.collect { visible ->
             vm.markNewSeen(visible.filter { it in currentNew })
         }
     }
     // The banner counts only the new articles this list shows and jumps to the first of them in the current order.
-    val firstNewIndex by remember(listState) { derivedStateOf { currentItems.indexOfFirst { it.id in currentNew } } }
+    val firstNewIndex by remember(scroll.owner) { derivedStateOf { currentItems.indexOfFirst { it.id in currentNew } } }
     val newCount = remember(items, newIds) { items.count { it.id in newIds } }
     val scope = rememberCoroutineScope()
     val now = remember(items) { System.currentTimeMillis() }
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize().testTag("article_list"), contentPadding = PaddingValues(bottom = 24.dp)) {
-            items(items, key = { it.id }, contentType = { mode }) { row ->
-                ArticleItem(row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"))
+        if (gridState != null) {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val widthDp = maxWidth.value
+                val columns = CardGridLayout.columns(widthDp, LocalDensity.current.fontScale, cardColumns)
+                val metrics = CardMetrics(columns.count, CardGridLayout.cardWidthDp(widthDp, columns.count))
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(columns.count),
+                    state = gridState,
+                    modifier = Modifier.fillMaxSize().testTag("article_list"),
+                    contentPadding = PaddingValues(start = CardGridLayout.EDGE_DP.dp, end = CardGridLayout.EDGE_DP.dp, top = 4.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(CardGridLayout.GAP_DP.dp),
+                    horizontalArrangement = Arrangement.spacedBy(CardGridLayout.GAP_DP.dp),
+                ) {
+                    items(items, key = { it.id }, contentType = { mode }) { row ->
+                        ArticleItem(row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"), metrics)
+                    }
+                }
+            }
+        } else if (listState != null) {
+            LazyColumn(state = listState, modifier = Modifier.fillMaxSize().testTag("article_list"), contentPadding = PaddingValues(bottom = 24.dp)) {
+                items(items, key = { it.id }, contentType = { mode }) { row ->
+                    ArticleItem(row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"))
+                }
             }
         }
         if (newCount > 0 && firstNewIndex >= 0) {
@@ -507,7 +610,7 @@ private fun ArticleList(
             FilledTonalButton(
                 onClick = {
                     val jumpTo = firstNewIndex
-                    scope.launch { if (jumpTo >= 0) listState.scrollToItem(jumpTo) }
+                    scope.launch { if (jumpTo >= 0) currentScroll.scrollTo(jumpTo) }
                 },
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp).testTag("new_articles_banner"),
             ) { Text(pluralStringResource(R.plurals.new_articles_banner, newCount, newCount)) }
@@ -609,7 +712,18 @@ private fun StatusBar(
             val results = report.perFeed.values
             val ok = results.count { it.result == FeedResult.UPDATED || it.result == FeedResult.NOT_MODIFIED }
             val waiting = results.count { it.result == FeedResult.BACKOFF || it.result == FeedResult.OFFLINE }
-            add(stringResource(R.string.status_result, report.total, ok, report.failed.size, waiting, report.notAttempted, report.httpPending))
+            // An all-clear result shows nothing (no permanent "9 feeds: OK 9 · failed 0 ..." line); only what needs
+            // attention is listed, with its count.
+            val parts = buildList {
+                if (report.failed.isNotEmpty() || waiting > 0 || report.notAttempted > 0 || report.httpPending > 0) {
+                    if (ok > 0) add(stringResource(R.string.status_part_ok, ok))
+                    if (report.failed.isNotEmpty()) add(stringResource(R.string.status_part_failed, report.failed.size))
+                    if (waiting > 0) add(stringResource(R.string.status_part_waiting, waiting))
+                    if (report.notAttempted > 0) add(stringResource(R.string.status_part_not_reached, report.notAttempted))
+                    if (report.httpPending > 0) add(stringResource(R.string.status_part_http, report.httpPending))
+                }
+            }
+            if (parts.isNotEmpty()) add(stringResource(R.string.status_result_compact, report.total, parts.joinToString(stringResource(R.string.status_part_separator))))
             val storage = report.failed.values.count { it == FetchError.STORAGE }
             if (storage > 0) add(pluralStringResource(R.plurals.status_storage_failed, storage, storage))
             if (report.deferredConstraint > 0 && report.offline && !offline) add(stringResource(R.string.status_deferred_offline))

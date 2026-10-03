@@ -18,6 +18,8 @@ import androidx.room.migration.Migration
         FeedDiagnosticsEntity::class,
         PrunedEntryEntity::class,
         FeedHttpsMigrationEntity::class,
+        FeedIconEntity::class,
+        FeedUrlMoveEntity::class,
     ],
     version = AppDatabase.VERSION,
     exportSchema = true,
@@ -26,13 +28,14 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun subscriptionDao(): SubscriptionDao
     abstract fun articleDao(): ArticleDao
     abstract fun diagnosticsDao(): DiagnosticsDao
+    abstract fun iconDao(): FeedIconDao
 
     companion object {
-        const val VERSION = 2
+        const val VERSION = 3
         const val NAME = "feeddeck.db"
 
         /** Explicit migrations only. Destructive fallback is forbidden (docs/03 section 6). */
-        val MIGRATIONS: Array<Migration> = arrayOf(Migrations.MIGRATION_1_2)
+        val MIGRATIONS: Array<Migration> = arrayOf(Migrations.MIGRATION_1_2, Migrations.MIGRATION_2_3)
 
         /** Database files on disk (main, WAL, shared memory) for the size display. */
         fun fileBytes(context: Context): Long =

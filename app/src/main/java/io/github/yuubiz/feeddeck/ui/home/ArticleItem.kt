@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,6 +27,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -64,6 +66,20 @@ class ArticleActions(
     val showSummary: (ArticleRow) -> Unit,
 )
 
+/** Size of one card in the card list: how many columns share the width and how wide this card is (dp). */
+@Immutable
+class CardMetrics(val columns: Int, val widthDp: Float) {
+    val multiColumn: Boolean get() = columns > 1
+    val horizontal: Boolean get() = CardGridLayout.isHorizontal(columns, widthDp)
+    val compact: Boolean get() = CardGridLayout.isCompact(widthDp)
+    val imageHeight: Dp get() = CardGridLayout.imageHeightDp(widthDp).dp
+
+    companion object {
+        /** One ordinary phone-width column (used where no grid measured the width). */
+        val SingleColumn = CardMetrics(1, 360f)
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ArticleItem(
@@ -74,6 +90,7 @@ fun ArticleItem(
     nowMillis: Long,
     actions: ArticleActions,
     modifier: Modifier = Modifier,
+    card: CardMetrics = CardMetrics.SingleColumn,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val saveLabel = stringResource(if (row.isSaved) R.string.action_unsave else R.string.action_save)
@@ -96,7 +113,7 @@ fun ArticleItem(
                 CustomAccessibilityAction(shareLabel) { actions.share(row); true },
             )
         }
-    val buttons: @Composable () -> Unit = {
+    val bookmarkButton: @Composable () -> Unit = {
         IconButton(onClick = { actions.toggleSaved(row) }) {
             Icon(
                 painter = painterResource(if (row.isSaved) R.drawable.ic_bookmark else R.drawable.ic_bookmark_border),
@@ -105,6 +122,8 @@ fun ArticleItem(
                 modifier = Modifier.size(20.dp),
             )
         }
+    }
+    val moreButton: @Composable () -> Unit = {
         Box {
             IconButton(onClick = { menuOpen = true }) {
                 Icon(Icons.Filled.MoreVert, contentDescription = menuLabel, modifier = Modifier.size(20.dp))
@@ -127,9 +146,13 @@ fun ArticleItem(
             }
         }
     }
+    val buttons: @Composable () -> Unit = {
+        bookmarkButton()
+        moreButton()
+    }
 
     if (mode == ListMode.CARD) {
-        ArticleCard(row, showImages, imageLoader, nowMillis, buttons, modifier, rowModifier)
+        ArticleCard(row, showImages, imageLoader, nowMillis, card, bookmarkButton, moreButton, modifier, rowModifier)
         return
     }
     Column(modifier) {
@@ -179,9 +202,12 @@ fun ArticleItem(
 }
 
 /**
- * Large card (UX-02): wide 16:9 image on top, headline (3 lines), summary (2 lines), source/time and actions.
- * Without an image URL (or with images off) it is a text card with no empty frame; with a URL the 16:9 area is
- * fixed while loading or after a failure, so the list does not jump. Images off: no image area, no request.
+ * Card (UX-GRID). Single column: image on top, headline (3 lines), summary (2 lines), source/time and actions; a
+ * single very wide column puts the image on the left instead. Several columns: every card has the same height
+ * (image area + a fixed text area), so rows stay even whatever the headline lengths; an article without an image
+ * uses that image area for more summary text, and the thumbnail area is fixed while loading or after a failure, so
+ * the list never jumps. The image height is capped ([CardGridLayout.MAX_IMAGE_HEIGHT_DP]). Images off: no image
+ * area and no request.
  */
 @Composable
 private fun ArticleCard(
@@ -189,47 +215,98 @@ private fun ArticleCard(
     showImages: Boolean,
     imageLoader: ImageLoader,
     nowMillis: Long,
-    buttons: @Composable () -> Unit,
+    metrics: CardMetrics,
+    bookmarkButton: @Composable () -> Unit,
+    moreButton: @Composable () -> Unit,
     modifier: Modifier,
     clickModifier: Modifier,
 ) {
-    ElevatedCard(modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
-        Column(clickModifier) {
-            if (showImages && row.imageUrl != null) {
-                val placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant)
-                Box(
-                    Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(MaterialTheme.colorScheme.surfaceVariant).testTag("card_image"),
-                ) {
-                    AsyncImage(
-                        model = row.imageUrl,
-                        contentDescription = null,
-                        imageLoader = imageLoader,
-                        placeholder = placeholder,
-                        error = placeholder,
-                        fallback = placeholder,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.matchParentSize(),
-                    )
-                }
-            }
-            Column(Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp)) {
-                ArticleTitle(row, fontSize = 18, lineHeight = 24, maxLines = 3)
+    val multi = metrics.multiColumn
+    val hasImage = showImages && row.imageUrl != null
+    val titleSize = if (multi) 15 else 18
+    val titleLine = if (multi) 20 else 24
+    val summarySize = if (multi) 13 else 14
+    val summaryLine = if (multi) 18 else 20
+    val density = LocalDensity.current
+    val textPadding = if (multi) 10.dp else 14.dp
+    // Several columns: the text area has a fixed height of 3 title lines + 2 summary lines, plus the image height
+    // for an article that has no image (so all cards of a row are equally tall).
+    val fixedTextHeight: Dp? = if (multi) {
+        val base = with(density) { (titleLine * 3 + 4 + summaryLine * 2).sp.toDp() }
+        if (showImages && !hasImage) base + metrics.imageHeight else base
+    } else null
+    val summaryLines = if (multi) {
+        val area = fixedTextHeight ?: 0.dp
+        val titleHeight = with(density) { (titleLine * 3 + 4).sp.toDp() }
+        val lineDp = with(density) { summaryLine.sp.toDp() }
+        ((area - titleHeight) / lineDp).toInt().coerceAtLeast(2)
+    } else 2
+
+    ElevatedCard(modifier.fillMaxWidth()) {
+        val textBlock: @Composable (Modifier) -> Unit = { m ->
+            Column(m) {
+                ArticleTitle(row, fontSize = titleSize, lineHeight = titleLine, maxLines = 3)
                 if (row.summaryText.isNotBlank()) {
                     Spacer(Modifier.padding(top = 4.dp))
                     Text(
                         text = row.summaryText,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 20.sp),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = summarySize.sp, lineHeight = summaryLine.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
+                        maxLines = summaryLines,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            MetaText(row, nowMillis, Modifier.weight(1f))
-            buttons()
+        if (metrics.horizontal) {
+            Row(clickModifier) {
+                if (hasImage) CardImage(row.imageUrl, imageLoader, Modifier.width(216.dp).height((216 * 9 / 16).dp))
+                textBlock(Modifier.weight(1f).padding(start = textPadding, end = textPadding, top = 12.dp))
+            }
+        } else {
+            Column(clickModifier) {
+                if (hasImage) CardImage(row.imageUrl, imageLoader, Modifier.fillMaxWidth().height(metrics.imageHeight))
+                textBlock(
+                    Modifier
+                        .padding(start = textPadding, end = textPadding, top = if (multi) 8.dp else 12.dp)
+                        .then(if (fixedTextHeight != null) Modifier.height(fixedTextHeight) else Modifier),
+                )
+            }
         }
+        Row(Modifier.fillMaxWidth().padding(start = textPadding), verticalAlignment = Alignment.CenterVertically) {
+            SourceMeta(row, nowMillis, Modifier.weight(1f), stacked = multi)
+            if (metrics.compact) {
+                if (row.isSaved) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_bookmark),
+                        contentDescription = stringResource(R.string.action_unsave),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+                moreButton()
+            } else {
+                bookmarkButton()
+                moreButton()
+            }
+        }
+    }
+}
+
+@Composable
+private fun CardImage(url: String?, imageLoader: ImageLoader, modifier: Modifier) {
+    val placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant)
+    Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant).testTag("card_image")) {
+        AsyncImage(
+            model = url,
+            contentDescription = null,
+            imageLoader = imageLoader,
+            placeholder = placeholder,
+            error = placeholder,
+            fallback = placeholder,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.matchParentSize(),
+        )
     }
 }
 
@@ -247,14 +324,36 @@ private fun ArticleTitle(row: ArticleRow, fontSize: Int, lineHeight: Int, maxLin
 
 @Composable
 private fun MetaText(row: ArticleRow, nowMillis: Long, modifier: Modifier) {
-    Text(
-        text = metaLine(row, nowMillis),
-        style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier,
-    )
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        SourceIcon(row.feedId, row.feedName, size = 16.dp)
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = metaLine(row, nowMillis),
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+    }
+}
+
+/** Source icon, then the name over the time (several columns) or "name · time" on one line (single column). */
+@Composable
+private fun SourceMeta(row: ArticleRow, nowMillis: Long, modifier: Modifier, stacked: Boolean) {
+    if (!stacked) {
+        MetaText(row, nowMillis, modifier)
+        return
+    }
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        SourceIcon(row.feedId, row.feedName, size = 20.dp)
+        Spacer(Modifier.width(6.dp))
+        Column(Modifier.weight(1f)) {
+            val style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp, lineHeight = 15.sp)
+            Text(sourceName(row), style = style, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(timeText(row, nowMillis), style = style, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
 }
 
 @Composable
@@ -285,11 +384,12 @@ private fun Thumbnail(url: String?, size: Dp, imageLoader: ImageLoader, bottomPa
 }
 
 @Composable
-private fun metaLine(row: ArticleRow, nowMillis: Long): String {
+private fun sourceName(row: ArticleRow): String = row.feedName?.takeIf { it.isNotBlank() } ?: stringResource(R.string.unknown_source)
+
+@Composable
+private fun timeText(row: ArticleRow, nowMillis: Long): String {
     val context = LocalContext.current
-    val parts = mutableListOf<String>()
-    parts += row.feedName?.takeIf { it.isNotBlank() } ?: stringResource(R.string.unknown_source)
-    parts += row.publishedAt?.let { published ->
+    val time = row.publishedAt?.let { published ->
         if (published in (nowMillis - DateUtils.DAY_IN_MILLIS)..nowMillis) {
             DateUtils.getRelativeTimeSpanString(published, nowMillis, DateUtils.MINUTE_IN_MILLIS).toString()
         } else {
@@ -300,6 +400,8 @@ private fun metaLine(row: ArticleRow, nowMillis: Long): String {
             )
         }
     } ?: stringResource(R.string.date_unknown)
-    if (!row.feedSubscribed) parts += stringResource(R.string.unsubscribed_label)
-    return parts.joinToString(" · ")
+    return if (row.feedSubscribed) time else time + " · " + stringResource(R.string.unsubscribed_label)
 }
+
+@Composable
+private fun metaLine(row: ArticleRow, nowMillis: Long): String = sourceName(row) + " · " + timeText(row, nowMillis)

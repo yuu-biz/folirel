@@ -166,7 +166,7 @@ class FeedFetcher(
 }
 
 /** Enqueues the call and runs [block] on the response; cancelling the coroutine cancels the call. */
-private suspend fun <T> Call.await(block: (Response) -> T): T = suspendCancellableCoroutine { cont ->
+internal suspend fun <T> Call.await(block: (Response) -> T): T = suspendCancellableCoroutine { cont ->
     cont.invokeOnCancellation { cancel() }
     enqueue(object : Callback {
         override fun onFailure(call: Call, e: IOException) {

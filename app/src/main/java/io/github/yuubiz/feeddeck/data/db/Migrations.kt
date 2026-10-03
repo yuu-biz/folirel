@@ -32,4 +32,24 @@ object Migrations {
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_feed_https_migrations_httpsUrl` ON `feed_https_migrations` (`httpsUrl`)")
         }
     }
+
+    /** v3: per-feed source icon cache, and the record of user-approved feed URL moves. */
+    val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `feed_icons` (`feedId` TEXT NOT NULL, `declaredUrl` TEXT, `status` TEXT NOT NULL, " +
+                    "`sourceKind` TEXT, `sourceUrl` TEXT, `png` BLOB, `width` INTEGER, `height` INTEGER, `resolvedAt` INTEGER, " +
+                    "`nextAttemptAt` INTEGER NOT NULL, `failureCount` INTEGER NOT NULL, PRIMARY KEY(`feedId`), " +
+                    "FOREIGN KEY(`feedId`) REFERENCES `feeds`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+            )
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `feed_url_moves` (`id` TEXT NOT NULL, `feedId` TEXT NOT NULL, `fromUrl` TEXT NOT NULL, " +
+                    "`toUrl` TEXT NOT NULL, `movedAt` INTEGER NOT NULL, PRIMARY KEY(`id`), " +
+                    "FOREIGN KEY(`feedId`) REFERENCES `feeds`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_feed_url_moves_feedId` ON `feed_url_moves` (`feedId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_feed_url_moves_fromUrl` ON `feed_url_moves` (`fromUrl`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_feed_url_moves_toUrl` ON `feed_url_moves` (`toUrl`)")
+        }
+    }
 }

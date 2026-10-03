@@ -11,10 +11,14 @@ import io.github.yuubiz.feeddeck.backend.BackendSynchronizer
 import io.github.yuubiz.feeddeck.backend.local.FeedFetcher
 import io.github.yuubiz.feeddeck.backend.local.HttpsUpgradeChecker
 import io.github.yuubiz.feeddeck.backend.local.LocalBackend
+import io.github.yuubiz.feeddeck.backend.local.SmallResourceFetcher
+import io.github.yuubiz.feeddeck.backend.local.icon.AndroidIconDecoder
+import io.github.yuubiz.feeddeck.backend.local.icon.FeedIconResolver
 import io.github.yuubiz.feeddeck.browser.BrowserLauncher
 import io.github.yuubiz.feeddeck.data.db.AppDatabase
 import io.github.yuubiz.feeddeck.data.preferences.SettingsRepository
 import io.github.yuubiz.feeddeck.data.repository.ArticleRepository
+import io.github.yuubiz.feeddeck.data.repository.FeedIconRepository
 import io.github.yuubiz.feeddeck.data.repository.FeedStore
 import io.github.yuubiz.feeddeck.data.repository.IdGenerator
 import io.github.yuubiz.feeddeck.data.repository.RetentionManager
@@ -25,6 +29,7 @@ import io.github.yuubiz.feeddeck.network.AndroidNetworkStatus
 import io.github.yuubiz.feeddeck.network.HttpClients
 import io.github.yuubiz.feeddeck.network.NetworkGuard
 import io.github.yuubiz.feeddeck.sync.AutoRefreshPolicy
+import io.github.yuubiz.feeddeck.sync.FeedIconCoordinator
 import io.github.yuubiz.feeddeck.sync.HttpsUpgradeCoordinator
 import io.github.yuubiz.feeddeck.sync.RefreshCoordinator
 import io.github.yuubiz.feeddeck.sync.RefreshScheduler
@@ -78,6 +83,24 @@ class AppContainer(context: Context) {
         allowHttp = { allowHttp.get() },
     )
 
+    /**
+     * Source icons (UX-ICON): looked up once per feed in the background, through the same network client (HTTP
+     * opt-in, address policy, TLS verification). Only while images are on and the same network rule as automatic
+     * refresh allows it; a failed lookup never affects a feed's refresh result.
+     */
+    val feedIcons = FeedIconRepository(database, clock)
+    val iconCoordinator = FeedIconCoordinator(
+        resolver = FeedIconResolver(SmallResourceFetcher(feedHttpClient), AndroidIconDecoder()),
+        repository = feedIcons,
+        accountId = { subscriptions.ensureLocalAccount() },
+        enabled = {
+            val s = settings.current()
+            val n = networkStatus.current()
+            s.showImages && s.onboardingDone && n.connected && (!s.unmeteredOnly || !n.metered)
+        },
+        scope = appScope,
+    )
+
     val refresh = RefreshCoordinator(
         backend = backend,
         accountId = { subscriptions.ensureLocalAccount() },
@@ -88,6 +111,7 @@ class AppContainer(context: Context) {
         afterRefresh = {
             val limit = settings.current().retentionLimit
             if (limit > 0) retention.apply(subscriptions.ensureLocalAccount(), limit)
+            iconCoordinator.request()
         },
     )
 
@@ -134,9 +158,16 @@ class AppContainer(context: Context) {
 
     init {
         appScope.launch {
+            var lastIconInputs: Pair<Boolean, Boolean>? = null
             settings.settings.collect { s ->
                 allowHttp.set(s.allowHttp)
                 scheduler.apply(s)
+                // Images switched on, or HTTP allowed: icon lookups that could not run before may run now.
+                val inputs = s.showImages to s.allowHttp
+                if (inputs != lastIconInputs) {
+                    lastIconInputs = inputs
+                    iconCoordinator.request()
+                }
             }
         }
     }
