@@ -99,6 +99,54 @@ class PagerAndCardTest {
         assertEquals(ArticleScope.All, lastScope())
     }
 
+
+    /** The tabs follow the finger: the tab of the page that is more than half in view is selected before the page settles. */
+    @Test
+    fun tabFollowsTheDragBeforeThePageHasSettled() {
+        launch()
+        waitForTag("category_pager")
+        compose.onNodeWithTag("tab_all").assertIsSelected()
+        compose.onNodeWithTag("category_pager").performTouchInput {
+            down(center)
+            moveBy(androidx.compose.ui.geometry.Offset(-width * 0.7f, 0f))
+        }
+        compose.waitForIdle()
+        // Still dragging: nothing has settled or been saved, yet the tab already moved.
+        compose.onNodeWithTag("tab_category:$alpha").assertIsSelected()
+        assertEquals(ArticleScope.All, lastScope())
+        compose.onNodeWithTag("category_pager").performTouchInput { up() }
+        waitForScope(ArticleScope.Category(alpha))
+        compose.onNodeWithTag("tab_category:$alpha").assertIsSelected()
+    }
+
+    /** Back to the top from far down: by the arrow button and by tapping the selected tab again. Nothing is marked read. */
+    @Test
+    fun arrowButtonAndSelectedTabTakeTheListBackToTheTop() {
+        launch()
+        waitForTag("category_pager")
+        val first = seeded.getValue(alpha).first()
+        compose.onNodeWithTag("tab_category:$alpha").performClick()
+        waitForScope(ArticleScope.Category(alpha))
+        val a = ArticleScope.Category(alpha)
+        waitInPage(a, "article_list")
+        // Near the top there is no button.
+        assertEquals(0, compose.onAllNodes(hasTestTag("scroll_to_top")).fetchSemanticsNodes().size)
+        inPage(a, "article_list").performScrollToIndex(30)
+        waitInPage(a, "scroll_to_top")
+        inPage(a, "scroll_to_top").performClick()
+        waitInPage(a, "article_$first")
+        inPage(a, "article_$first").assertIsDisplayed()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("scroll_to_top")).fetchSemanticsNodes().isEmpty() }
+
+        inPage(a, "article_list").performScrollToIndex(30)
+        waitInPage(a, "scroll_to_top")
+        compose.onNodeWithTag("tab_category:$alpha").performClick() // the selected tab again
+        waitInPage(a, "article_$first")
+        inPage(a, "article_$first").assertIsDisplayed()
+        assertEquals(ArticleScope.Category(alpha), lastScope())
+        assertTrue(seeded.values.flatten().none { TestData.state(it).isRead })
+    }
+
     /** N01 + N24: each category keeps its own position across swipes and tab switches; nothing is marked read. */
     @Test
     fun eachCategoryKeepsItsOwnPositionAndNothingIsMarkedRead() {

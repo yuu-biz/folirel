@@ -42,7 +42,7 @@ object HtmlLinks {
         val utf16 = head.size >= 2 && ((head[0] == 0xFE.toByte() && head[1] == 0xFF.toByte()) || (head[0] == 0xFF.toByte() && head[1] == 0xFE.toByte()))
         val text = if (utf16) String(head, Charsets.UTF_16) else String(head, Charsets.ISO_8859_1)
         var i = 0
-        while (i < text.length && (text[i].isWhitespace() || text[i] == '﻿' || (!utf16 && i < 3 && text[i].code in BOM_BYTES))) i++
+        while (i < text.length && (text[i].isWhitespace() || text[i].code == 0xFEFF || (!utf16 && i < 3 && text[i].code in BOM_BYTES))) i++
         while (i < text.length) {
             when {
                 text[i].isWhitespace() -> i++

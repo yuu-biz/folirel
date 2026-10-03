@@ -208,6 +208,7 @@
     <string name="summary_empty">No summary.</string>
     <string name="summary_no_url_note">This article has no original URL. Only the fetched summary is shown.</string>
     <string name="tab_all">All</string>
+    <string name="scroll_to_top">Back to top</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_light">Light</string>
     <string name="theme_system">System default</string>

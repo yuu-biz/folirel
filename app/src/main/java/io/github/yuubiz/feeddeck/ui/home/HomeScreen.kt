@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
@@ -55,10 +56,12 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -70,6 +73,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -91,7 +96,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.ImageLoader
 import io.github.yuubiz.feeddeck.R
@@ -147,6 +154,13 @@ fun HomeScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
+    // One pager state for the tabs and the pages: the tabs follow the finger instead of waiting for the page to settle.
+    // Created once the selected scope is among the pages, so a saved category opens on its own page (not by sliding there).
+    val pagerState = key(pages.contains(selection.scope)) {
+        rememberPagerState(initialPage = pages.indexOf(selection.scope).coerceAtLeast(0)) { pages.size }
+    }
+    // Bumped to send the list on screen back to its top (tapping the selected tab); lists compare it with the value they started with.
+    var scrollToTopTick by remember { mutableIntStateOf(0) }
     val snackbar = remember { SnackbarHostState() }
 
     var markAllRequest by remember { mutableStateOf<MarkAllReadRequest?>(null) }
@@ -317,7 +331,9 @@ fun HomeScreen(
         ) { padding ->
             Column(Modifier.padding(padding).fillMaxSize()) {
                 val pagerMode = selection.scope !is ArticleScope.Feed && structure.subscribedFeeds.isNotEmpty()
-                if (pagerMode) ScopeTabs(structure, pages, selection.scope, vm::selectScope)
+                if (pagerMode) {
+                    ScopeTabs(structure, pages, selection.scope, pagerState, vm::selectScope) { scrollToTopTick++ }
+                }
                 FilterBar(selection, vm::selectFilter, vm::toggleSort)
                 StatusBar(
                     refresh = refresh,
@@ -343,6 +359,7 @@ fun HomeScreen(
                             imageLoader = imageLoader,
                             actions = actions,
                             newIds = newIds,
+                            scrollToTopTick = scrollToTopTick,
                             refreshing = refresh.runningFor(HomeViewModel.scopeOf(pageScope)) != null,
                             offline = !network.connected,
                             onRefresh = { requestRefresh() },
@@ -351,7 +368,7 @@ fun HomeScreen(
                     when {
                         !structure.loaded -> Unit
                         structure.feeds.isEmpty() -> NoSubscriptions(nav.importOpml, nav.addFeed)
-                        pagerMode -> CategoryPager(vm, pages, selection.scope, page)
+                        pagerMode -> CategoryPager(vm, pages, selection.scope, pagerState, page)
                         else -> page(selection.scope, true)
                     }
                 }
@@ -436,8 +453,13 @@ private fun HttpOpenDialog(onOpen: (dontAskAgain: Boolean) -> Unit, onDismiss: (
  * Not circular. Only the visible page (and its neighbour while swiping) is composed and queries the DB.
  */
 @Composable
-private fun CategoryPager(vm: HomeViewModel, pages: List<ArticleScope>, selected: ArticleScope, page: @Composable (ArticleScope, Boolean) -> Unit) {
-    val pagerState = rememberPagerState(initialPage = pages.indexOf(selected).coerceAtLeast(0)) { pages.size }
+private fun CategoryPager(
+    vm: HomeViewModel,
+    pages: List<ArticleScope>,
+    selected: ArticleScope,
+    pagerState: PagerState,
+    page: @Composable (ArticleScope, Boolean) -> Unit,
+) {
     val selectedIndex = pages.indexOf(selected)
     LaunchedEffect(selectedIndex, pages) {
         if (selectedIndex >= 0 && pagerState.currentPage != selectedIndex && !pagerState.isScrollInProgress) {
@@ -471,6 +493,7 @@ private fun ScopePage(
     imageLoader: ImageLoader,
     actions: ArticleActions,
     newIds: Set<String>,
+    scrollToTopTick: Int,
     refreshing: Boolean,
     offline: Boolean,
     onRefresh: () -> Unit,
@@ -493,12 +516,16 @@ private fun ScopePage(
                 newIds = newIds,
                 newestFirst = selection.sort == SortOrder.NEWEST,
                 isCurrent = isCurrent,
+                scrollToTopTick = scrollToTopTick,
             )
         }
     }
 }
 
 /** Scroll position of the article list, the same operations for the column list and the card grid. */
+/** Items scrolled past before the "back to top" button appears. */
+private const val SCROLL_TOP_BUTTON_AFTER = 6
+
 private interface ScrollHandle {
     /** The underlying Compose state object; effects restart when it changes. */
     val owner: Any
@@ -506,6 +533,9 @@ private interface ScrollHandle {
     val firstOffset: Int
     val visibleKeys: List<Any>
     suspend fun scrollTo(index: Int)
+
+    /** Back to the first article, animated. */
+    suspend fun animateToTop()
 }
 
 private class ListScroll(private val s: LazyListState) : ScrollHandle {
@@ -514,6 +544,7 @@ private class ListScroll(private val s: LazyListState) : ScrollHandle {
     override val firstOffset: Int get() = s.firstVisibleItemScrollOffset
     override val visibleKeys: List<Any> get() = s.layoutInfo.visibleItemsInfo.map { it.key }
     override suspend fun scrollTo(index: Int) = s.scrollToItem(index)
+    override suspend fun animateToTop() = s.animateScrollToItem(0)
 }
 
 private class GridScroll(private val s: LazyGridState) : ScrollHandle {
@@ -522,6 +553,7 @@ private class GridScroll(private val s: LazyGridState) : ScrollHandle {
     override val firstOffset: Int get() = s.firstVisibleItemScrollOffset
     override val visibleKeys: List<Any> get() = s.layoutInfo.visibleItemsInfo.map { it.key }
     override suspend fun scrollTo(index: Int) = s.scrollToItem(index)
+    override suspend fun animateToTop() = s.animateScrollToItem(0)
 }
 
 @Composable
@@ -537,6 +569,7 @@ private fun ArticleList(
     newIds: Set<String>,
     newestFirst: Boolean,
     isCurrent: Boolean,
+    scrollToTopTick: Int,
 ) {
     val items = state.items
     val useGrid = mode == ListMode.CARD
@@ -577,6 +610,13 @@ private fun ArticleList(
         // Both sides are observed: a marker added later for an article that is already shown is consumed too (V3-R03).
         NewArticleSeen.visibleNew({ currentScroll.visibleKeys }, { currentNew }).collect { vm.markNewSeen(it) }
     }
+    // "Back to top": the selected tab was tapped again (only the list on screen follows, and only a tap made after this list appeared).
+    val firstTick = remember { scrollToTopTick }
+    LaunchedEffect(scrollToTopTick) {
+        if (isCurrent && scrollToTopTick != firstTick) currentScroll.animateToTop()
+    }
+    // Far enough down that the way back is long; the button is for that case only.
+    val farDown by remember(scroll.owner) { derivedStateOf { currentScroll.firstIndex > SCROLL_TOP_BUTTON_AFTER } }
     // The banner counts only the new articles this list shows and jumps to the first of them in the current order.
     val firstNewIndex by remember(scroll.owner) { derivedStateOf { currentItems.indexOfFirst { it.id in currentNew } } }
     val newCount = remember(items, newIds) { items.count { it.id in newIds } }
@@ -650,11 +690,27 @@ private fun ArticleList(
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp).testTag("new_articles_banner"),
             ) { Text(pluralStringResource(R.plurals.new_articles_banner, newCount, newCount)) }
         }
+        if (farDown) {
+            SmallFloatingActionButton(
+                onClick = { scope.launch { currentScroll.animateToTop() } },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).testTag("scroll_to_top"),
+                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.92f),
+            ) {
+                Icon(painterResource(R.drawable.ic_arrow_upward), contentDescription = stringResource(R.string.scroll_to_top))
+            }
+        }
     }
 }
 
 @Composable
-private fun ScopeTabs(structure: Structure, pages: List<ArticleScope>, current: ArticleScope, onSelect: (ArticleScope) -> Unit) {
+private fun ScopeTabs(
+    structure: Structure,
+    pages: List<ArticleScope>,
+    current: ArticleScope,
+    pagerState: PagerState,
+    onSelect: (ArticleScope) -> Unit,
+    onReselect: () -> Unit,
+) {
     val all = stringResource(R.string.tab_all)
     val uncategorized = stringResource(R.string.scope_uncategorized)
     val tabs = pages.map { scope ->
@@ -665,14 +721,49 @@ private fun ScopeTabs(structure: Structure, pages: List<ArticleScope>, current: 
             is ArticleScope.Feed -> ""
         }
     }
-    val selected = tabs.indexOfFirst { it.first == current }
-    PrimaryScrollableTabRow(selectedTabIndex = selected.coerceAtLeast(0), edgePadding = 8.dp, minTabWidth = 48.dp) {
-        tabs.forEachIndexed { index, (scope, label) ->
+    // The highlighted tab and the indicator follow the pager while it is dragged or animated; the selection (which
+    // is saved) only follows once the page has settled, so it is not what the tabs wait for.
+    val selected = pagerState.currentPage.coerceIn(0, (tabs.size - 1).coerceAtLeast(0))
+    val scope = rememberCoroutineScope()
+    PrimaryScrollableTabRow(
+        selectedTabIndex = selected,
+        edgePadding = 8.dp,
+        minTabWidth = 48.dp,
+        indicator = {
+            TabRowDefaults.PrimaryIndicator(
+                Modifier.tabIndicatorLayout { measurable, constraints, tabPositions ->
+                    val position = (pagerState.currentPage + pagerState.currentPageOffsetFraction).coerceIn(0f, tabPositions.lastIndex.toFloat())
+                    val from = position.toInt().coerceIn(0, tabPositions.lastIndex)
+                    val to = (from + 1).coerceAtMost(tabPositions.lastIndex)
+                    val fraction = (position - from).coerceIn(0f, 1f)
+                    val a = tabPositions[from]
+                    val b = tabPositions[to]
+                    fun mix(x: Float, y: Float) = x + (y - x) * fraction
+                    val width = mix(a.contentWidth.toPx(), b.contentWidth.toPx()).roundToInt()
+                    val center = mix((a.left + a.width / 2).toPx(), (b.left + b.width / 2).toPx())
+                    val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+                    layout(constraints.maxWidth, placeable.height) {
+                        placeable.placeRelative((center - width / 2f).roundToInt(), 0)
+                    }
+                },
+                width = Dp.Unspecified,
+            )
+        },
+    ) {
+        tabs.forEachIndexed { index, (tabScope, label) ->
             Tab(
                 selected = index == selected,
-                onClick = { onSelect(scope) },
+                onClick = {
+                    if (index == selected) {
+                        onReselect()
+                    } else {
+                        // Start moving the page at once; the selection catches up when the page has settled.
+                        scope.launch { pagerState.animateScrollToPage(index) }
+                        onSelect(tabScope)
+                    }
+                },
                 text = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                modifier = Modifier.heightIn(min = 48.dp).testTag("tab_${scope.encode()}"),
+                modifier = Modifier.heightIn(min = 48.dp).testTag("tab_${tabScope.encode()}"),
             )
         }
     }

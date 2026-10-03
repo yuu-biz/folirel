@@ -207,6 +207,7 @@
     <string name="summary_empty">概要はありません。</string>
     <string name="summary_no_url_note">この記事には元記事のURLがありません。取得した概要のみを表示しています。</string>
     <string name="tab_all">すべて</string>
+    <string name="scroll_to_top">先頭へ戻る</string>
     <string name="theme_dark">ダーク</string>
     <string name="theme_light">ライト</string>
     <string name="theme_system">システムに従う</string>
