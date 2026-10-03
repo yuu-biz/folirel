@@ -5,7 +5,7 @@ import java.nio.charset.Charset
 /**
  * Decodes an XML byte stream to text before parsing, so the parser cannot re-detect the encoding.
  *
- * Precedence (docs/04 section 1, V1 rule, deliberately differs from RFC 7303):
+ * Precedence (docs/fetch-and-security.md section 1, V1 rule, deliberately differs from RFC 7303):
  * BOM → XML declaration → HTTP Content-Type charset → UTF-8.
  * Unknown/unsupported declared names fall through to the next source.
  * Compatibility rule: Shift_JIS labels decode with windows-31j (CP932) when available, because Japanese

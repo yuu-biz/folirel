@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 r"""Tiny adb + uiautomator driver for manual emulator checks (development helper, not used by the app or CI).
 
-Run with `python -X utf8 tools/adb_ui.py ...`. Uses %LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe.
+Run with `python -X utf8 tools/adb_ui.py ...`. Uses adb from $ANDROID_HOME (or $ANDROID_SDK_ROOT), otherwise from PATH.
 Note: `type` uses `adb shell input text`, which supports ASCII only.
 
 usage: adb_ui.py [-s SERIAL] dump | texts | tap TEXT [--exact] [--desc] [--index N] | tapxy X Y | type TEXT |
@@ -9,12 +9,23 @@ usage: adb_ui.py [-s SERIAL] dump | texts | tap TEXT [--exact] [--desc] [--index
 """
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
 import xml.etree.ElementTree as ET
 
-ADB = os.path.expandvars(r"%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe")
+def find_adb():
+    """adb from ANDROID_HOME / ANDROID_SDK_ROOT if present there, otherwise from PATH."""
+    exe = "adb.exe" if os.name == "nt" else "adb"
+    for var in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
+        root = os.environ.get(var)
+        if root and os.path.exists(os.path.join(root, "platform-tools", exe)):
+            return os.path.join(root, "platform-tools", exe)
+    return shutil.which("adb") or exe
+
+
+ADB = find_adb()
 args = sys.argv[1:]
 serial = None
 if args and args[0] == "-s":

@@ -3,7 +3,7 @@ package io.github.yuubiz.feeddeck.backend
 import io.github.yuubiz.feeddeck.model.FetchError
 
 /**
- * Account/scope level refresh contract (docs/05 section 4). V1 has exactly one implementation (LOCAL).
+ * Account/scope level refresh contract (docs/architecture.md section 4). V1 has exactly one implementation (LOCAL).
  * The UI never talks to a backend directly; it goes through RefreshCoordinator and repositories.
  */
 interface BackendSynchronizer {
@@ -13,7 +13,7 @@ interface BackendSynchronizer {
     /**
      * Refreshes the feeds in [scope] for one request. The result describes this request's own target feeds: a feed
      * fetched for another overlapping request counts only if this request waited for that same fetch.
-     * [force] revalidates without the stored HTTP validators (docs/FeedDeck_Next_Iteration_Mobile_v2.md SYNC-03).
+     * [force] revalidates without the stored HTTP validators.
      */
     suspend fun refresh(
         accountId: String,

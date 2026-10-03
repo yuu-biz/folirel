@@ -43,8 +43,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Fetch coverage and diagnostics (docs/FeedDeck_Next_Iteration_Mobile_v2.md §5.1 S01, S02, S07–S16 and §5
- * N12–N17). Each test checks the HTTP calls the local server actually received and what the DB holds.
+ * Fetch coverage and diagnostics (scenarios S01, S02, S07–S16 and N12–N17 in docs/testing.md).
+ * Each test checks the HTTP calls the local server actually received and what the DB holds.
  */
 @RunWith(AndroidJUnit4::class)
 class FetchCoverageTest {

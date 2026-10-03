@@ -20,6 +20,7 @@ Its own tests: python -X utf8 -m unittest tools.test_layout_upgrade_check
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -34,6 +35,16 @@ SETTINGS = "files/datastore/settings.preferences_pb"
 EXPECTED_NEW_NAME = {"MAGAZINE": "LIST", "LIST": "COMPACT_LIST", "CARD": "MAGAZINE"}
 
 
+def find_adb():
+    """adb from ANDROID_HOME / ANDROID_SDK_ROOT if present there, otherwise from PATH."""
+    exe = "adb.exe" if os.name == "nt" else "adb"
+    for var in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
+        root = os.environ.get(var)
+        if root and os.path.exists(os.path.join(root, "platform-tools", exe)):
+            return os.path.join(root, "platform-tools", exe)
+    return shutil.which("adb") or exe
+
+
 class AdbError(Exception):
     """An adb command did not succeed. The check must not go on as if it had."""
 
@@ -41,7 +52,7 @@ class AdbError(Exception):
 class Adb:
     def __init__(self, serial=None, adb_path=None, runner=subprocess.run):
         self.serial = serial
-        self.adb_path = adb_path or os.path.expandvars(r"%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe")
+        self.adb_path = adb_path or find_adb()
         self.runner = runner
 
     def run(self, *args, binary=False):

@@ -180,7 +180,7 @@ class HomeViewModel(
     }
 
     /**
-     * Position key. List mode is deliberately not part of it (docs/08 D13): switching Magazine/List keeps the
+     * Position key. List mode is deliberately not part of it: switching Magazine/List keeps the
      * same first visible article instead of starting a separate position.
      */
     private fun listKey(spec: ArticleQuerySpec): String =
@@ -195,7 +195,7 @@ class HomeViewModel(
         savedState[KEY_SEARCH] = updated.search
     }
 
-    /** Scope change keeps the current filter (docs/02 S10). */
+    /** Scope change keeps the current filter (docs/product-and-ux.md S10). */
     fun selectScope(scope: ArticleScope) {
         updateSelection { it.copy(scope = scope) }
         viewModelScope.launch { settingsRepository.setLastScope(scope) }

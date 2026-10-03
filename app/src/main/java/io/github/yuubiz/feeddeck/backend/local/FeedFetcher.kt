@@ -48,7 +48,7 @@ sealed interface FetchOutcome {
     ) : FetchOutcome
 }
 
-/** GET only. Conditional requests, status classification and body limits (docs/04 section 4). */
+/** GET only. Conditional requests, status classification and body limits (docs/fetch-and-security.md section 4). */
 class FeedFetcher(
     private val client: OkHttpClient,
     private val clock: Clock,

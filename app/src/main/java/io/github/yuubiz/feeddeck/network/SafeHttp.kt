@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit
 class BlockedRequestException(val error: FetchError, message: String) : IOException(message)
 
 /**
- * The single network policy for feeds and images (docs/04 section 6):
+ * The single network policy for feeds and images (docs/fetch-and-security.md section 6):
  * - only http/https, no userinfo; http only after the user's opt-in
  * - every resolved address (and every IP literal) must pass [addressPolicy]; OkHttp connects to exactly the
  *   addresses returned by [dns], so the validated answer is the one used for the connection

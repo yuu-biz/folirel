@@ -41,7 +41,7 @@ data class OpmlDocument(
 )
 
 /**
- * OPML 1.x/2.0 `body/outline` reader (docs/03 section 4). The whole file is rejected on DOCTYPE, limit
+ * OPML 1.x/2.0 `body/outline` reader (docs/data-and-import.md section 4). The whole file is rejected on DOCTYPE, limit
  * violations or malformed XML. Nothing referenced by the file (include/link targets) is fetched.
  */
 object OpmlParser {

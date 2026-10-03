@@ -34,7 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
         const val VERSION = 3
         const val NAME = "feeddeck.db"
 
-        /** Explicit migrations only. Destructive fallback is forbidden (docs/03 section 6). */
+        /** Explicit migrations only. Destructive fallback is forbidden (docs/data-and-import.md section 6). */
         val MIGRATIONS: Array<Migration> = arrayOf(Migrations.MIGRATION_1_2, Migrations.MIGRATION_2_3)
 
         /** Database files on disk (main, WAL, shared memory) for the size display. */

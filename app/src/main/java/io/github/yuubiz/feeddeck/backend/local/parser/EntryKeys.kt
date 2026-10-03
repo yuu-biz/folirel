@@ -3,7 +3,7 @@ package io.github.yuubiz.feeddeck.backend.local.parser
 import java.security.MessageDigest
 
 /**
- * Entry identity (docs/03 section 3):
+ * Entry identity (docs/data-and-import.md section 3):
  * 1. `id:` + trimmed opaque guid / atom:id / rdf:about (never URL-normalized)
  * 2. `url:` + normalized link
  * 3. `fallback:` + SHA-256 of the compact JSON array [title, publishedAtOrNull, author, summary]

@@ -15,7 +15,7 @@ data class NormalizedFeed(
 )
 
 data class NormalizedEntry(
-    /** `id:` / `url:` / `fallback:` prefixed key, unique per feed (docs/03 section 3). */
+    /** `id:` / `url:` / `fallback:` prefixed key, unique per feed (docs/data-and-import.md section 3). */
     val entryKey: String,
     /** Empty when the feed has no title; the UI shows a placeholder. */
     val title: String,

@@ -1,6 +1,6 @@
 package io.github.yuubiz.feeddeck.model
 
-/** What part of the subscriptions the list shows (docs/02 S10). Independent from [ReadFilter]. */
+/** What part of the subscriptions the list shows (docs/product-and-ux.md S10). Independent from [ReadFilter]. */
 sealed interface ArticleScope {
     data object All : ArticleScope
     data object Uncategorized : ArticleScope

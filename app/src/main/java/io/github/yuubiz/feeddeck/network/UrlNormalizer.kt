@@ -4,7 +4,7 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
- * URL identity rules (docs/03 section 2).
+ * URL identity rules (docs/data-and-import.md section 2).
  *
  * Parsing is delegated to OkHttp's [HttpUrl]: scheme/host lower-cased, IDN per library rules,
  * default port omitted, empty path becomes "/". The fragment is removed. Path case, trailing slash,

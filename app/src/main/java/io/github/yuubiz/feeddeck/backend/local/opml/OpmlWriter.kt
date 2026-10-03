@@ -1,7 +1,7 @@
 package io.github.yuubiz.feeddeck.backend.local.opml
 
 /**
- * OPML 2.0 export (docs/03 section 5): subscribed feeds with title/text/xmlUrl/htmlUrl and category hierarchy.
+ * OPML 2.0 export (docs/data-and-import.md section 5): subscribed feeds with title/text/xmlUrl/htmlUrl and category hierarchy.
  * A feed in several categories is repeated under each; uncategorized feeds go directly under body.
  * No articles, reading state, settings or images are written.
  */

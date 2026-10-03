@@ -49,7 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 private val Context.settingsDataStore by preferencesDataStore(name = "settings", produceMigrations = { SettingsMigrations.all })
 
-/** Manual dependency container (docs/05: no DI framework). One instance per process. */
+/** Manual dependency container (docs/architecture.md: no DI framework). One instance per process. */
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
     val clock: Clock = Clock.systemUTC()

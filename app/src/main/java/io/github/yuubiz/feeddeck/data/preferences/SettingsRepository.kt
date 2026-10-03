@@ -48,7 +48,7 @@ data class AppSettings(
     val lastScope: ArticleScope = ArticleScope.All,
     val lastFilter: ReadFilter = ReadFilter.ALL,
     val sortOrder: SortOrder = SortOrder.NEWEST,
-    /** Last refresh attempt of any kind (docs/04 §5: the startup rule is based on the last attempt). */
+    /** Last refresh attempt of any kind (docs/fetch-and-security.md §5: the startup rule is based on the last attempt). */
     val lastRefreshAttemptAt: Long = 0,
     /** Articles to keep on the device (0 = no limit). Unread and saved articles are never removed. */
     val retentionLimit: Int = 0,

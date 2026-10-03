@@ -5,7 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-/** docs/03 section 1. All timestamps are UTC epoch milliseconds. */
+/** docs/data-and-import.md section 1. All timestamps are UTC epoch milliseconds. */
 @Entity(tableName = "accounts")
 data class AccountEntity(
     @PrimaryKey val id: String,
@@ -54,7 +54,7 @@ data class FeedFetchStateEntity(
 )
 
 /**
- * Per-feed fetch diagnostics (v2, docs/FeedDeck_Next_Iteration_Mobile_v2.md DATA-01/SYNC-04). Diagnostic only:
+ * Per-feed fetch diagnostics (v2). Diagnostic only:
  * refresh scheduling never depends on it except [pendingSince] for "retry unfinished".
  * The "last request" fields change on every request that targeted the feed; the "attempt" fields only when an
  * HTTP request was actually made; the "body" fields only after a 200 was parsed and applied.

@@ -23,7 +23,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import java.time.Clock
 
-/** Diff of an OPML document against the current DB, shown before anything is written (docs/02 S30). */
+/** Diff of an OPML document against the current DB, shown before anything is written (docs/product-and-ux.md S30). */
 data class ImportPreview(
     val document: OpmlDocument,
     val totalUniqueFeeds: Int,

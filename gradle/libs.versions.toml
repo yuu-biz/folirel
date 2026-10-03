@@ -1,5 +1,5 @@
 [versions]
-# Fixed versions. Verified against Google Maven / Maven Central on 2026-10-03 (see docs/BUILD_ENV.md).
+# Fixed versions (see docs/building.md).
 agp = "9.4.1"
 kotlin = "2.4.20"
 ksp = "2.3.12"

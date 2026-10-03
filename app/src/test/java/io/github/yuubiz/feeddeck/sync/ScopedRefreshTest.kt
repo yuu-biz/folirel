@@ -25,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * S03–S06 (docs/FeedDeck_Next_Iteration_Mobile_v2.md §5.1): a narrow manual refresh issued while a refresh of
+ * S03–S06 (docs/testing.md): a narrow manual refresh issued while a refresh of
  * everything is running must act on its own target. Every assertion is on the HTTP calls MockWebServer
  * actually received and on the DB, not on a mocked report.
  */

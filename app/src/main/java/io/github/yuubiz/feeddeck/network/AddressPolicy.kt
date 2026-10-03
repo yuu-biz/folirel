@@ -9,7 +9,7 @@ fun interface AddressPolicy {
     fun isAllowed(address: InetAddress): Boolean
 
     companion object {
-        /** Public unicast internet addresses only (docs/04 section 6). */
+        /** Public unicast internet addresses only (docs/fetch-and-security.md section 6). */
         val PUBLIC_ONLY = AddressPolicy { PublicAddresses.isPublic(it) }
     }
 }
