@@ -42,6 +42,9 @@ sealed interface ApplyResult {
 
     /** Feed was unsubscribed/paused/removed while the fetch was running; nothing was written. */
     data object SkippedInactive : ApplyResult
+
+    /** The fetch URL changed (approved move, HTTPS migration) while the answer was on its way; nothing was written. */
+    data object Superseded : ApplyResult
 }
 
 /**
@@ -92,6 +95,11 @@ class FeedStore(
     /**
      * Applies every entry of one parsed response (no count or date cut-off). Existing entries are updated,
      * new ones inserted as unread; reading state of existing articles is never touched.
+     *
+     * [fetchedFrom]: the fetch URL this request was started with. An answer is applied only while the feed is still
+     * fetched from that URL; after a move to another address it belongs to the old address and is dropped as a whole
+     * (a redirect target the old address announces included). A normal redirect inside the request does not matter:
+     * only the start URL is compared. null = content not tied to a request (fixtures, import of known content).
      */
     suspend fun applySuccess(
         feedId: String,
@@ -99,11 +107,13 @@ class FeedStore(
         meta: FetchMetadata,
         body: BodyStats = BodyStats(0, feed.rawEntryCount),
         attempt: AttemptInfo = AttemptInfo(200, false),
+        fetchedFrom: String? = null,
     ): ApplyResult = db.withTransaction {
         val now = clock.millis()
         val current = subscriptions.feed(feedId)
         // Re-check right before applying: an unsubscribe/pause during the fetch wins.
         if (current == null || !current.isSubscribed || current.isPaused) return@withTransaction ApplyResult.SkippedInactive
+        if (fetchedFrom != null && current.fetchUrl != fetchedFrom) return@withTransaction ApplyResult.Superseded
         subscriptions.updateFeedMetadata(feedId, feed.title ?: current.feedTitle, feed.siteUrl ?: current.siteUrl)
         // Only the icon URL the feed declares is recorded here; looking it up is the icon coordinator's job.
         icons.insertIgnore(FeedIconEntity(feedId = feedId, declaredUrl = feed.iconUrl, status = IconStatus.PENDING.name))
@@ -184,7 +194,8 @@ class FeedStore(
      * 304 to a conditional request: content unchanged, only the success time moves. The last body statistics
      * (entry counts) are kept as they were; a 304 never turns them into zero.
      */
-    suspend fun recordNotModified(feedId: String) = db.withTransaction {
+    suspend fun recordNotModified(feedId: String, fetchedFrom: String? = null): Boolean = db.withTransaction {
+        if (isSuperseded(feedId, fetchedFrom)) return@withTransaction false
         val now = clock.millis()
         val state = fetchState(feedId)
         subscriptions.insertFetchState(FeedFetchStateEntity(feedId = feedId))
@@ -193,7 +204,12 @@ class FeedStore(
         )
         ensureDiagnostics(listOf(feedId))
         diagnostics.attemptFinished(feedId, now, 304, true, null, null, FeedResult.NOT_MODIFIED.name)
+        true
     }
+
+    /** True when the feed is no longer fetched from [fetchedFrom], the URL the finished request started with. */
+    private suspend fun isSuperseded(feedId: String, fetchedFrom: String?): Boolean =
+        fetchedFrom != null && subscriptions.feed(feedId)?.fetchUrl.let { it != null && it != fetchedFrom }
 
     /**
      * Failure keeps all previously fetched articles. Validators are kept; backoff is scheduled. A valid server
@@ -204,7 +220,9 @@ class FeedStore(
         error: FetchError,
         retryAfterMillis: Long?,
         attempt: AttemptInfo = AttemptInfo(null, false),
-    ) = db.withTransaction {
+        fetchedFrom: String? = null,
+    ): Boolean = db.withTransaction {
+        if (isSuperseded(feedId, fetchedFrom)) return@withTransaction false
         val now = clock.millis()
         val state = fetchState(feedId)
         val failures = state.failureCount + 1
@@ -222,6 +240,7 @@ class FeedStore(
         )
         ensureDiagnostics(listOf(feedId))
         diagnostics.attemptFinished(feedId, now, attempt.httpStatus, attempt.validatorsSent, error.name, attempt.errorDetail, FeedResult.FAILED.name)
+        true
     }
 
     /** The fetch finished but the feed was unsubscribed/paused meanwhile: nothing applied, no longer pending. */

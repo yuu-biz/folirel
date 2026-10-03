@@ -81,6 +81,8 @@ class LocalBackend(
         data object NotStarted : FeedOutcome
         /** Every requester stopped waiting while it was running. Nothing applied. */
         data object Cancelled : FeedOutcome
+        /** The fetch URL of the feed changed while this fetch ran; its answer belongs to the old address and was dropped. */
+        data object Superseded : FeedOutcome
     }
 
     /** One planned fetch of one feed, shared by all requests that want it while it is queued or running. */
@@ -100,6 +102,14 @@ class LocalBackend(
         var started = false
         var running: Job? = null
         var followUp: FeedJob? = null
+
+        /** The URL this job really fetches, once it has re-read the feed (a redirect may have changed it since planning). */
+        @Volatile var fetchingUrl: String? = null
+
+        /** A newer job for another address of the same feed took over; this one only finishes (or is cancelled) and applies nothing. */
+        @Volatile var superseded = false
+
+        val url: String get() = fetchingUrl ?: feed.fetchUrl
     }
 
     private val lock = Any()
@@ -211,6 +221,8 @@ class LocalBackend(
                 FeedOutcome.SkippedInactive -> FeedRefreshResult(FeedResult.INACTIVE).also { inactive++ }
                 FeedOutcome.NotStarted -> FeedRefreshResult(FeedResult.NOT_STARTED)
                 FeedOutcome.Cancelled -> FeedRefreshResult(FeedResult.CANCELLED)
+                // The fetch of the old address was replaced by one of the new address that continues.
+                FeedOutcome.Superseded -> FeedRefreshResult(FeedResult.CONTINUING)
                 null -> FeedRefreshResult(unfinished[feedId] ?: FeedResult.NOT_STARTED)
             }
         }
@@ -240,6 +252,15 @@ class LocalBackend(
         val existing = current[feed.id]
         val job = when {
             existing == null -> newJob(feed, priority, force, sortKey, null).also { current[feed.id] = it }
+            // The address changed (adopted move, HTTPS migration) while the old address is being fetched: the new
+            // address needs its own fetch. Joining would end the request with the old address's answer.
+            existing.started && existing.url != feed.fetchUrl -> {
+                existing.superseded = true
+                existing.followUp?.let { it.superseded = true; it.result.complete(FeedOutcome.Superseded) }
+                existing.followUp = null
+                existing.running?.cancel()
+                newJob(feed, priority, force, sortKey, null).also { current[feed.id] = it }
+            }
             !force || existing.force -> existing
             // A queued conditional fetch simply becomes the forced one.
             !existing.started -> existing.also { it.force = true }
@@ -273,14 +294,15 @@ class LocalBackend(
         // ATOMIC: the body always runs (and so always reaches finish()), even if cancelled before dispatch.
         job.running = workScope.launch(start = CoroutineStart.ATOMIC) {
             val outcome = try {
-                fetchAndApply(job.feed, job.force)
+                fetchAndApply(job)
             } catch (_: CancellationException) {
                 FeedOutcome.Cancelled
             } catch (_: Exception) {
                 // Never let one feed's unexpected error affect other feeds.
                 FeedOutcome.Failed(FetchError.STORAGE)
             }
-            finish(job, outcome)
+            // A job a newer one replaced never reports its own cancellation or answer as a result.
+            finish(job, if (job.superseded && outcome == FeedOutcome.Cancelled) FeedOutcome.Superseded else outcome)
         }
     }
 
@@ -343,14 +365,19 @@ class LocalBackend(
         return unfinished
     }
 
-    private suspend fun fetchAndApply(planned: FeedEntity, force: Boolean): FeedOutcome {
+    private suspend fun fetchAndApply(job: FeedJob): FeedOutcome {
+        val planned = job.feed
+        val force = job.force
         store.attemptStarted(planned.id)
-        // Re-read: a permanent redirect applied by an earlier fetch may have changed the fetch URL.
+        // Re-read: a permanent redirect or an approved move may have changed the fetch URL since planning.
         val feed = store.feed(planned.id) ?: planned
+        // Everything this fetch writes is tied to the URL it started with (see FeedStore.applySuccess).
+        val startedFrom = feed.fetchUrl
+        job.fetchingUrl = startedFrom
         val state = store.fetchState(feed.id)
         val validators = state.validatorUrl?.takeIf { state.etag != null || state.lastModified != null }
             ?.let { ConditionalValidators(it, state.etag, state.lastModified) }
-        return when (val outcome = fetcher.fetch(feed.fetchUrl, validators, state.initialized, revalidate = force)) {
+        return when (val outcome = fetcher.fetch(startedFrom, validators, state.initialized, revalidate = force)) {
             is FetchOutcome.Success -> {
                 val attempt = AttemptInfo(outcome.httpStatus, outcome.validatorsSent)
                 val parsed = try {
@@ -360,29 +387,27 @@ class LocalBackend(
                     }
                 } catch (e: FeedParseException) {
                     // Previous articles stay; validators are not updated.
-                    store.recordFailure(feed.id, e.error, null, attempt.copy(errorDetail = e.detail))
+                    if (!store.recordFailure(feed.id, e.error, null, attempt.copy(errorDetail = e.detail), startedFrom)) return FeedOutcome.Superseded
                     return FeedOutcome.Failed(e.error)
                 }
                 val meta = FetchMetadata(outcome.etag, outcome.lastModified, outcome.finalUrl, outcome.permanentRedirectUrl)
                 try {
-                    when (val applied = store.applySuccess(feed.id, parsed, meta, BodyStats(outcome.body.size.toLong(), parsed.rawEntryCount), attempt)) {
+                    when (val applied = store.applySuccess(feed.id, parsed, meta, BodyStats(outcome.body.size.toLong(), parsed.rawEntryCount), attempt, startedFrom)) {
                         is ApplyResult.Applied -> FeedOutcome.Updated(applied.newArticles, applied.updatedArticles, applied.insertedIds, !state.initialized)
                         ApplyResult.SkippedInactive -> FeedOutcome.SkippedInactive.also { store.recordInactive(feed.id) }
+                        ApplyResult.Superseded -> FeedOutcome.Superseded
                     }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
-                    store.recordFailure(feed.id, FetchError.STORAGE, null, attempt)
-                    FeedOutcome.Failed(FetchError.STORAGE)
+                    if (store.recordFailure(feed.id, FetchError.STORAGE, null, attempt, startedFrom)) FeedOutcome.Failed(FetchError.STORAGE) else FeedOutcome.Superseded
                 }
             }
             FetchOutcome.NotModified -> {
-                store.recordNotModified(feed.id)
-                FeedOutcome.NotModified
+                if (store.recordNotModified(feed.id, startedFrom)) FeedOutcome.NotModified else FeedOutcome.Superseded
             }
             is FetchOutcome.Failure -> {
-                store.recordFailure(feed.id, outcome.error, outcome.retryAfterMillis, AttemptInfo(outcome.httpStatus, false, outcome.detail))
-                FeedOutcome.Failed(outcome.error)
+                if (store.recordFailure(feed.id, outcome.error, outcome.retryAfterMillis, AttemptInfo(outcome.httpStatus, false, outcome.detail), startedFrom)) FeedOutcome.Failed(outcome.error) else FeedOutcome.Superseded
             }
         }
     }
