@@ -72,6 +72,14 @@ class ImportRepositoryTest {
         env.subscriptions.commitImport(account, doc)
         val alpha = dao.feedByUrl(account, "https://example.com/alpha.xml")!!
         env.subscriptions.renameFeed(alpha.id, "私の名前")
+        env.store.applySuccess(
+            alpha.id,
+            io.github.yuubiz.feeddeck.model.NormalizedFeed(null, null, listOf(io.github.yuubiz.feeddeck.model.NormalizedEntry("id:a", "t", null, "", null, null, null))),
+            FetchMetadata(null, null, "https://example.com/alpha.xml", null),
+        )
+        val articleId = env.db.articleDao().articlesOfFeed(alpha.id).single().id
+        env.articles.setRead(articleId, true)
+        env.articles.setSaved(articleId, true)
 
         val again = env.subscriptions.previewImport(account, doc, allowHttp = false)
         assertEquals(0, again.newFeeds)
@@ -90,6 +98,9 @@ class ImportRepositoryTest {
         assertEquals(1, result.addedMemberships)
         assertEquals(5, dao.memberships(account).size)
         assertEquals("私の名前", dao.feed(alpha.id)!!.userTitle)
+        val state = env.db.articleDao().state(articleId)!!
+        assertTrue("read/saved survive re-import", state.isRead && state.isSaved)
+        assertEquals(1, env.db.articleDao().articlesOfFeed(alpha.id).size)
     }
 
     @Test

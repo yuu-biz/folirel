@@ -88,6 +88,8 @@ class AppContainer(context: Context) {
 
     val documents = DocumentIo(appContext)
 
+    fun databaseFileBytes(): Long = AppDatabase.fileBytes(appContext)
+
     /** Thumbnails: same network policy, bounded disk cache, no service-loaded default fetchers. */
     val imageLoader: ImageLoader = ImageLoader.Builder(appContext)
         .serviceLoaderEnabled(false)

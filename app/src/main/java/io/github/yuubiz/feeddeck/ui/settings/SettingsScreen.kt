@@ -1,6 +1,5 @@
 package io.github.yuubiz.feeddeck.ui.settings
 
-import android.content.Context
 import android.text.format.Formatter
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -51,7 +50,6 @@ import coil3.ImageLoader
 import io.github.yuubiz.feeddeck.BuildConfig
 import io.github.yuubiz.feeddeck.R
 import io.github.yuubiz.feeddeck.app.AppContainer
-import io.github.yuubiz.feeddeck.data.db.AppDatabase
 import io.github.yuubiz.feeddeck.data.preferences.AppSettings
 import io.github.yuubiz.feeddeck.data.preferences.BrowserMode
 import io.github.yuubiz.feeddeck.data.preferences.SettingsRepository
@@ -70,6 +68,7 @@ class SettingsViewModel(
     private val articles: ArticleRepository,
     private val imageLoader: ImageLoader,
     private val accountId: suspend () -> String,
+    private val databaseFileBytes: () -> Long,
 ) : ViewModel() {
     val settings: StateFlow<AppSettings> = repository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
 
@@ -81,6 +80,8 @@ class SettingsViewModel(
 
     fun imageCacheBytes(): Long = imageLoader.diskCache?.size ?: 0
 
+    fun databaseBytes(): Long = databaseFileBytes()
+
     /** Removes cached thumbnails only. Reading state, saved articles and categories are untouched. */
     suspend fun clearImageCache() = withContext(Dispatchers.IO) {
         imageLoader.memoryCache?.clear()
@@ -88,8 +89,6 @@ class SettingsViewModel(
     }
 }
 
-fun databaseBytes(context: Context): Long =
-    listOf(AppDatabase.NAME, "${AppDatabase.NAME}-wal", "${AppDatabase.NAME}-shm").sumOf { context.getDatabasePath(it).length() }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,7 +100,7 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Un
     var httpWarning by remember { mutableStateOf(false) }
     var cacheVersion by remember { mutableIntStateOf(0) }
     val articleCount by produceState(-1) { value = vm.articleCount() }
-    val dbBytes = remember(articleCount) { databaseBytes(context) }
+    val dbBytes = remember(articleCount) { vm.databaseBytes() }
     val cacheBytes = remember(cacheVersion) { vm.imageCacheBytes() }
     val cacheCleared = stringResource(R.string.settings_cache_cleared)
 

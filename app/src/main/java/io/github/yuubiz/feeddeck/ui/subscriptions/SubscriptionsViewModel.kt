@@ -7,7 +7,6 @@ import io.github.yuubiz.feeddeck.app.DocumentIo
 import io.github.yuubiz.feeddeck.backend.RefreshReason
 import io.github.yuubiz.feeddeck.backend.RefreshScope
 import io.github.yuubiz.feeddeck.backend.local.opml.OpmlWriter
-import io.github.yuubiz.feeddeck.data.db.FeedFetchStateEntity
 import io.github.yuubiz.feeddeck.data.repository.AddFeedResult
 import io.github.yuubiz.feeddeck.data.repository.SubscriptionRepository
 import io.github.yuubiz.feeddeck.model.Structure
@@ -38,7 +37,7 @@ sealed interface SubscriptionEvent {
 }
 
 /** Fetch details for the feed detail screen (times are epoch millis UTC). */
-data class FeedDetail(val state: FeedFetchStateEntity?, val fetchUrl: String?, val siteUrl: String?, val feedTitle: String?, val userTitle: String?)
+data class FeedDetail(val lastAttemptAt: Long?, val lastSuccessAt: Long?, val fetchUrl: String?, val siteUrl: String?, val feedTitle: String?, val userTitle: String?)
 
 class SubscriptionsViewModel(
     private val subscriptions: SubscriptionRepository,
@@ -70,7 +69,8 @@ class SubscriptionsViewModel(
 
     suspend fun detail(feedId: String): FeedDetail {
         val feed = subscriptions.feed(feedId)
-        return FeedDetail(subscriptions.fetchState(feedId), feed?.fetchUrl, feed?.siteUrl, feed?.feedTitle, feed?.userTitle)
+        val state = subscriptions.fetchState(feedId)
+        return FeedDetail(state?.lastAttemptAt, state?.lastSuccessAt, feed?.fetchUrl, feed?.siteUrl, feed?.feedTitle, feed?.userTitle)
     }
 
     fun addFeed(url: String, onDone: (AddFeedResult) -> Unit = {}) = viewModelScope.launch {

@@ -30,6 +30,10 @@ abstract class AppDatabase : RoomDatabase() {
         /** Explicit migrations only. Destructive fallback is forbidden (docs/03 section 6). */
         val MIGRATIONS: Array<Migration> = emptyArray()
 
+        /** Database files on disk (main, WAL, shared memory) for the size display. */
+        fun fileBytes(context: Context): Long =
+            listOf(NAME, "$NAME-wal", "$NAME-shm").sumOf { context.getDatabasePath(it).length() }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, NAME)
                 .addMigrations(*MIGRATIONS)

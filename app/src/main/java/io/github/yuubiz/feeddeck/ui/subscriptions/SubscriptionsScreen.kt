@@ -48,13 +48,13 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.yuubiz.feeddeck.R
 import io.github.yuubiz.feeddeck.data.repository.AddFeedResult
 import io.github.yuubiz.feeddeck.model.FeedNode
 import io.github.yuubiz.feeddeck.model.FetchError
 import io.github.yuubiz.feeddeck.model.Structure
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /** Collects one-shot events into a snackbar. */
 @Composable
@@ -172,7 +172,7 @@ private fun FeedRow(feed: FeedNode, structure: Structure, onClick: () -> Unit) {
         val categories = feed.categoryIds.mapNotNull { id -> structure.categories.firstOrNull { it.id == id }?.display }
         val status = feedStatus(feed)
         Text(
-            listOfNotNull(feed.url.toHttpUrlOrNull()?.host, categories.joinToString(", ").ifEmpty { stringResource(R.string.scope_uncategorized) }, status)
+            listOfNotNull(feed.url.toUri().host, categories.joinToString(", ").ifEmpty { stringResource(R.string.scope_uncategorized) }, status)
                 .joinToString(" · "),
             style = MaterialTheme.typography.labelMedium,
             color = if (feed.lastError != null && feed.subscribed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -244,9 +244,9 @@ fun FeedDetailScreen(vm: SubscriptionsViewModel, feedId: String, onBack: () -> U
             detail?.fetchUrl?.takeIf { it != feed.url }?.let { item { LabeledValue(stringResource(R.string.feed_fetch_url), it) } }
             detail?.siteUrl?.let { item { LabeledValue(stringResource(R.string.feed_site_url), it) } }
             item {
-                val state = detail?.state
-                LabeledValue(stringResource(R.string.feed_last_attempt), formatTime(context, state?.lastAttemptAt) ?: stringResource(R.string.never))
-                LabeledValue(stringResource(R.string.feed_last_success), formatTime(context, state?.lastSuccessAt) ?: stringResource(R.string.never))
+                val d = detail
+                LabeledValue(stringResource(R.string.feed_last_attempt), formatTime(context, d?.lastAttemptAt) ?: stringResource(R.string.never))
+                LabeledValue(stringResource(R.string.feed_last_success), formatTime(context, d?.lastSuccessAt) ?: stringResource(R.string.never))
                 LabeledValue(stringResource(R.string.feed_last_error), feed.lastError?.let { errorLabel(it) } ?: stringResource(R.string.none))
             }
             item {

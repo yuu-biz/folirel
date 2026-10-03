@@ -99,7 +99,13 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
     )
     val settingsVm: SettingsViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { SettingsViewModel(container.settings, container.articles, container.imageLoader) { container.subscriptions.ensureLocalAccount() } }
+            initializer {
+                SettingsViewModel(
+                    container.settings, container.articles, container.imageLoader,
+                    accountId = { container.subscriptions.ensureLocalAccount() },
+                    databaseFileBytes = { container.databaseFileBytes() },
+                )
+            }
         },
     )
     // Results of add-feed / export / category operations, wherever they were triggered from.
