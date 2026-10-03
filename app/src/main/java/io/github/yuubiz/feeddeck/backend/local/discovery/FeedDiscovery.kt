@@ -74,7 +74,7 @@ class FeedDiscovery(
             via = CandidateVia.ENTERED_URL
             status = DiscoveryResult.PageStatus.FEED_ENTERED
         }
-        val knownKeys = known.entryKeys.mapTo(HashSet()) { HttpsUpgradeChecker.comparableKey(it) }
+        val knownKeys = known.entryKeys.mapTo(HashSet()) { comparable(it) }
         val candidates = links
             .filter { it.url != known.fetchUrl }
             .take(MAX_CANDIDATES)
@@ -98,7 +98,7 @@ class FeedDiscovery(
         } catch (e: FeedParseException) {
             return base.copy(failure = e.error)
         }
-        val keys = parsed.entries.mapTo(HashSet()) { HttpsUpgradeChecker.comparableKey(it.entryKey) }
+        val keys = parsed.entries.mapTo(HashSet()) { comparable(it.entryKey) }
         val dates = parsed.entries.mapNotNull { it.publishedAt }
         return base.copy(
             // A redirect inside the candidate keeps working; adopting uses the final address.
@@ -113,6 +113,19 @@ class FeedDiscovery(
             sameTitle = known.feedTitle != null && parsed.title != null &&
                 TextNormalizer.normalize(known.feedTitle).equals(TextNormalizer.normalize(parsed.title), ignoreCase = true),
         )
+    }
+
+    /**
+     * An article key without the difference of http/https, `www.`, and of whether the address came from the id or the
+     * link of the entry: the same permalink as a guid in one feed and as a link in another is the same article.
+     */
+    private fun comparable(key: String): String {
+        val rest = key.removePrefix("id:").takeIf { it != key } ?: key.removePrefix("url:").takeIf { it != key }
+        return if (rest != null && (rest.startsWith("http://") || rest.startsWith("https://"))) {
+            "url:" + HttpsUpgradeChecker.comparableKey(rest)
+        } else {
+            HttpsUpgradeChecker.comparableKey(key)
+        }
     }
 
     private fun dominantOrigin(links: List<String>): String? {
