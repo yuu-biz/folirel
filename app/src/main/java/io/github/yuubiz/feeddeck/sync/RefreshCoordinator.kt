@@ -39,7 +39,8 @@ class RefreshCoordinator(
     private val accountId: suspend () -> String,
     /** For automatic reasons only: whether the current network satisfies the auto-update constraint. */
     private val automaticAllowed: suspend () -> Boolean,
-    private val onAutomaticAttempt: suspend (Long) -> Unit,
+    /** Called when any refresh (manual or automatic) actually starts; the startup 30-minute rule uses it. */
+    private val onAttempt: suspend (Long) -> Unit,
     private val scope: CoroutineScope,
     private val clock: Clock,
 ) {
@@ -51,13 +52,11 @@ class RefreshCoordinator(
     private val active = AtomicInteger()
 
     suspend fun refresh(target: RefreshScope, reason: RefreshReason): RefreshReport {
-        if (reason.isAutomatic) {
-            if (!automaticAllowed()) {
-                _state.update { it.copy(lastAutoBlocked = true) }
-                return RefreshReport(total = 0, deferredConstraint = 1)
-            }
-            onAutomaticAttempt(clock.millis())
+        if (reason.isAutomatic && !automaticAllowed()) {
+            _state.update { it.copy(lastAutoBlocked = true) }
+            return RefreshReport(total = 0, deferredConstraint = 1)
         }
+        onAttempt(clock.millis())
         val job = mutex.withLock {
             running[RefreshScope.All] ?: running[target] ?: scope.async(start = CoroutineStart.LAZY) {
                 try {

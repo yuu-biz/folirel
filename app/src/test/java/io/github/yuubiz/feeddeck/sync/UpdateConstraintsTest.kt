@@ -82,11 +82,15 @@ class UpdateConstraintsTest {
 
         assertEquals(1, coordinator.refresh(RefreshScope.All, RefreshReason.MANUAL).updated)
         assertEquals(1, backend.calls.get())
+        // Any started refresh counts as an attempt for the startup 30-minute rule; a blocked one does not.
+        assertEquals(listOf(clock.millis()), attempts)
 
         allowed = true
+        clock.advanceMinutes(5)
         coordinator.refresh(RefreshScope.All, RefreshReason.PERIODIC)
         assertEquals(2, backend.calls.get())
-        assertEquals(listOf(clock.millis()), attempts)
+        assertEquals(2, attempts.size)
+        assertEquals(clock.millis(), attempts.last())
         scope.cancel()
     }
 

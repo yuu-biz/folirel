@@ -77,7 +77,7 @@ class AppContainer(context: Context) {
         backend = backend,
         accountId = { subscriptions.ensureLocalAccount() },
         automaticAllowed = { AutoRefreshPolicy.networkAllowed(settings.current(), networkStatus.current()) },
-        onAutomaticAttempt = { settings.setLastAutoRefreshAttempt(it) },
+        onAttempt = { settings.setLastRefreshAttempt(it) },
         scope = appScope,
         clock = clock,
     )

@@ -35,7 +35,8 @@ data class AppSettings(
     val lastScope: ArticleScope = ArticleScope.All,
     val lastFilter: ReadFilter = ReadFilter.ALL,
     val sortOrder: SortOrder = SortOrder.NEWEST,
-    val lastAutoRefreshAttemptAt: Long = 0,
+    /** Last refresh attempt of any kind (docs/04 §5: the startup rule is based on the last attempt). */
+    val lastRefreshAttemptAt: Long = 0,
 ) {
     companion object {
         val TEXT_SCALES = listOf(0.9f, 1.0f, 1.15f, 1.3f)
@@ -57,7 +58,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val lastScope = stringPreferencesKey("last_scope")
         val lastFilter = stringPreferencesKey("last_filter")
         val sortOrder = stringPreferencesKey("sort_order")
-        val lastAutoAttempt = longPreferencesKey("last_auto_refresh_attempt")
+        val lastAttempt = longPreferencesKey("last_refresh_attempt")
     }
 
     val settings: Flow<AppSettings> = store.data.map { p ->
@@ -75,7 +76,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             lastScope = ArticleScope.decode(p[Keys.lastScope]),
             lastFilter = enumOr(p[Keys.lastFilter], defaults.lastFilter),
             sortOrder = enumOr(p[Keys.sortOrder], defaults.sortOrder),
-            lastAutoRefreshAttemptAt = p[Keys.lastAutoAttempt] ?: 0,
+            lastRefreshAttemptAt = p[Keys.lastAttempt] ?: 0,
         )
     }
 
@@ -93,7 +94,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setLastScope(value: ArticleScope) = store.edit { it[Keys.lastScope] = value.encode() }
     suspend fun setLastFilter(value: ReadFilter) = store.edit { it[Keys.lastFilter] = value.name }
     suspend fun setSortOrder(value: SortOrder) = store.edit { it[Keys.sortOrder] = value.name }
-    suspend fun setLastAutoRefreshAttempt(at: Long) = store.edit { it[Keys.lastAutoAttempt] = at }
+    suspend fun setLastRefreshAttempt(at: Long) = store.edit { it[Keys.lastAttempt] = at }
 
     private inline fun <reified E : Enum<E>> enumOr(value: String?, default: E): E =
         value?.let { v -> enumValues<E>().firstOrNull { it.name == v } } ?: default

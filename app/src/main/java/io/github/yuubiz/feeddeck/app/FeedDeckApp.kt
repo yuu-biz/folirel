@@ -21,7 +21,7 @@ class FeedDeckApp : Application() {
 }
 
 /**
- * On app start/return: refresh once if the last automatic attempt is at least 30 minutes old. Uses the same
+ * On app start/return: refresh once if the last refresh attempt (manual or automatic) is at least 30 minutes old. Uses the same
  * coordinator and the same network constraint as periodic updates (opening the app does not bypass it).
  */
 private class StartupRefreshObserver(private val container: AppContainer) : DefaultLifecycleObserver {
@@ -29,7 +29,7 @@ private class StartupRefreshObserver(private val container: AppContainer) : Defa
         container.appScope.launch {
             val settings = container.settings.current()
             val now = container.clock.millis()
-            if (AutoRefreshPolicy.startupDue(now, settings.lastAutoRefreshAttemptAt)) {
+            if (AutoRefreshPolicy.startupDue(now, settings.lastRefreshAttemptAt)) {
                 container.refresh.refresh(RefreshScope.All, RefreshReason.STARTUP)
             }
         }

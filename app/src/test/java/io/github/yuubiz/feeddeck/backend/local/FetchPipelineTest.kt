@@ -175,6 +175,25 @@ class FetchPipelineTest {
     }
 
     @Test
+    fun httpCharsetIsUsedOnlyWithoutBomOrDeclaration() = runTest {
+        // No XML declaration: the Content-Type charset decides (EUC-JP).
+        val eucJp = "<rss version=\"2.0\"><channel><title>EUC配信</title><item><guid>e1</guid><title>日本語のEUC-JP記事</title></item></channel></rss>"
+        val eucResponse = MockResponse.Builder().setHeader("Content-Type", "application/rss+xml; charset=EUC-JP").body(Buffer().write(eucJp.toByteArray(charset("EUC-JP")))).build()
+        // Declared Shift_JIS wins over a wrong header charset.
+        val sjisResponse = xml("feeds/rss2-shiftjis.xml", "text/xml; charset=utf-8")
+        server.dispatcher = object : mockwebserver3.Dispatcher() {
+            override fun dispatch(request: mockwebserver3.RecordedRequest) = if (request.url.encodedPath == "/euc") eucResponse else sjisResponse
+        }
+        val account = env.subscriptions.ensureLocalAccount()
+        val (euc, sjis) = env.subscriptions.commitImport(account, OpmlParser.parse(opmlFor(server.url("/euc").toString(), server.url("/sjis").toString()))).feedIdsToFetch
+        val report = env.backend.refresh(account, RefreshScope.All, RefreshReason.MANUAL) {}
+        assertEquals(2, report.updated)
+        assertEquals("日本語のEUC-JP記事", env.db.articleDao().articlesOfFeed(euc).single().title)
+        assertEquals("日本語の文字化けを確認", env.db.articleDao().articlesOfFeed(sjis).single().title)
+        assertEquals("日本語配信", env.db.subscriptionDao().feed(sjis)!!.feedTitle)
+    }
+
+    @Test
     fun dataSurvivesDatabaseReopen() = runTest {
         val context = TestEnv.context()
         val name = "reopen-test.db"
