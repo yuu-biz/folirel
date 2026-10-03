@@ -40,6 +40,13 @@ android {
             isIncludeAndroidResources = true
             all { test ->
                 test.maxHeapSize = "2g"
+                // Robolectric 4.17 on JDK 17+ needs access to FileDescriptor internals.
+                test.jvmArgs(
+                    "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
+                    "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
+                    "--add-opens=java.base/java.io=ALL-UNNAMED",
+                    "--add-opens=java.base/java.lang=ALL-UNNAMED",
+                )
             }
         }
     }
