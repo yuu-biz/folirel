@@ -69,7 +69,7 @@ class ArticleActions(
 )
 
 /**
- * Size of one card in the card list: how much of the row it spans and how wide it is (dp). [wide] marks the
+ * Size of one card in the Magazine layout: how much of the row it spans and how wide it is (dp). [wide] marks the
  * full-width card of a mixed (magazine) page, drawn with the image beside the text.
  */
 @Immutable
@@ -164,12 +164,12 @@ fun ArticleItem(
         moreButton()
     }
 
-    if (mode == ListMode.CARD) {
+    if (mode == ListMode.MAGAZINE) {
         ArticleCard(row, showImages, imageLoader, nowMillis, card, bookmarkButton, moreButton, modifier, rowModifier)
         return
     }
     Column(modifier) {
-        if (mode == ListMode.MAGAZINE) {
+        if (mode == ListMode.LIST) {
             Row(
                 modifier = rowModifier.padding(start = 12.dp, end = 4.dp, top = 8.dp).heightIn(min = 72.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),

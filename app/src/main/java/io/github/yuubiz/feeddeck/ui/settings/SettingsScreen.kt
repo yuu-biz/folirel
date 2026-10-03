@@ -151,9 +151,9 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Un
                 Choice(
                     stringResource(R.string.settings_list_mode),
                     listOf(
-                        ListMode.MAGAZINE to stringResource(R.string.list_mode_magazine),
                         ListMode.LIST to stringResource(R.string.list_mode_list),
-                        ListMode.CARD to stringResource(R.string.list_mode_card),
+                        ListMode.COMPACT_LIST to stringResource(R.string.list_mode_compact_list),
+                        ListMode.MAGAZINE to stringResource(R.string.list_mode_magazine),
                     ),
                     s.listMode,
                 ) { vm.update { setListMode(it) } }

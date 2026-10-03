@@ -131,17 +131,17 @@ class NewArticleBannerTest {
     }
 
     @Test
-    fun aMarkerAddedAfterTheArticleIsShownDoesNotLeaveABannerInTheCardGrid() = lateMarker(ListMode.CARD)
+    fun aMarkerAddedAfterTheArticleIsShownDoesNotLeaveABannerInTheMagazineLayout() = lateMarker(ListMode.MAGAZINE)
 
     @Test
-    fun aMarkerAddedAfterTheArticleIsShownDoesNotLeaveABannerInTheMixedMagazineList() = lateMarker(ListMode.MAGAZINE)
+    fun aMarkerAddedAfterTheArticleIsShownDoesNotLeaveABannerInTheListLayout() = lateMarker(ListMode.LIST)
 
     @Test
-    fun aMarkerAddedAfterTheArticleIsShownDoesNotLeaveABannerInTheColumnList() = lateMarker(ListMode.LIST)
+    fun aMarkerAddedAfterTheArticleIsShownDoesNotLeaveABannerInTheCompactListLayout() = lateMarker(ListMode.COMPACT_LIST)
 
     @Test
     fun offScreenNewArticlesAreAnnouncedAndTheBannerJumpsToThemNewestFirst() {
-        show(ListMode.CARD, articles(80))
+        show(ListMode.MAGAZINE, articles(80))
         newIds = setOf("a60", "a61")
         compose.waitForIdle()
         waitForBanner(true)
@@ -159,7 +159,7 @@ class NewArticleBannerTest {
     fun theBannerJumpsToTheFirstNewArticleOfTheCurrentOrderWhenOldestFirst() {
         newestFirst = false
         // Oldest first: the list is a79 ... a0; the new (newest) ones are at the end.
-        show(ListMode.LIST, articles(80).reversed())
+        show(ListMode.COMPACT_LIST, articles(80).reversed())
         newIds = setOf("a0", "a1")
         compose.waitForIdle()
         waitForBanner(true)
@@ -172,7 +172,7 @@ class NewArticleBannerTest {
     @Test
     fun aPreComposedNeighbourPageDoesNotConsumeMarkers() {
         isCurrent = false
-        show(ListMode.CARD, articles(60))
+        show(ListMode.MAGAZINE, articles(60))
         newIds = setOf("a1")
         compose.waitForIdle()
         assertTrue("announced, and a1 is composed on screen", bannerShown() && displayed("a1"))
@@ -203,8 +203,8 @@ class NewArticleBannerTest {
     }
 
     @Test
-    fun articlesArrivingAtTheHeadKeepTheReadingPlaceInTheCardGrid() = headArrival(ListMode.CARD)
+    fun articlesArrivingAtTheHeadKeepTheReadingPlaceInTheMagazineLayout() = headArrival(ListMode.MAGAZINE)
 
     @Test
-    fun articlesArrivingAtTheHeadKeepTheReadingPlaceInTheColumnList() = headArrival(ListMode.LIST)
+    fun articlesArrivingAtTheHeadKeepTheReadingPlaceInTheCompactListLayout() = headArrival(ListMode.COMPACT_LIST)
 }

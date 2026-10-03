@@ -121,8 +121,8 @@
     <string name="import_unsupported">非対応の項目（除外）</string>
     <string name="import_warnings">非標準の構造</string>
     <string name="interval_off">オフ</string>
-    <string name="list_mode_list">コンパクト</string>
-    <string name="list_mode_magazine">マガジン（画像付き）</string>
+    <string name="list_mode_compact_list">リスト（コンパクト）</string>
+    <string name="list_mode_list">リスト</string>
     <string name="mark_all_confirm">既読にする</string>
     <string name="mark_all_filter">条件: %1$s</string>
     <string name="mark_all_none">対象の未読記事はありません。</string>
@@ -300,7 +300,7 @@
     <string name="limit_entry_count">記事数</string>
     <string name="limit_xml_depth">XML深度</string>
     <string name="limit_xml_elements">XML要素数</string>
-    <string name="list_mode_card">大きなカード</string>
+    <string name="list_mode_magazine">マガジン</string>
     <string name="no">いいえ</string>
     <string name="reason_backoff">失敗後の待機、またはサーバー指定の待機中です。通常の失敗は手動更新ですぐ再試行します。サーバー指定の待機は守ります。</string>
     <string name="reason_cancelled">前回の更新は取得中に止まりました（時間切れ・停止）。未完了を再試行してください。</string>
@@ -355,15 +355,15 @@
         <item quantity="other">%d分ごと</item>
     </plurals>
     <string name="https_reason_redirect_unconfirmed">別のサイトへ転送され、同じフィードか確認できない（HTTPを許可すると比較して判定）</string>
-    <string name="settings_card_style">大きなカードの並べ方</string>
+    <string name="settings_card_style">マガジンの並べ方</string>
     <string name="card_style_mixed">大きさ混在（雑誌風）</string>
     <string name="card_style_even">すべて同じ大きさ</string>
-    <string name="settings_card_columns">大きなカードの最大列数</string>
+    <string name="settings_card_columns">マガジンの最大列数</string>
     <string name="card_columns_auto">自動（画面幅と文字サイズに合わせる）</string>
     <plurals name="card_columns_n">
         <item quantity="other">%1$d列</item>
     </plurals>
-    <string name="settings_card_columns_note">雑誌風では、この列数の小さなカードの行と、横長・大きめのカードの行が交互に並びます。選んだ列数だと見出しが読めないほど狭くなる場合（小さなウィンドウ、大きな文字）は、列数を減らします。列数を保つために文字を縮小することはありません。</string>
+    <string name="settings_card_columns_note">マガジンでは、この列数の小さなカードの行と、横長・大きめのカードの行が交互に並びます。選んだ列数だと見出しが読めないほど狭くなる場合（小さなウィンドウ、大きな文字）は、列数を減らします。列数を保つために文字を縮小することはありません。</string>
     <string name="settings_card_columns_now">この画面では横に最大%1$d列で表示します。</string>
     <string name="settings_card_columns_reduced">（選択した%1$d列はここでは収まらないため減らしています。）</string>
     <string name="status_result_compact">%1$dフィード：%2$s</string>

@@ -17,6 +17,7 @@ import io.github.yuubiz.feeddeck.backend.local.discovery.FeedDiscovery
 import io.github.yuubiz.feeddeck.backend.local.icon.FeedIconResolver
 import io.github.yuubiz.feeddeck.browser.BrowserLauncher
 import io.github.yuubiz.feeddeck.data.db.AppDatabase
+import io.github.yuubiz.feeddeck.data.preferences.SettingsMigrations
 import io.github.yuubiz.feeddeck.data.preferences.SettingsRepository
 import io.github.yuubiz.feeddeck.data.repository.ArticleRepository
 import io.github.yuubiz.feeddeck.data.repository.FeedIconRepository
@@ -46,7 +47,7 @@ import okio.Path.Companion.toOkioPath
 import java.time.Clock
 import java.util.concurrent.atomic.AtomicBoolean
 
-private val Context.settingsDataStore by preferencesDataStore(name = "settings")
+private val Context.settingsDataStore by preferencesDataStore(name = "settings", produceMigrations = { SettingsMigrations.all })
 
 /** Manual dependency container (docs/05: no DI framework). One instance per process. */
 class AppContainer(context: Context) {

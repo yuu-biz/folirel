@@ -6,7 +6,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Column rules of the card list (UX-GRID). Pure functions so they are testable without a device.
+ * Column rules of the Magazine layout (UX-GRID). Pure functions so they are testable without a device.
  *
  * Auto picks the number of columns that keeps every card at least [AUTO_MIN_CARD_DP] wide. An explicit choice
  * (1/2/3) may go narrower, down to [MANUAL_MIN_CARD_DP], because the user asked for it; below that a headline is
@@ -70,7 +70,7 @@ object CardGridLayout {
 }
 
 /**
- * The mixed card list (UX-GRID, magazine style). Every article prefers a card size, chosen from its id alone
+ * The mixed arrangement of the Magazine layout (UX-GRID). Every article prefers a card size, chosen from its id alone
  * (a fixed hash, so the same article always asks for the same size, whatever its position, the sort order or when
  * the list is redrawn; nothing is random at run time). Cards are packed left to right into rows of [GRID_SPANS]
  * sixths: small (1/3), medium (1/2), large (2/3) and wide (full width). The result looks irregular, like a magazine

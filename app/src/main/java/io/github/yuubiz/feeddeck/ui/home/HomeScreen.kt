@@ -303,9 +303,9 @@ fun HomeScreen(
                             }
                             DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
                                 listOf(
-                                    ListMode.MAGAZINE to R.string.list_mode_magazine,
                                     ListMode.LIST to R.string.list_mode_list,
-                                    ListMode.CARD to R.string.list_mode_card,
+                                    ListMode.COMPACT_LIST to R.string.list_mode_compact_list,
+                                    ListMode.MAGAZINE to R.string.list_mode_magazine,
                                 ).forEach { (mode, label) ->
                                     DropdownMenuItem(
                                         text = { Text(stringResource(label)) },
@@ -534,7 +534,7 @@ private fun ScopePage(
     }
 }
 
-/** Scroll position of the article list, the same operations for the column list and the card grid. */
+/** Scroll position of the article list, the same operations for the List/Compact list column and the Magazine grid. */
 /** Items scrolled past before the "back to top" button appears. */
 private const val SCROLL_TOP_BUTTON_AFTER = 6
 
@@ -584,10 +584,10 @@ internal fun ArticleList(
     scrollToTopTick: Int,
 ) {
     val items = state.items
-    val useGrid = mode == ListMode.CARD
+    val isMagazine = mode == ListMode.MAGAZINE
     // Restore from this list's own anchor (article id + offset); if it is gone, use the nearest remaining article.
     // Switching list style, rotating or resizing the window keeps the same article near the top.
-    val start = remember(state.key, useGrid) {
+    val start = remember(state.key, isMagazine) {
         val anchor = host.anchorFor(state.key)
         val index = anchor?.let { a ->
             items.indexOfFirst { it.id == a.articleId }.takeIf { it >= 0 }
@@ -599,7 +599,7 @@ internal fun ArticleList(
     val scroll: ScrollHandle
     val gridState: LazyGridState?
     val listState: LazyListState?
-    if (useGrid) {
+    if (isMagazine) {
         gridState = remember(state.key) { LazyGridState(start.first, start.second) }
         listState = null
         scroll = GridScroll(gridState)

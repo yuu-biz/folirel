@@ -106,7 +106,7 @@ class HomeFlowTest {
     }
 
     @Test
-    fun imagesOffRemovesThumbnailAreaAndListModeSwitches() {
+    fun imagesOffRemovesThumbnailAreaAndTheLayoutSwitches() {
         TestData.reset(showImages = true)
         TestData.seedArticles(5)
         launch()
@@ -116,9 +116,9 @@ class HomeFlowTest {
         kotlinx.coroutines.runBlocking { TestData.container.settings.setShowImages(false) }
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("thumbnail", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
 
-        kotlinx.coroutines.runBlocking { TestData.container.settings.setListMode(io.github.yuubiz.feeddeck.model.ListMode.LIST) }
+        kotlinx.coroutines.runBlocking { TestData.container.settings.setListMode(io.github.yuubiz.feeddeck.model.ListMode.COMPACT_LIST) }
         compose.waitForIdle()
-        // List mode shows no summary line.
+        // The Compact list shows no summary line.
         compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("article_list")).fetchSemanticsNodes().isNotEmpty() }
         assertTrue(compose.onAllNodesWithTag("article_list").fetchSemanticsNodes().isNotEmpty())
         assertFalse(compose.onAllNodes(androidx.compose.ui.test.hasText("概要 0")).fetchSemanticsNodes().isNotEmpty())

@@ -24,9 +24,9 @@ enum class BrowserMode { CUSTOM_TABS, EXTERNAL }
 /** Display/update preferences and the last selection. Reading state and subscriptions live in Room only. */
 data class AppSettings(
     val theme: ThemeMode = ThemeMode.SYSTEM,
-    val listMode: ListMode = ListMode.MAGAZINE,
+    val listMode: ListMode = ListMode.LIST,
     val textScale: Float = 1.0f,
-    /** Columns of the card list: 0 = automatic by width and text size, otherwise 1..3 (reduced when they do not fit). */
+    /** Columns of the Magazine layout: 0 = automatic by width and text size, otherwise 1..3 (reduced when they do not fit). */
     val cardColumns: Int = 0,
     /** Mixed sizes (magazine page) or one size for every card. */
     val cardStyle: CardLayoutStyle = CardLayoutStyle.MIXED,
@@ -69,7 +69,8 @@ data class AppSettings(
 class SettingsRepository(private val store: DataStore<Preferences>) {
     private object Keys {
         val theme = stringPreferencesKey("theme")
-        val listMode = stringPreferencesKey("list_mode")
+        /** `list_layout`; the pre-0.3.2 `list_mode` is translated by [ListModeMigration] and never read here. */
+        val listMode = ListModeMigration.KEY
         val textScale = floatPreferencesKey("text_scale")
         val cardColumns = intPreferencesKey("card_columns")
         val cardStyle = stringPreferencesKey("card_style")

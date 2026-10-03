@@ -30,10 +30,19 @@ enum class ReadFilter { ALL, UNREAD, SAVED }
 
 enum class SortOrder { NEWEST, OLDEST }
 
-/** MAGAZINE: text + side thumbnail. LIST: compact one line. CARD: large card with a wide image on top. */
-enum class ListMode { MAGAZINE, LIST, CARD }
+/**
+ * How the article list is laid out. The names are the user-facing concepts (Settings and menu: List, Compact list,
+ * Magazine); [name] is what is stored in the settings (key `list_layout`).
+ * - LIST: one column; title, two lines of summary, a side thumbnail, the source line and the buttons.
+ * - COMPACT_LIST: one dense row per article.
+ * - MAGAZINE: cards of different sizes packed into gap-free rows (see MagazinePlan, CardGridLayout).
+ *
+ * Before 0.3.2 the same three layouts were stored as MAGAZINE (= LIST), LIST (= COMPACT_LIST) and CARD (= MAGAZINE)
+ * under the key `list_mode`; see ListModeMigration. Never read an old value as one of these names.
+ */
+enum class ListMode { LIST, COMPACT_LIST, MAGAZINE }
 
-/** How the cards of the card list are arranged. */
+/** How the cards of the Magazine layout are arranged (the persisted keys keep their `card_` names). */
 enum class CardLayoutStyle {
     /** Cards of different sizes packed into irregular, gap-free rows, like a magazine page (see MagazinePlan). */
     MIXED,

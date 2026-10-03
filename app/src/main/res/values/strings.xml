@@ -122,8 +122,8 @@
     <string name="import_unsupported">Unsupported items (skipped)</string>
     <string name="import_warnings">Non-standard structures</string>
     <string name="interval_off">Off</string>
-    <string name="list_mode_list">Compact list</string>
-    <string name="list_mode_magazine">Magazine (with images)</string>
+    <string name="list_mode_compact_list">Compact list</string>
+    <string name="list_mode_list">List</string>
     <string name="mark_all_confirm">Mark as read</string>
     <string name="mark_all_filter">Filter: %1$s</string>
     <string name="mark_all_none">No unread articles match.</string>
@@ -308,7 +308,7 @@
     <string name="limit_entry_count">number of entries</string>
     <string name="limit_xml_depth">XML depth</string>
     <string name="limit_xml_elements">number of XML elements</string>
-    <string name="list_mode_card">Large cards</string>
+    <string name="list_mode_magazine">Magazine</string>
     <string name="no">No</string>
     <string name="reason_backoff">Waiting after a failure or for the server\'s Retry-After. A manual refresh retries an ordinary failure now; a server wait is respected.</string>
     <string name="reason_cancelled">The last update stopped while fetching this feed (time limit or stopped). Retry unfinished feeds.</string>
@@ -364,16 +364,16 @@
         <item quantity="other">Every %d minutes</item>
     </plurals>
     <string name="https_reason_redirect_unconfirmed">Redirected to another site; not confirmed as the same feed (allowing HTTP lets the check compare)</string>
-    <string name="settings_card_style">Large card arrangement</string>
+    <string name="settings_card_style">Magazine arrangement</string>
     <string name="card_style_mixed">Mixed sizes, like a magazine page</string>
     <string name="card_style_even">Same size for every card</string>
-    <string name="settings_card_columns">Most columns in large card style</string>
+    <string name="settings_card_columns">Most columns in Magazine layout</string>
     <string name="card_columns_auto">Automatic (by screen width and text size)</string>
     <plurals name="card_columns_n">
         <item quantity="one">%1$d column</item>
         <item quantity="other">%1$d columns</item>
     </plurals>
-    <string name="settings_card_columns_note">In the magazine arrangement, rows of this many small cards alternate with wide and larger cards. If the chosen number of columns would make headlines too narrow to read (small window, large text), fewer columns are used. Text is never shrunk to keep columns.</string>
+    <string name="settings_card_columns_note">In the Magazine layout, rows of this many small cards alternate with wide and larger cards. If the chosen number of columns would make headlines too narrow to read (small window, large text), fewer columns are used. Text is never shrunk to keep columns.</string>
     <string name="settings_card_columns_now">Right now this screen shows up to %1$d column(s) across.</string>
     <string name="settings_card_columns_reduced">(Your choice of %1$d columns does not fit here, so it is reduced.)</string>
     <string name="status_result_compact">%1$d feeds: %2$s</string>

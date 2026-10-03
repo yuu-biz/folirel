@@ -29,7 +29,7 @@ object TestData {
         c.settings.setStartupRefresh(false)
         c.settings.setOnboardingDone(onboardingDone)
         c.settings.setShowImages(showImages)
-        c.settings.setListMode(ListMode.MAGAZINE)
+        c.settings.setListMode(ListMode.LIST)
         c.settings.setLastScope(ArticleScope.All)
         c.settings.setLastFilter(ReadFilter.ALL)
         c.settings.setSortOrder(SortOrder.NEWEST)

@@ -60,20 +60,20 @@ class UxNextTest {
 
     private fun text(res: Int) = context.getString(res)
 
-    // U03: the same article stays near the top when the list style changes
+    // U03: the same article stays near the top when the layout (List, Compact list, Magazine) changes
 
     @Test
-    fun cardAndColumnStylesKeepTheSameArticleAndNeverMarkRead() {
+    fun layoutChangesKeepTheSameArticleAndNeverMarkRead() {
         TestData.reset()
         val ids = TestData.seedArticles(80)
-        runBlocking { TestData.container.settings.setListMode(ListMode.CARD) }
+        runBlocking { TestData.container.settings.setListMode(ListMode.MAGAZINE) }
         launch()
         waitForTag("article_list")
         compose.onNodeWithTag("article_list").performScrollToIndex(40)
         val anchor = ids[40]
         compose.onNodeWithTag("article_$anchor").assertIsDisplayed()
 
-        for (mode in listOf(ListMode.MAGAZINE, ListMode.LIST, ListMode.CARD)) {
+        for (mode in listOf(ListMode.LIST, ListMode.COMPACT_LIST, ListMode.MAGAZINE)) {
             runBlocking { TestData.container.settings.setListMode(mode) }
             compose.waitForIdle()
             waitForTag("article_$anchor")
@@ -82,12 +82,12 @@ class UxNextTest {
         assertTrue(ids.none { TestData.state(it).isRead })
     }
 
-    /** U04 (category round trip in the card grid): each category keeps its own place; nothing is marked read. */
+    /** U04 (category round trip in the Magazine layout): each category keeps its own place; nothing is marked read. */
     @Test
-    fun cardGridKeepsEachCategoryPositionAcrossTabSwitches() {
+    fun magazineLayoutKeepsEachCategoryPositionAcrossTabSwitches() {
         TestData.reset()
         val seeded = TestData.seedCategories(listOf("Alpha", "Beta"), perCategory = 60)
-        runBlocking { TestData.container.settings.setListMode(ListMode.CARD) }
+        runBlocking { TestData.container.settings.setListMode(ListMode.MAGAZINE) }
         val alpha = seeded.keys.elementAt(0)
         val beta = seeded.keys.elementAt(1)
         launch()

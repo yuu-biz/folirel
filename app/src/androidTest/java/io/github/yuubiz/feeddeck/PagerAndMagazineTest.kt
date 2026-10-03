@@ -29,9 +29,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** N01/N03/N24 (category pager) and N09 (card mode) on a device. Uses seeded data only; no network. */
+/** N01/N03/N24 (category pager) and N09 (list layouts: List, Compact list, Magazine) on a device. Uses seeded data only; no network. */
 @RunWith(AndroidJUnit4::class)
-class PagerAndCardTest {
+class PagerAndMagazineTest {
     @get:Rule
     val compose = createEmptyComposeRule()
 
@@ -225,7 +225,7 @@ class PagerAndCardTest {
         inPage(ArticleScope.Category(beta), "article_${seeded.getValue(beta).first()}").assertIsDisplayed()
     }
 
-    /** Back to the top in every list style; other categories keep their place and no article changes state. */
+    /** Back to the top in every layout (List, Compact list, Magazine mixed/even); other categories keep their place and no article changes state. */
     private fun backToTop(mode: ListMode, style: io.github.yuubiz.feeddeck.model.CardLayoutStyle) {
         runBlocking {
             TestData.container.settings.setListMode(mode)
@@ -261,16 +261,16 @@ class PagerAndCardTest {
     }
 
     @Test
-    fun backToTopInTheMixedCardGrid() = backToTop(ListMode.CARD, io.github.yuubiz.feeddeck.model.CardLayoutStyle.MIXED)
+    fun backToTopInTheMagazineLayoutMixed() = backToTop(ListMode.MAGAZINE, io.github.yuubiz.feeddeck.model.CardLayoutStyle.MIXED)
 
     @Test
-    fun backToTopInTheEvenCardGrid() = backToTop(ListMode.CARD, io.github.yuubiz.feeddeck.model.CardLayoutStyle.EVEN)
+    fun backToTopInTheMagazineLayoutEven() = backToTop(ListMode.MAGAZINE, io.github.yuubiz.feeddeck.model.CardLayoutStyle.EVEN)
 
     @Test
-    fun backToTopInTheMagazineList() = backToTop(ListMode.MAGAZINE, io.github.yuubiz.feeddeck.model.CardLayoutStyle.MIXED)
+    fun backToTopInTheListLayout() = backToTop(ListMode.LIST, io.github.yuubiz.feeddeck.model.CardLayoutStyle.MIXED)
 
     @Test
-    fun backToTopInTheColumnList() = backToTop(ListMode.LIST, io.github.yuubiz.feeddeck.model.CardLayoutStyle.MIXED)
+    fun backToTopInTheCompactListLayout() = backToTop(ListMode.COMPACT_LIST, io.github.yuubiz.feeddeck.model.CardLayoutStyle.MIXED)
 
 
     /** A tab far from the first one (the row scrolls to it): tab, underline, page and saved selection agree, also with large text. */
@@ -330,21 +330,21 @@ class PagerAndCardTest {
         assertTrue(seeded.values.flatten().none { TestData.state(it).isRead })
     }
 
-    /** N09: card mode from the menu, persisted, same article area kept; images off → no image area. */
+    /** N09: the Magazine layout from the menu, persisted, same article area kept; images off → no image area. */
     @Test
-    fun cardModeIsSelectableAndPersisted() {
+    fun magazineLayoutIsSelectableAndPersisted() {
         launch()
         waitForTag("category_pager")
         waitInPage(ArticleScope.All, "article_list")
         inPage(ArticleScope.All, "article_list").performScrollToIndex(5)
         compose.onNodeWithTag("home_more").performClick()
-        compose.onNodeWithTag("menu_mode_CARD").performClick()
-        compose.waitUntil(5_000) { runBlocking { TestData.container.settings.current().listMode } == ListMode.CARD }
+        compose.onNodeWithTag("menu_mode_MAGAZINE").performClick()
+        compose.waitUntil(5_000) { runBlocking { TestData.container.settings.current().listMode } == ListMode.MAGAZINE }
         compose.waitForIdle()
         assertTrue(compose.onAllNodesWithTag("card_image", useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
         scenario?.recreate()
         waitForTag("article_list")
-        assertEquals(ListMode.CARD, runBlocking { TestData.container.settings.current().listMode })
+        assertEquals(ListMode.MAGAZINE, runBlocking { TestData.container.settings.current().listMode })
         assertFalse(compose.onAllNodesWithTag("article_list").fetchSemanticsNodes().isEmpty())
     }
 }
