@@ -260,7 +260,7 @@ fun HomeScreen(
                             }
                         }
                         Box {
-                            IconButton(onClick = { overflowOpen = true }) {
+                            IconButton(onClick = { overflowOpen = true }, modifier = Modifier.testTag("home_more")) {
                                 Icon(Icons.Filled.MoreVert, stringResource(R.string.action_more))
                             }
                             DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {

@@ -129,7 +129,7 @@ fun ArticleItem(
     }
 
     if (mode == ListMode.CARD) {
-        ArticleCard(row, showImages, imageLoader, nowMillis, rowModifier, buttons, modifier)
+        ArticleCard(row, showImages, imageLoader, nowMillis, buttons, modifier, rowModifier)
         return
     }
     Column(modifier) {
@@ -189,12 +189,12 @@ private fun ArticleCard(
     showImages: Boolean,
     imageLoader: ImageLoader,
     nowMillis: Long,
-    rowModifier: Modifier,
     buttons: @Composable () -> Unit,
     modifier: Modifier,
+    clickModifier: Modifier,
 ) {
     ElevatedCard(modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
-        Column(rowModifier) {
+        Column(clickModifier) {
             if (showImages && row.imageUrl != null) {
                 val placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant)
                 Box(

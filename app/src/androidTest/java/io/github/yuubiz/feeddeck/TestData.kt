@@ -60,4 +60,27 @@ object TestData {
     }
 
     fun state(articleId: String) = runBlocking { container.database.articleDao().state(articleId)!! }
+
+    /**
+     * One feed per category ("Alpha", "Beta", ...), [perCategory] articles each, no network.
+     * Returns category id → article ids newest first.
+     */
+    fun seedCategories(names: List<String>, perCategory: Int): Map<String, List<String>> = runBlocking {
+        val c = container
+        val account = c.subscriptions.ensureLocalAccount()
+        val outlines = names.joinToString("") { n -> """<outline text="$n"><outline text="feed $n" xmlUrl="https://feed.example.com/$n.xml"/></outline>""" }
+        c.subscriptions.commitImport(account, OpmlParser.parse("""<opml version="2.0"><body>$outlines</body></opml>""".toByteArray()))
+        val store = FeedStore(c.database, Clock.systemUTC(), IdGenerator.Random)
+        val now = System.currentTimeMillis()
+        val categories = c.database.subscriptionDao().categories(account).associateBy { it.name }
+        val feeds = c.database.subscriptionDao().feeds(account).associateBy { it.subscriptionUrl }
+        names.associate { n ->
+            val feedId = feeds.getValue("https://feed.example.com/$n.xml").id
+            val entries = (0 until perCategory).map { i ->
+                NormalizedEntry("id:$n-$i", "$n 記事 $i", "https://www.example.com/", "概要 $n $i", null, now - i * 60_000L, null)
+            }
+            store.applySuccess(feedId, NormalizedFeed("feed $n", null, entries), FetchMetadata(null, null, "https://feed.example.com/$n.xml", null))
+            categories.getValue(n).id to c.database.articleDao().articlesOfFeed(feedId).map { it.id }
+        }
+    }
 }

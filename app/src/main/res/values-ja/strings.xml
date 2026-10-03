@@ -126,8 +126,6 @@
     <string name="mark_all_scope">範囲: %1$s</string>
     <string name="mark_all_search">検索: %1$s</string>
     <string name="mark_all_title">まとめて既読にしますか？</string>
-    <string name="menu_list_mode_compact">コンパクト表示</string>
-    <string name="menu_list_mode_magazine">画像付き表示</string>
     <string name="menu_mark_all_read">この範囲を既読にする</string>
     <string name="menu_refresh">更新</string>
     <string name="metered_confirm">今回は更新する</string>
@@ -232,15 +230,6 @@
     </plurals>
     <plurals name="new_articles_banner">
         <item quantity="other">新着%d件</item>
-    </plurals>
-    <plurals name="status_http_pending">
-        <item quantity="other">HTTP保留%d件</item>
-    </plurals>
-    <plurals name="status_not_attempted">
-        <item quantity="other">未取得%d件</item>
-    </plurals>
-    <plurals name="status_partial_failure">
-        <item quantity="other">一部取得失敗%d件</item>
     </plurals>
     <string name="action_refetch_revalidate">キャッシュを再検証して再取得</string>
     <string name="action_refresh_this_feed">このフィードを更新</string>

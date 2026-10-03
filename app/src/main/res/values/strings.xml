@@ -127,8 +127,6 @@
     <string name="mark_all_scope">Scope: %1$s</string>
     <string name="mark_all_search">Search: %1$s</string>
     <string name="mark_all_title">Mark all as read?</string>
-    <string name="menu_list_mode_compact">Compact list</string>
-    <string name="menu_list_mode_magazine">Magazine view</string>
     <string name="menu_mark_all_read">Mark all as read</string>
     <string name="menu_refresh">Refresh</string>
     <string name="metered_confirm">Update now</string>
@@ -241,18 +239,6 @@
         <item quantity="one">%d new article</item>
         <item quantity="other">%d new articles</item>
     </plurals>
-    <plurals name="status_http_pending">
-        <item quantity="one">%d HTTP feed pending</item>
-        <item quantity="other">%d HTTP feeds pending</item>
-    </plurals>
-    <plurals name="status_not_attempted">
-        <item quantity="one">%d not fetched</item>
-        <item quantity="other">%d not fetched</item>
-    </plurals>
-    <plurals name="status_partial_failure">
-        <item quantity="one">%d feed failed</item>
-        <item quantity="other">%d feeds failed</item>
-    </plurals>
     <string name="action_refetch_revalidate">Revalidate and refetch</string>
     <string name="action_refresh_this_feed">Refresh this feed</string>
     <string name="action_retry_unfinished">Retry unfinished</string>
@@ -281,7 +267,7 @@
     <string name="diag_retry_after">Server asked to wait until</string>
     <string name="diag_stored">On this device</string>
     <string name="diag_stored_counts">Articles</string>
-    <string name="diag_stored_value">%1$d stored · %2$d unread · %3$d saved</string>
+    <string name="diag_stored_value">stored: %1$d · unread: %2$d · saved: %3$d</string>
     <string name="feed_https_migrated">Moved to HTTPS from</string>
     <string name="feed_inactive_note">This feed is unsubscribed or paused, so it is not fetched. Turn it back on to fetch it.</string>
     <string name="https_background_note">You can leave this screen; the check continues in the background.</string>
@@ -343,11 +329,11 @@
     <string name="result_running">Fetching…</string>
     <string name="result_updated">Fetched</string>
     <string name="retention_confirm">Remove</string>
-    <string name="retention_confirm_message">Keep about %1$d articles. Stored now: %2$d. This removes %3$d old read, unsaved articles now and keeps doing so after updates. Unread and saved articles (%4$d) are never removed. Removed articles are not added again as unread.</string>
+    <string name="retention_confirm_message">Limit: about %1$d. Stored now: %2$d. Old read, unsaved articles to remove now: %3$d; the same cleanup runs after updates. Unread and saved articles are never removed (now: %4$d). Removed articles are not added again as unread.</string>
     <string name="retention_confirm_title">Articles to keep</string>
     <string name="retention_count">About %1$d</string>
-    <string name="retention_over_limit">Still %1$d articles: %2$d are unread or saved and are kept above the limit.</string>
-    <string name="retention_removed">Removed %1$d old read articles.</string>
+    <string name="retention_over_limit">Remaining: %1$d, above the limit because unread or saved articles are kept (%2$d).</string>
+    <string name="retention_removed">Old read articles removed: %1$d</string>
     <string name="retention_unlimited">No limit</string>
     <string name="scope_category">category</string>
     <string name="scope_feeds">%1$s feeds</string>
@@ -363,9 +349,9 @@
     <string name="status_interrupted">Last update was interrupted</string>
     <string name="status_other_refresh">Another update is running</string>
     <string name="status_other_refresh_progress">Another update %1$d/%2$d</string>
-    <string name="status_result">%1$d feeds: OK %2$d · failed %3$d · waiting %4$d · not reached %5$d · HTTP %6$d</string>
-    <string name="summary_counts">%1$d feeds · last result OK %2$d · failed %3$d · HTTP pending %4$d · waiting %5$d · unfinished %6$d</string>
-    <string name="summary_http">%1$d feeds still use http://. They are not fetched unless HTTP is allowed.</string>
+    <string name="status_result">Feeds: %1$d · OK %2$d · failed %3$d · waiting %4$d · not reached %5$d · HTTP %6$d</string>
+    <string name="summary_counts">Feeds: %1$d · last result OK %2$d · failed %3$d · HTTP pending %4$d · waiting %5$d · unfinished %6$d</string>
+    <string name="summary_http">Feeds still on http://: %1$d. They are not fetched unless HTTP is allowed.</string>
     <string name="summary_never_fetched">Never fetched: %1$d</string>
     <string name="unknown_value">unknown</string>
     <string name="yes">Yes</string>

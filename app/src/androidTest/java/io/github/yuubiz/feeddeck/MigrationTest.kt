@@ -15,7 +15,7 @@ import org.junit.runner.RunWith
 /**
  * T38: migration test infrastructure. Creates a database from the exported v1 schema with raw SQL, then opens
  * it through the production builder (explicit migrations only, no destructive fallback) and reads it back.
- * When version 2 is introduced, add `runMigrationsAndValidate(DB, 2, true, MIGRATION_1_2)` here.
+ * v2 (N25): the explicit 1→2 migration is validated against the exported v2 schema with the data kept.
  */
 @RunWith(AndroidJUnit4::class)
 class MigrationTest {
@@ -49,6 +49,34 @@ class MigrationTest {
             assertTrue(state.isRead && state.isSaved)
             assertEquals("Tech", room.subscriptionDao().categories("acc").single().name)
             assertEquals(1, room.subscriptionDao().memberships("acc").size)
+        } finally {
+            room.close()
+            context.deleteDatabase(db)
+        }
+    }
+
+    @Test
+    fun migration1To2IsValidAndKeepsData() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(db)
+        helper.createDatabase(db, 1).apply {
+            execSQL("INSERT INTO accounts (id, backendType, displayName, createdAt) VALUES ('acc', 'LOCAL', 'Local', 0)")
+            execSQL(
+                "INSERT INTO feeds (id, accountId, subscriptionUrl, fetchUrl, siteUrl, feedTitle, userTitle, isSubscribed, isPaused, createdAt) " +
+                    "VALUES ('f1', 'acc', 'http://example.com/a.xml', 'http://example.com/a.xml', NULL, 'A', NULL, 1, 0, 0)",
+            )
+            execSQL(
+                "INSERT INTO articles (id, accountId, feedId, entryKey, externalEntryId, linkUrl, title, summaryText, author, publishedAt, firstSeenAt, sortAt, imageUrl, lastSeenAt) " +
+                    "VALUES ('a1', 'acc', 'f1', 'id:1', NULL, 'https://example.com/1', 't', 's', NULL, 1, 1, 1, NULL, 1)",
+            )
+            execSQL("INSERT INTO article_states (articleId, isRead, isSaved, updatedAt) VALUES ('a1', 1, 1, 1)")
+            close()
+        }
+        helper.runMigrationsAndValidate(db, 2, true, io.github.yuubiz.feeddeck.data.db.Migrations.MIGRATION_1_2).close()
+        val room = Room.databaseBuilder(context, AppDatabase::class.java, db).addMigrations(*AppDatabase.MIGRATIONS).build()
+        try {
+            val state = runBlocking { room.articleDao().state("a1")!! }
+            assertTrue(state.isRead && state.isSaved)
         } finally {
             room.close()
             context.deleteDatabase(db)
