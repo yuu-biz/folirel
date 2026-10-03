@@ -10,9 +10,11 @@ import io.github.yuubiz.feeddeck.data.db.FeedEntity
 import io.github.yuubiz.feeddeck.data.db.FeedFetchStateEntity
 import io.github.yuubiz.feeddeck.data.db.FeedDiagnosticsEntity
 import io.github.yuubiz.feeddeck.data.db.FeedHttpsMigrationEntity
+import io.github.yuubiz.feeddeck.data.db.FeedUrlMoveEntity
 import io.github.yuubiz.feeddeck.backend.FeedResult
 import io.github.yuubiz.feeddeck.model.FeedDiagnostics
 import io.github.yuubiz.feeddeck.model.FeedFetchInfo
+import io.github.yuubiz.feeddeck.model.FeedUrlMove
 import io.github.yuubiz.feeddeck.model.FetchError
 import io.github.yuubiz.feeddeck.model.Structure
 import io.github.yuubiz.feeddeck.network.UrlNormalizer
@@ -28,6 +30,8 @@ data class ImportPreview(
     val newFeeds: Int,
     val existingFeeds: Int,
     val resubscribeFeeds: Int,
+    /** Names of (up to 10 of) the unsubscribed feeds this import would subscribe again, so it is never a surprise. */
+    val resubscribeSamples: List<String> = emptyList(),
     val addedMemberships: Int,
     val multiCategoryFeeds: Int,
     /** Valid http:// feeds; registered, but not fetched while HTTP is disabled. */
@@ -85,7 +89,8 @@ class SubscriptionRepository(
         dao.observeFetchState(feedId),
         db.articleDao().observeFeedCounts(feedId),
         dao.observeHttpsMigration(feedId),
-    ) { feed, state, counts, https ->
+        dao.observeUrlMoves(feedId),
+    ) { feed, state, counts, https, moves ->
         feed?.let {
             FeedFetchInfo(
                 fetchUrl = it.fetchUrl, siteUrl = it.siteUrl, feedTitle = it.feedTitle, userTitle = it.userTitle,
@@ -93,6 +98,7 @@ class SubscriptionRepository(
                 retryAfterUntil = state?.retryAfterUntil, failureCount = state?.failureCount ?: 0,
                 storedArticles = counts.total, unreadArticles = counts.unread, savedArticles = counts.saved,
                 httpsFromUrl = https?.takeIf { m -> m.httpsUrl == it.fetchUrl }?.httpUrl,
+                urlMoves = moves.map { m -> FeedUrlMove(m.fromUrl, m.toUrl, m.movedAt) },
             )
         }
     }
@@ -148,6 +154,7 @@ class SubscriptionRepository(
             newFeeds = newUrls.size,
             existingFeeds = existing.count { it.isSubscribed },
             resubscribeFeeds = existing.count { !it.isSubscribed },
+            resubscribeSamples = existing.filter { !it.isSubscribed }.take(10).map { Structure.displayName(it) },
             addedMemberships = added,
             multiCategoryFeeds = wantedMemberships.groupBy { it.first }.count { it.value.size > 1 },
             httpFeeds = httpUrls.size,
@@ -164,7 +171,7 @@ class SubscriptionRepository(
      * Finds the existing feed of an OPML/add-feed URL: the registered URL first, then a feed already fetched from
      * that URL (moved to HTTPS or permanently redirected there). One implementation for preview and commit.
      */
-    private class FeedLookup(feeds: List<FeedEntity>, migrations: List<FeedHttpsMigrationEntity>) {
+    private class FeedLookup(feeds: List<FeedEntity>, migrations: List<FeedHttpsMigrationEntity>, moves: List<FeedUrlMoveEntity>) {
         private val byUrl = feeds.associateByTo(HashMap()) { it.subscriptionUrl }
         private val byFetchUrl = HashMap<String, FeedEntity>()
 
@@ -172,7 +179,9 @@ class SubscriptionRepository(
             val byId = feeds.associateBy { it.id }
             val order = compareBy<FeedEntity>({ it.createdAt }, { it.id })
             val candidates = feeds.map { it.fetchUrl to it } +
-                migrations.mapNotNull { m -> byId[m.feedId]?.let { m.httpsUrl to it } }
+                migrations.mapNotNull { m -> byId[m.feedId]?.let { m.httpsUrl to it } } +
+                // Every address a feed was moved from or to still identifies that feed (older OPML files).
+                moves.flatMap { m -> byId[m.feedId]?.let { listOf(m.fromUrl to it, m.toUrl to it) }.orEmpty() }
             // Earliest feed wins, like the SQL lookup (ORDER BY createdAt, id LIMIT 1).
             candidates.sortedWith { a, b -> order.compare(a.second, b.second) }.forEach { (url, feed) -> byFetchUrl.putIfAbsent(url, feed) }
         }
@@ -185,7 +194,8 @@ class SubscriptionRepository(
         }
     }
 
-    private suspend fun feedLookup(accountId: String) = FeedLookup(dao.feeds(accountId), dao.httpsMigrations(accountId))
+    private suspend fun feedLookup(accountId: String) =
+        FeedLookup(dao.feeds(accountId), dao.httpsMigrations(accountId), dao.urlMoves(accountId))
 
     /**
      * Applies the import in one transaction: add/merge only. Existing user titles, memberships and reading
@@ -261,7 +271,7 @@ class SubscriptionRepository(
             is UrlNormalizer.Result.Invalid -> return AddFeedResult.Invalid(result.reason)
         }
         return db.withTransaction {
-            val existing = dao.feedByUrl(accountId, url) ?: dao.feedByFetchUrl(accountId, url)
+            val existing = feedLookup(accountId).find(url)
             val result = when {
                 existing == null -> {
                     val id = ids.newId()
@@ -293,6 +303,25 @@ class SubscriptionRepository(
 
     suspend fun resubscribe(feedId: String) {
         dao.setSubscribed(feedId, true)
+    }
+
+    /**
+     * Soft-unsubscribes exactly [ids] in one transaction (SUB-BULK). Articles, reading and saved state and category
+     * memberships stay; saved articles remain readable under "Saved". Feeds that are already unsubscribed are not
+     * touched. Returns the ids that were really changed, so an undo restores exactly those.
+     */
+    suspend fun unsubscribeAll(ids: Collection<String>): List<String> = setSubscribedAll(ids, subscribed = false)
+
+    /** The counterpart of [unsubscribeAll] (undo / bulk subscribe again). Returns the ids that were really changed. */
+    suspend fun resubscribeAll(ids: Collection<String>): List<String> = setSubscribedAll(ids, subscribed = true)
+
+    private suspend fun setSubscribedAll(ids: Collection<String>, subscribed: Boolean): List<String> = db.withTransaction {
+        val changed = ArrayList<String>()
+        ids.distinct().chunked(SQL_CHUNK).forEach { chunk ->
+            changed += dao.idsWithSubscribed(chunk, !subscribed)
+            dao.setSubscribedBulk(chunk, subscribed)
+        }
+        changed
     }
 
     suspend fun setPaused(feedId: String, paused: Boolean) {
@@ -373,9 +402,9 @@ class SubscriptionRepository(
     suspend fun exportData(accountId: String): Pair<List<FeedEntity>, Map<String, List<List<String>>>> {
         // Feeds moved to HTTPS are exported with their current https:// fetch URL (it may have followed a later
         // permanent redirect); importing that file again finds the same feed by its fetch URL.
-        val migrated = dao.httpsMigrations(accountId).map { it.feedId }.toSet()
+        val migrated = (dao.httpsMigrations(accountId).map { it.feedId } + dao.urlMoves(accountId).map { it.feedId }).toSet()
         val feeds = dao.feeds(accountId).filter { it.isSubscribed }
-            .map { f -> if (f.id in migrated && f.fetchUrl.startsWith("https://")) f.copy(subscriptionUrl = f.fetchUrl) else f }
+            .map { f -> if (f.id in migrated) f.copy(subscriptionUrl = f.fetchUrl) else f }
         val paths = dao.categories(accountId).associate { it.id to CategoryPaths.decode(it.pathSegmentsJson) }
         val byFeed = dao.memberships(accountId).groupBy({ it.feedId }, { paths.getValue(it.categoryId) })
         return feeds to byFeed
@@ -386,6 +415,28 @@ class SubscriptionRepository(
     /** Subscribed feeds still fetched over http://. */
     suspend fun httpFeeds(accountId: String): List<FeedEntity> =
         dao.feeds(accountId).filter { it.isSubscribed && it.fetchUrl.startsWith("http://", ignoreCase = true) }
+
+    /** What discovery compares candidates with: the feed's current address, site, title, entries and article links. */
+    class DiscoverySource(
+        val fetchUrl: String,
+        val siteUrl: String?,
+        val feedTitle: String?,
+        val displayName: String,
+        val entryKeys: Set<String>,
+        val articleLinks: List<String>,
+    )
+
+    suspend fun discoverySource(feedId: String): DiscoverySource? {
+        val feed = dao.feed(feedId) ?: return null
+        return DiscoverySource(
+            fetchUrl = feed.fetchUrl,
+            siteUrl = feed.siteUrl,
+            feedTitle = feed.feedTitle,
+            displayName = Structure.displayName(feed),
+            entryKeys = db.articleDao().recentEntryKeys(feedId, 200).toSet(),
+            articleLinks = db.iconDao().recentLinks(feedId, 20),
+        )
+    }
 
     /** Title and recent entry keys of a feed, to recognize the same feed over HTTPS. */
     suspend fun knownContent(feedId: String): Pair<String?, List<String>> =
@@ -404,10 +455,43 @@ class SubscriptionRepository(
         true
     }
 
+    sealed interface MoveResult {
+        data object Applied : MoveResult
+
+        /** The feed was unsubscribed, or its fetch URL is no longer the one the candidate was found for. */
+        data object Stale : MoveResult
+
+        data object Invalid : MoveResult
+
+        /** The new address already belongs to another subscription; nothing is merged automatically. */
+        data class Conflict(val feedId: String, val name: String) : MoveResult
+    }
+
+    /**
+     * Applies a user-approved move of the fetch URL of [feedId] from [fromUrl] to [toUrl] (SUB-DISCOVERY). The feed
+     * row (id, categories, articles, reading and saved state) stays; the registered URL stays the OPML identity and
+     * both addresses are recorded, so importing an older OPML still finds this feed. The errors and waits of the old
+     * address are cleared so the new one is tried at the next refresh. A new address that already belongs to
+     * another feed is refused.
+     */
+    suspend fun applyUrlMove(feedId: String, fromUrl: String, toUrl: String): MoveResult = db.withTransaction {
+        val feed = dao.feed(feedId)
+        if (feed == null || !feed.isSubscribed || feed.fetchUrl != fromUrl) return@withTransaction MoveResult.Stale
+        val target = UrlNormalizer.normalizedOrNull(toUrl)
+        if (target == null || target == fromUrl) return@withTransaction MoveResult.Invalid
+        val owner = feedLookup(feed.accountId).find(target)
+        if (owner != null && owner.id != feedId) return@withTransaction MoveResult.Conflict(owner.id, Structure.displayName(owner))
+        dao.setFetchUrl(feedId, target)
+        dao.insertUrlMove(FeedUrlMoveEntity(ids.newId(), feedId, fromUrl, target, clock.millis()))
+        dao.clearFetchFailure(feedId)
+        MoveResult.Applied
+    }
+
     private suspend fun accountOf(categoryId: String): String? =
         db.subscriptionDao().categoryAccount(categoryId)
 
     companion object {
         const val LOCAL = "LOCAL"
+        private const val SQL_CHUNK = 500
     }
 }

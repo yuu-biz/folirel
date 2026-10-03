@@ -29,7 +29,19 @@ data class FeedNode(
     val lastError: FetchError?,
     val initialized: Boolean,
     val categoryIds: Set<String>,
-)
+    val lastSuccessAt: Long? = null,
+    val failureCount: Int = 0,
+    /** The server asked for no request before this time (Retry-After). */
+    val retryAfterUntil: Long? = null,
+    /** Next automatic attempt (failure backoff). */
+    val nextEligibleAt: Long? = null,
+) {
+    val problem: FeedProblem? get() = lastError?.let { FeedProblem.of(it) }
+
+    /** Waiting for a retry time: the server's Retry-After, or the failure backoff after an error. */
+    fun isWaiting(now: Long): Boolean =
+        (retryAfterUntil ?: 0) > now || (lastError != null && (nextEligibleAt ?: 0) > now)
+}
 
 /** Subscriptions and categories derived for drawer, tabs and scope resolution. */
 data class Structure(
@@ -68,6 +80,10 @@ data class Structure(
                     lastError = FetchError.fromStored(state?.lastErrorCode),
                     initialized = state?.initialized == true,
                     categoryIds = categoriesByFeed[f.id].orEmpty().toSet(),
+                    lastSuccessAt = state?.lastSuccessAt,
+                    failureCount = state?.failureCount ?: 0,
+                    retryAfterUntil = state?.retryAfterUntil,
+                    nextEligibleAt = state?.nextEligibleAt,
                 )
             }
             val paths = categories.associate { it.id to CategoryPaths.decode(it.pathSegmentsJson) }

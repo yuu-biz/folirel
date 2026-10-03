@@ -80,6 +80,13 @@ interface SubscriptionDao {
     @Query("UPDATE feeds SET isSubscribed = :subscribed WHERE id = :id")
     suspend fun setSubscribed(id: String, subscribed: Boolean): Int
 
+    /** Only rows that are not in that state yet change; the return value is what really changed. */
+    @Query("UPDATE feeds SET isSubscribed = :subscribed WHERE id IN (:ids) AND isSubscribed != :subscribed")
+    suspend fun setSubscribedBulk(ids: List<String>, subscribed: Boolean): Int
+
+    @Query("SELECT id FROM feeds WHERE id IN (:ids) AND isSubscribed = :subscribed")
+    suspend fun idsWithSubscribed(ids: List<String>, subscribed: Boolean): List<String>
+
     @Query("UPDATE feeds SET isPaused = :paused WHERE id = :id")
     suspend fun setPaused(id: String, paused: Boolean): Int
 

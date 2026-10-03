@@ -375,4 +375,96 @@
     <string name="status_part_not_reached">not reached %1$d</string>
     <string name="status_part_http">HTTP held %1$d</string>
     <string name="status_part_separator">" · "</string>
+    <plurals name="selected_count">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <string name="action_cancel_selection">Cancel selection</string>
+    <string name="action_select_feeds">Select feeds</string>
+    <plurals name="select_shown">
+        <item quantity="one">Select shown (%d)</item>
+        <item quantity="other">Select shown (%d)</item>
+    </plurals>
+    <string name="action_clear_selection">Clear selection</string>
+    <plurals name="unsubscribe_selected">
+        <item quantity="one">Unsubscribe %d feed</item>
+        <item quantity="other">Unsubscribe %d feeds</item>
+    </plurals>
+    <string name="feed_filter_all">All</string>
+    <string name="feed_filter_failed">Failed</string>
+    <string name="feed_filter_never">Not fetched yet</string>
+    <string name="feed_filter_http">HTTP held</string>
+    <string name="feed_filter_waiting">Waiting to retry</string>
+    <string name="feed_filter_paused">Paused</string>
+    <string name="filter_nothing_shown">No feed matches this filter.</string>
+    <string name="problem_missing">Not found (404/410)</string>
+    <string name="problem_access">Access denied (401/403)</string>
+    <string name="problem_busy">Too many requests (429)</string>
+    <string name="problem_server">Server error (5xx)</string>
+    <string name="problem_tls">Certificate problem</string>
+    <string name="problem_network">Connection problem (often temporary)</string>
+    <string name="problem_unreadable">Not a readable feed</string>
+    <string name="problem_blocked">Blocked address or redirect loop</string>
+    <string name="problem_other">Other error</string>
+    <plurals name="bulk_title">
+        <item quantity="one">Unsubscribe %d feed?</item>
+        <item quantity="other">Unsubscribe %d feeds?</item>
+    </plurals>
+    <string name="bulk_recovered">Works again since you selected it</string>
+    <string name="bulk_failures">%d failures in a row</string>
+    <string name="bulk_last_success">last success %s</string>
+    <string name="bulk_never_succeeded">never fetched successfully</string>
+    <string name="bulk_retry_after">retry not before %s</string>
+    <plurals name="bulk_more">
+        <item quantity="one">and %d more</item>
+        <item quantity="other">and %d more</item>
+    </plurals>
+    <plurals name="bulk_recovered_note">
+        <item quantity="one">%d feed works again and is kept subscribed.</item>
+        <item quantity="other">%d feeds work again and are kept subscribed.</item>
+    </plurals>
+    <string name="bulk_note">A failure does not prove that a site is closed: 404/410 can also mean the address moved, and connection, busy or server errors often pass. Articles, saved and read state and categories stay on the device (saved articles remain under Saved). You can undo right after, and subscribe again later from the list. Importing an older OPML would subscribe these feeds again.</string>
+    <plurals name="msg_bulk_unsubscribed">
+        <item quantity="one">Unsubscribed %d feed.</item>
+        <item quantity="other">Unsubscribed %d feeds.</item>
+    </plurals>
+    <plurals name="msg_bulk_kept_recovered">
+        <item quantity="one">%d recovered feed was kept.</item>
+        <item quantity="other">%d recovered feeds were kept.</item>
+    </plurals>
+    <string name="msg_bulk_nothing_changed">Nothing was changed.</string>
+    <string name="action_undo">Undo</string>
+    <string name="import_resubscribe_note">This file contains feeds you unsubscribed. Importing subscribes them again and fetches them:</string>
+    <string name="import_resubscribe_more">and %d more</string>
+    <string name="msg_move_applied">Address changed. The feed keeps its articles, categories and read/saved state.</string>
+    <string name="msg_move_conflict">That address already belongs to another subscription (%s). Nothing was merged.</string>
+    <string name="msg_move_stale">The feed changed in the meantime. Nothing was changed.</string>
+    <string name="discovery_title">Find where this feed moved</string>
+    <string name="discovery_intro">Looks on the feed\'s own site for RSS/Atom links and checks that each one is a real feed. Nothing is chosen or changed for you.</string>
+    <string name="discovery_find">Look on the site</string>
+    <string name="discovery_web_search">Search the web by feed name</string>
+    <string name="discovery_web_search_note">Opens your device search with the feed name and \"RSS\" when you tap it. Nothing is sent from here otherwise. Paste an address you find below to check it.</string>
+    <string name="discovery_no_search_app">No app on this device can run a web search.</string>
+    <string name="discovery_enter_label">Site or feed address you found</string>
+    <string name="discovery_check_entered">Check this address</string>
+    <string name="discovery_failed">The search could not run.</string>
+    <string name="discovery_page_read">Read the site page and listed the feed links it declares.</string>
+    <string name="discovery_page_feed">The address is itself a feed.</string>
+    <string name="discovery_page_no_site">No site address is known for this feed. Enter one below.</string>
+    <string name="discovery_page_http">That address uses http://, which is not allowed in Settings.</string>
+    <string name="discovery_page_unreadable">The page could not be read.</string>
+    <string name="discovery_none_found">No RSS/Atom links were found there.</string>
+    <string name="discovery_not_fetchable">Not usable as a feed</string>
+    <string name="discovery_entries">%d entries</string>
+    <string name="discovery_shared">%d articles shared with your feed</string>
+    <string name="discovery_same_title">same feed title</string>
+    <string name="discovery_no_evidence">no articles in common, different title: check before using</string>
+    <string name="discovery_use">Use this address</string>
+    <string name="discovery_close">Close results</string>
+    <string name="discovery_history">Earlier address changes</string>
+    <string name="discovery_adopt_title">Change this feed\'s address?</string>
+    <string name="discovery_adopt_from">Now: %s</string>
+    <string name="discovery_adopt_to">New: %s</string>
+    <string name="discovery_adopt_note">The feed keeps its articles, categories and read/saved state. Articles of the new address are matched by their own ids and links, so some may appear again as new. Older OPML files that name the old address still find this feed.</string>
+    <string name="discovery_adopt_confirm">Change address</string>
 </resources>

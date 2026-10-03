@@ -120,6 +120,18 @@ private fun PreviewContent(state: ImportState.Preview, onConfirm: () -> Unit, on
         CountRow(stringResource(R.string.import_new_feeds), p.newFeeds)
         CountRow(stringResource(R.string.import_existing_feeds), p.existingFeeds)
         CountRow(stringResource(R.string.import_resubscribe), p.resubscribeFeeds)
+        if (p.resubscribeSamples.isNotEmpty()) {
+            // Feeds the user unsubscribed (for example a failed-feed cleanup) come back with an old OPML: say so by name.
+            val more = if (p.resubscribeFeeds > p.resubscribeSamples.size) {
+                stringResource(R.string.import_resubscribe_more, p.resubscribeFeeds - p.resubscribeSamples.size)
+            } else null
+            Text(
+                (listOf(stringResource(R.string.import_resubscribe_note)) + p.resubscribeSamples.map { "· $it" } + listOfNotNull(more))
+                    .joinToString("\n"),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.testTag("import_resubscribe_list"),
+            )
+        }
         CountRow(stringResource(R.string.import_added_memberships), p.addedMemberships)
         CountRow(stringResource(R.string.import_multi_category), p.multiCategoryFeeds)
         CountRow(stringResource(R.string.import_new_categories), p.newCategories)

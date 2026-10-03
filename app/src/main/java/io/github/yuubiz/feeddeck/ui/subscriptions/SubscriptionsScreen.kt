@@ -1,5 +1,23 @@
 package io.github.yuubiz.feeddeck.ui.subscriptions
 
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SnackbarDuration
+import io.github.yuubiz.feeddeck.ui.home.SourceIcon
+import io.github.yuubiz.feeddeck.model.FeedProblem
+import io.github.yuubiz.feeddeck.model.FeedListFilter
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Button
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -74,9 +92,28 @@ fun SubscriptionEvents(vm: SubscriptionsViewModel, snackbar: SnackbarHostState) 
         "conflict" to stringResource(R.string.msg_category_conflict),
         "cat_invalid" to stringResource(R.string.msg_category_invalid),
         "failed" to stringResource(R.string.msg_update_failed),
+        "move_ok" to stringResource(R.string.msg_move_applied),
+        "move_stale" to stringResource(R.string.msg_move_stale),
     )
+    val resources = LocalResources.current
+    val undoLabel = stringResource(R.string.action_undo)
     LaunchedEffect(vm, context) {
         vm.eventFlow.collect { event ->
+            if (event is SubscriptionEvent.BulkUnsubscribed) {
+                val n = event.ids.size
+                val message = buildString {
+                    append(if (n == 0) resources.getString(R.string.msg_bulk_nothing_changed) else resources.getQuantityString(R.plurals.msg_bulk_unsubscribed, n, n))
+                    if (event.skippedRecovered > 0) append(" ").append(resources.getQuantityString(R.plurals.msg_bulk_kept_recovered, event.skippedRecovered, event.skippedRecovered))
+                }
+                // The undo restores exactly the feeds this action changed.
+                val result = snackbar.showSnackbar(message, actionLabel = if (n > 0) undoLabel else null, duration = SnackbarDuration.Long)
+                if (result == SnackbarResult.ActionPerformed) vm.undoBulkUnsubscribe(event.ids)
+                return@collect
+            }
+            if (event is SubscriptionEvent.MoveConflict) {
+                snackbar.showSnackbar(resources.getString(R.string.msg_move_conflict, event.name))
+                return@collect
+            }
             val key = when (event) {
                 is SubscriptionEvent.FeedAdded -> when (event.result) {
                     is AddFeedResult.Added -> if (event.httpPending) "added_http" else "added"
@@ -89,13 +126,16 @@ fun SubscriptionEvents(vm: SubscriptionsViewModel, snackbar: SnackbarHostState) 
                 SubscriptionEvent.CategoryConflict -> "conflict"
                 SubscriptionEvent.CategoryInvalid -> "cat_invalid"
                 SubscriptionEvent.OperationFailed -> "failed"
+                SubscriptionEvent.MoveApplied -> "move_ok"
+                SubscriptionEvent.MoveStale -> "move_stale"
+                is SubscriptionEvent.BulkUnsubscribed, is SubscriptionEvent.MoveConflict -> "failed"
             }
             snackbar.showSnackbar(texts.getValue(key))
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SubscriptionsScreen(
     vm: SubscriptionsViewModel,
@@ -111,37 +151,64 @@ fun SubscriptionsScreen(
     val diagnostics by vm.diagnostics.collectAsStateWithLifecycle()
     val refresh by vm.refreshState.collectAsStateWithLifecycle()
     val search by vm.search.collectAsStateWithLifecycle()
+    val filter by vm.filter.collectAsStateWithLifecycle()
+    val selecting by vm.selecting.collectAsStateWithLifecycle()
+    val selected by vm.selected.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var menu by remember { mutableStateOf(false) }
+    var confirm by remember { mutableStateOf<BulkSnapshot?>(null) }
+    val now = remember(structure, diagnostics) { System.currentTimeMillis() }
     val query = search.trim().lowercase()
-    val feeds = structure.feeds.values
+    val matching = structure.feeds.values
         .filter { query.isEmpty() || it.name.lowercase().contains(query) || it.url.lowercase().contains(query) || it.fetchUrl.lowercase().contains(query) }
         .sortedBy { it.name.lowercase() }
-    val (active, inactive) = feeds.partition { it.subscribed }
+    val (activeAll, inactive) = matching.partition { it.subscribed }
+    // The filter narrows the subscribed feeds only; unsubscribed ones stay in their own section.
+    val active = activeAll.filter { filter.matches(it, diagnostics[it.id], now) }
     val subscribed = structure.subscribedFeeds
     val httpCount = subscribed.count { it.fetchUrl.startsWith("http://") }
     val unfinished = subscribed.count { f -> !f.paused && (diagnostics[f.id]?.pendingSince != null || f.lastError != null) }
+    val filterCounts = FeedListFilter.entries.associateWith { f -> subscribed.count { f.matches(it, diagnostics[it.id], now) } }
+    // A selection never keeps feeds that are gone (unsubscribed elsewhere): only ids of subscribed feeds count.
+    val selectedIds = selected.filter { structure.feeds[it]?.subscribed == true }
+
+    BackHandler(enabled = selecting) { vm.stopSelecting() }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 expandedHeight = 56.dp,
-                title = { Text(stringResource(R.string.nav_subscriptions)) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back)) } },
+                title = { Text(if (selecting) pluralStringResource(R.plurals.selected_count, selectedIds.size, selectedIds.size) else stringResource(R.string.nav_subscriptions)) },
+                navigationIcon = {
+                    if (selecting) {
+                        IconButton(onClick = vm::stopSelecting, modifier = Modifier.testTag("selection_close")) {
+                            Icon(Icons.Filled.Close, stringResource(R.string.action_cancel_selection))
+                        }
+                    } else {
+                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back)) }
+                    }
+                },
                 actions = {
-                    IconButton(onClick = onAddFeed) { Icon(Icons.Filled.Add, stringResource(R.string.action_add_feed)) }
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, stringResource(R.string.action_more)) }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(text = { Text(stringResource(R.string.categories_title)) }, onClick = { menu = false; onCategories() })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.https_check_title)) }, onClick = { menu = false; onHttpsCheck() })
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.action_retry_unfinished)) },
-                            enabled = unfinished > 0 && !refresh.running,
-                            onClick = { menu = false; vm.retryPending() },
-                        )
-                        DropdownMenuItem(text = { Text(stringResource(R.string.action_import_opml)) }, onClick = { menu = false; onImport() })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.action_export_opml)) }, onClick = { menu = false; onExport() })
+                    if (!selecting) {
+                        IconButton(onClick = onAddFeed) { Icon(Icons.Filled.Add, stringResource(R.string.action_add_feed)) }
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, stringResource(R.string.action_more)) }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.action_select_feeds)) },
+                                onClick = { menu = false; vm.startSelecting() },
+                                modifier = Modifier.testTag("menu_select"),
+                            )
+                            DropdownMenuItem(text = { Text(stringResource(R.string.categories_title)) }, onClick = { menu = false; onCategories() })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.https_check_title)) }, onClick = { menu = false; onHttpsCheck() })
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.action_retry_unfinished)) },
+                                enabled = unfinished > 0 && !refresh.running,
+                                onClick = { menu = false; vm.retryPending() },
+                            )
+                            DropdownMenuItem(text = { Text(stringResource(R.string.action_import_opml)) }, onClick = { menu = false; onImport() })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.action_export_opml)) }, onClick = { menu = false; onExport() })
+                        }
                     }
                 },
             )
@@ -157,16 +224,67 @@ fun SubscriptionsScreen(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                 )
             }
-            if (subscribed.isNotEmpty()) {
+            if (subscribed.isNotEmpty() && !selecting) {
                 item { FetchSummary(subscribed, diagnostics, httpCount, unfinished, refresh.running, onHttpsCheck) { vm.retryPending() } }
+            }
+            if (subscribed.isNotEmpty()) {
+                item {
+                    FlowRow(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        itemVerticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        FeedListFilter.entries.forEach { f ->
+                            val count = filterCounts.getValue(f)
+                            // A filter with nothing in it stays visible only while it is the chosen one.
+                            if (f == FeedListFilter.ALL || count > 0 || f == filter) {
+                                FilterChip(
+                                    selected = f == filter,
+                                    onClick = { vm.setFilter(f) },
+                                    label = { Text(stringResource(filterLabel(f)) + " " + count, maxLines = 1) },
+                                    modifier = Modifier.testTag("feed_filter_${f.name}"),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            if (selecting) {
+                item {
+                    FlowRow(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        itemVerticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedButton(onClick = { vm.selectAll(active.map { it.id }) }, enabled = active.isNotEmpty(), modifier = Modifier.testTag("select_shown")) {
+                            Text(pluralStringResource(R.plurals.select_shown, active.size, active.size))
+                        }
+                        OutlinedButton(onClick = vm::clearSelected, enabled = selectedIds.isNotEmpty()) { Text(stringResource(R.string.action_clear_selection)) }
+                        Button(
+                            onClick = { confirm = vm.snapshotOf(selectedIds) },
+                            enabled = selectedIds.isNotEmpty(),
+                            modifier = Modifier.testTag("unsubscribe_selected"),
+                        ) { Text(pluralStringResource(R.plurals.unsubscribe_selected, selectedIds.size, selectedIds.size)) }
+                    }
+                }
             }
             if (structure.loaded && structure.feeds.isEmpty()) {
                 item {
                     Text(stringResource(R.string.empty_no_subscriptions), modifier = Modifier.padding(16.dp))
                 }
             }
-            items(active, key = { it.id }) { FeedRow(it, diagnostics[it.id], structure) { onOpenFeed(it.id) } }
-            if (inactive.isNotEmpty()) {
+            if (structure.loaded && structure.feeds.isNotEmpty() && active.isEmpty() && activeAll.isNotEmpty()) {
+                item { Text(stringResource(R.string.filter_nothing_shown), modifier = Modifier.padding(16.dp)) }
+            }
+            items(active, key = { it.id }) { feed ->
+                FeedRow(
+                    feed, diagnostics[feed.id], structure, now,
+                    selecting = selecting, checked = feed.id in selectedIds,
+                    onClick = { if (selecting) vm.toggleSelected(feed.id) else onOpenFeed(feed.id) },
+                    onLongClick = { if (!selecting) vm.startSelecting(feed.id) },
+                )
+            }
+            if (inactive.isNotEmpty() && !selecting) {
                 item {
                     Text(
                         stringResource(R.string.subscriptions_unsubscribed_header),
@@ -174,11 +292,102 @@ fun SubscriptionsScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     )
                 }
-                items(inactive, key = { it.id }) { FeedRow(it, diagnostics[it.id], structure) { onOpenFeed(it.id) } }
+                items(inactive, key = { it.id }) {
+                    FeedRow(it, diagnostics[it.id], structure, now, selecting = false, checked = false, onClick = { onOpenFeed(it.id) }, onLongClick = {})
+                }
             }
         }
     }
+    confirm?.let { snapshot ->
+        BulkUnsubscribeDialog(
+            snapshot = snapshot,
+            structure = structure,
+            onConfirm = { vm.confirmBulkUnsubscribe(snapshot); confirm = null },
+            onDismiss = { confirm = null },
+        )
+    }
 }
+
+private fun filterLabel(filter: FeedListFilter): Int = when (filter) {
+    FeedListFilter.ALL -> R.string.feed_filter_all
+    FeedListFilter.FAILED -> R.string.feed_filter_failed
+    FeedListFilter.NEVER_FETCHED -> R.string.feed_filter_never
+    FeedListFilter.HTTP_PENDING -> R.string.feed_filter_http
+    FeedListFilter.WAITING -> R.string.feed_filter_waiting
+    FeedListFilter.PAUSED -> R.string.feed_filter_paused
+}
+
+@Composable
+fun problemLabel(problem: FeedProblem): String = stringResource(
+    when (problem) {
+        FeedProblem.MISSING -> R.string.problem_missing
+        FeedProblem.ACCESS -> R.string.problem_access
+        FeedProblem.BUSY -> R.string.problem_busy
+        FeedProblem.SERVER -> R.string.problem_server
+        FeedProblem.TLS -> R.string.problem_tls
+        FeedProblem.NETWORK -> R.string.problem_network
+        FeedProblem.UNREADABLE -> R.string.problem_unreadable
+        FeedProblem.BLOCKED -> R.string.problem_blocked
+        FeedProblem.OTHER -> R.string.problem_other
+    },
+)
+
+/**
+ * Confirmation for the fixed [snapshot]. It never changes which feeds it is about; it only shows live whether a feed
+ * with a problem has recovered since it was selected (those are kept subscribed). Nothing here says a site is
+ * closed: a failure is not proof.
+ */
+@Composable
+private fun BulkUnsubscribeDialog(snapshot: BulkSnapshot, structure: Structure, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val recovered = snapshot.items.filter { it.problem != null && structure.feeds[it.id]?.problem == null }
+    val count = snapshot.items.size - recovered.size
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(pluralStringResource(R.plurals.bulk_title, count, count)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                snapshot.items.take(BULK_LIST_LIMIT).forEach { item ->
+                    val gone = item in recovered
+                    Column(Modifier.testTag("bulk_item_${item.id}")) {
+                        Text(item.name, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        val details = buildList {
+                            if (gone) add(stringResource(R.string.bulk_recovered))
+                            else item.problem?.let { add(problemLabel(it)) }
+                            item.httpStatus?.takeIf { item.problem != null && !gone }?.let { add("HTTP $it") }
+                            if (item.failureCount > 0 && !gone) add(stringResource(R.string.bulk_failures, item.failureCount))
+                            add(
+                                formatTime(context, item.lastSuccessAt)?.let { stringResource(R.string.bulk_last_success, it) }
+                                    ?: stringResource(R.string.bulk_never_succeeded),
+                            )
+                        }
+                        Text(details.joinToString(" · "), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (snapshot.items.size > BULK_LIST_LIMIT) {
+                    Text(pluralStringResource(R.plurals.bulk_more, snapshot.items.size - BULK_LIST_LIMIT, snapshot.items.size - BULK_LIST_LIMIT), style = MaterialTheme.typography.labelMedium)
+                }
+                if (recovered.isNotEmpty()) {
+                    Text(
+                        pluralStringResource(R.plurals.bulk_recovered_note, recovered.size, recovered.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.testTag("bulk_recovered_note"),
+                    )
+                }
+                Text(stringResource(R.string.bulk_note), style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = count > 0, modifier = Modifier.testTag("bulk_confirm")) {
+                Text(pluralStringResource(R.plurals.unsubscribe_selected, count, count))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss, modifier = Modifier.testTag("bulk_cancel")) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+private const val BULK_LIST_LIMIT = 8
 
 /** Counts by last result, so "many feeds not fetched" has a visible reason (SYNC-04). */
 @Composable
@@ -220,23 +429,59 @@ private fun FetchSummary(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FeedRow(feed: FeedNode, diagnostics: FeedDiagnostics?, structure: Structure, onClick: () -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 8.dp)
+private fun FeedRow(
+    feed: FeedNode,
+    diagnostics: FeedDiagnostics?,
+    structure: Structure,
+    now: Long,
+    selecting: Boolean,
+    checked: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
+    val context = LocalContext.current
+    Row(
+        Modifier.fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .testTag("feed_row_${feed.id}"),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(feed.name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        val categories = feed.categoryIds.mapNotNull { id -> structure.categories.firstOrNull { it.id == id }?.display }
-        val status = feedStatus(feed, diagnostics)
-        Text(
-            listOfNotNull(feed.fetchUrl.toUri().host, categories.joinToString(", ").ifEmpty { stringResource(R.string.scope_uncategorized) }, status)
-                .joinToString(" · "),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (feed.lastError != null && feed.subscribed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+        if (selecting) {
+            Checkbox(checked = checked, onCheckedChange = null, modifier = Modifier.testTag("feed_check_${feed.id}"))
+            Spacer(Modifier.width(8.dp))
+        }
+        SourceIcon(feed.id, feed.name, size = 24.dp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(feed.name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            val categories = feed.categoryIds.mapNotNull { id -> structure.categories.firstOrNull { it.id == id }?.display }
+            val status = feedStatus(feed, diagnostics)
+            Text(
+                listOfNotNull(feed.fetchUrl.toUri().host, categories.joinToString(", ").ifEmpty { stringResource(R.string.scope_uncategorized) }, status)
+                    .joinToString(" · "),
+                style = MaterialTheme.typography.labelMedium,
+                color = if (feed.lastError != null && feed.subscribed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            val problem = feed.problem
+            if (feed.subscribed && problem != null) {
+                // What is known about the failure: kind, HTTP status, how often in a row, last success, next retry.
+                val retryAt = maxOf(feed.retryAfterUntil ?: 0L, feed.nextEligibleAt ?: 0L).takeIf { it > now }
+                val details = buildList {
+                    add(problemLabel(problem))
+                    diagnostics?.httpStatus?.let { add("HTTP $it") }
+                    if (feed.failureCount > 0) add(stringResource(R.string.bulk_failures, feed.failureCount))
+                    add(formatTime(context, feed.lastSuccessAt)?.let { stringResource(R.string.bulk_last_success, it) } ?: stringResource(R.string.bulk_never_succeeded))
+                    retryAt?.let { t -> formatTime(context, t)?.let { add(stringResource(R.string.bulk_retry_after, it)) } }
+                }
+                Text(details.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
     HorizontalDivider()
 }

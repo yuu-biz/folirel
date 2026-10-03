@@ -13,6 +13,7 @@ import io.github.yuubiz.feeddeck.backend.local.HttpsUpgradeChecker
 import io.github.yuubiz.feeddeck.backend.local.LocalBackend
 import io.github.yuubiz.feeddeck.backend.local.SmallResourceFetcher
 import io.github.yuubiz.feeddeck.backend.local.icon.AndroidIconDecoder
+import io.github.yuubiz.feeddeck.backend.local.discovery.FeedDiscovery
 import io.github.yuubiz.feeddeck.backend.local.icon.FeedIconResolver
 import io.github.yuubiz.feeddeck.browser.BrowserLauncher
 import io.github.yuubiz.feeddeck.data.db.AppDatabase
@@ -29,6 +30,7 @@ import io.github.yuubiz.feeddeck.network.AndroidNetworkStatus
 import io.github.yuubiz.feeddeck.network.HttpClients
 import io.github.yuubiz.feeddeck.network.NetworkGuard
 import io.github.yuubiz.feeddeck.sync.AutoRefreshPolicy
+import io.github.yuubiz.feeddeck.sync.FeedDiscoveryService
 import io.github.yuubiz.feeddeck.sync.FeedIconCoordinator
 import io.github.yuubiz.feeddeck.sync.HttpsUpgradeCoordinator
 import io.github.yuubiz.feeddeck.sync.RefreshCoordinator
@@ -128,6 +130,12 @@ class AppContainer(context: Context) {
         subscriptions = subscriptions,
         refresh = refresh,
         scope = appScope,
+    )
+
+    /** In-site search for a moved feed: same client and policy as feeds (HTTP opt-in, address policy, TLS). */
+    val discovery = FeedDiscoveryService(
+        discovery = FeedDiscovery(SmallResourceFetcher(feedHttpClient), FeedFetcher(feedHttpClient, clock)),
+        subscriptions = subscriptions,
     )
 
     val scheduler = RefreshScheduler(appContext)

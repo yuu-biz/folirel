@@ -52,4 +52,8 @@ data class FeedFetchInfo(
     val savedArticles: Int,
     /** Set when the fetch URL was moved from HTTP to HTTPS after verification. */
     val httpsFromUrl: String?,
+    /** Fetch URL changes the user approved after a discovery, newest first. */
+    val urlMoves: List<FeedUrlMove> = emptyList(),
 )
+
+data class FeedUrlMove(val fromUrl: String, val toUrl: String, val movedAt: Long)

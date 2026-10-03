@@ -9,9 +9,13 @@ import io.github.yuubiz.feeddeck.backend.RefreshScope
 import io.github.yuubiz.feeddeck.backend.local.opml.OpmlWriter
 import io.github.yuubiz.feeddeck.data.repository.AddFeedResult
 import io.github.yuubiz.feeddeck.data.repository.SubscriptionRepository
+import io.github.yuubiz.feeddeck.model.DiscoveryResult
 import io.github.yuubiz.feeddeck.model.FeedDiagnostics
+import io.github.yuubiz.feeddeck.model.FeedListFilter
+import io.github.yuubiz.feeddeck.model.FeedProblem
 import io.github.yuubiz.feeddeck.model.FeedFetchInfo
 import io.github.yuubiz.feeddeck.model.Structure
+import io.github.yuubiz.feeddeck.sync.FeedDiscoveryService
 import io.github.yuubiz.feeddeck.sync.HttpsUpgradeCoordinator
 import io.github.yuubiz.feeddeck.sync.HttpsUpgradeState
 import io.github.yuubiz.feeddeck.sync.RefreshState
@@ -27,6 +31,8 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.ZoneOffset
@@ -39,6 +45,29 @@ sealed interface SubscriptionEvent {
     data object CategoryConflict : SubscriptionEvent
     data object CategoryInvalid : SubscriptionEvent
     data object OperationFailed : SubscriptionEvent
+    /** [ids] are the feeds really unsubscribed (the undo restores exactly those). */
+    data class BulkUnsubscribed(val ids: List<String>, val skippedRecovered: Int) : SubscriptionEvent
+    data object MoveApplied : SubscriptionEvent
+    data class MoveConflict(val name: String) : SubscriptionEvent
+    data object MoveStale : SubscriptionEvent
+}
+
+/** One feed of a bulk unsubscribe confirmation, as it was when it was selected. */
+data class BulkItem(
+    val id: String,
+    val name: String,
+    val problem: FeedProblem?,
+    val lastSuccessAt: Long?,
+    val failureCount: Int,
+    val httpStatus: Int?,
+)
+
+data class BulkSnapshot(val items: List<BulkItem>)
+
+sealed interface DiscoveryState {
+    data object Idle : DiscoveryState
+    data class Running(val feedId: String) : DiscoveryState
+    data class Done(val feedId: String, val result: DiscoveryResult?, val enteredUrl: String?) : DiscoveryState
 }
 
 
@@ -46,6 +75,7 @@ class SubscriptionsViewModel(
     private val subscriptions: SubscriptionRepository,
     private val coordinator: RefreshCoordinator,
     private val httpsUpgrade: HttpsUpgradeCoordinator,
+    private val discovery: FeedDiscoveryService,
     private val documents: DocumentIo,
     private val allowHttp: suspend () -> Boolean,
     private val clock: Clock,
@@ -168,6 +198,123 @@ class SubscriptionsViewModel(
             documents.write(uri, OpmlWriter.write("FeedDeck subscriptions", exportFeeds, created))
         }.isSuccess
         events.send(if (ok) SubscriptionEvent.ExportDone else SubscriptionEvent.ExportFailed)
+    }
+
+    // Selection and filter of the management list (SUB-BULK)
+
+    private val _filter = MutableStateFlow(FeedListFilter.ALL)
+    val filter: StateFlow<FeedListFilter> = _filter.asStateFlow()
+
+    private val _selecting = MutableStateFlow(false)
+    val selecting: StateFlow<Boolean> = _selecting.asStateFlow()
+
+    private val _selected = MutableStateFlow<Set<String>>(emptySet())
+    val selected: StateFlow<Set<String>> = _selected.asStateFlow()
+
+    fun setFilter(filter: FeedListFilter) {
+        _filter.value = filter
+    }
+
+    fun startSelecting(first: String? = null) {
+        _selecting.value = true
+        if (first != null) _selected.value = _selected.value + first
+    }
+
+    fun stopSelecting() {
+        _selecting.value = false
+        _selected.value = emptySet()
+    }
+
+    fun toggleSelected(feedId: String) {
+        _selected.update { if (feedId in it) it - feedId else it + feedId }
+    }
+
+    /** "Select shown": exactly the ids the list shows now (after filter and search), added to the selection. */
+    fun selectAll(ids: Collection<String>) {
+        _selecting.value = true
+        _selected.update { it + ids }
+    }
+
+    fun clearSelected() {
+        _selected.value = emptySet()
+    }
+
+    /**
+     * The feeds to unsubscribe, frozen when the confirmation opens: later list changes (a refresh, a filter, a
+     * search) never change which feeds the dialog is about (SUB-BULK).
+     */
+    fun snapshotOf(ids: Collection<String>): BulkSnapshot {
+        val s = structure.value
+        val d = diagnostics.value
+        val items = ids.mapNotNull { id ->
+            val node = s.feeds[id] ?: return@mapNotNull null
+            if (!node.subscribed) return@mapNotNull null
+            BulkItem(id, node.name, node.problem, node.lastSuccessAt, node.failureCount, d[id]?.httpStatus)
+        }.sortedBy { it.name.lowercase() }
+        return BulkSnapshot(items)
+    }
+
+    /**
+     * Unsubscribes the snapshot (soft: articles, saved and read state, categories stay). A feed that had a problem
+     * when it was selected but works again now is left alone and reported, so nothing that recovered is dropped.
+     */
+    fun confirmBulkUnsubscribe(snapshot: BulkSnapshot) = viewModelScope.launch {
+        val current = structure.value
+        val (recovered, targets) = snapshot.items.partition { it.problem != null && current.feeds[it.id]?.problem == null }
+        val changed = runCatching { subscriptions.unsubscribeAll(targets.map { it.id }) }.getOrNull()
+        if (changed == null) {
+            events.send(SubscriptionEvent.OperationFailed)
+            return@launch
+        }
+        stopSelecting()
+        events.send(SubscriptionEvent.BulkUnsubscribed(changed, recovered.size))
+    }
+
+    /** Undo of a bulk unsubscribe: exactly the feeds it changed, fetched again right away. */
+    fun undoBulkUnsubscribe(ids: List<String>) = viewModelScope.launch {
+        val changed = runCatching { subscriptions.resubscribeAll(ids) }.getOrNull()
+        if (changed == null) {
+            events.send(SubscriptionEvent.OperationFailed)
+            return@launch
+        }
+        if (changed.isNotEmpty()) coordinator.refresh(RefreshScope.Feeds(changed), RefreshReason.MANUAL)
+    }
+
+    // Finding where a feed moved (SUB-DISCOVERY)
+
+    private val _discovery = MutableStateFlow<DiscoveryState>(DiscoveryState.Idle)
+    val discoveryState: StateFlow<DiscoveryState> = _discovery.asStateFlow()
+    private var discoveryJob: Job? = null
+
+    /** Reads the feed site (or the address the user entered) for feed links. Changes nothing. */
+    fun startDiscovery(feedId: String, enteredUrl: String? = null) {
+        discoveryJob?.cancel()
+        _discovery.value = DiscoveryState.Running(feedId)
+        discoveryJob = viewModelScope.launch {
+            val result = runCatching { discovery.run(feedId, enteredUrl) }.getOrNull()
+            _discovery.value = DiscoveryState.Done(feedId, result, enteredUrl)
+        }
+    }
+
+    fun clearDiscovery() {
+        discoveryJob?.cancel()
+        _discovery.value = DiscoveryState.Idle
+    }
+
+    suspend fun searchName(feedId: String): String? = discovery.searchName(feedId)
+
+    /** The user approved this candidate for [feedId]. The refresh that follows fetches the new address. */
+    fun applyMove(feedId: String, fromUrl: String, toUrl: String) = viewModelScope.launch {
+        when (val result = runCatching { subscriptions.applyUrlMove(feedId, fromUrl, toUrl) }.getOrNull()) {
+            SubscriptionRepository.MoveResult.Applied -> {
+                clearDiscovery()
+                events.send(SubscriptionEvent.MoveApplied)
+                coordinator.refresh(RefreshScope.Feeds(listOf(feedId)), RefreshReason.MANUAL)
+            }
+            is SubscriptionRepository.MoveResult.Conflict -> events.send(SubscriptionEvent.MoveConflict(result.name))
+            SubscriptionRepository.MoveResult.Stale, SubscriptionRepository.MoveResult.Invalid -> events.send(SubscriptionEvent.MoveStale)
+            null -> events.send(SubscriptionEvent.OperationFailed)
+        }
     }
 
     private fun guarded(block: suspend () -> Unit) = viewModelScope.launch {

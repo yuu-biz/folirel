@@ -366,4 +366,88 @@
     <string name="status_part_not_reached">未取得%1$d</string>
     <string name="status_part_http">HTTP保留%1$d</string>
     <string name="status_part_separator">・</string>
+    <plurals name="selected_count">
+        <item quantity="other">%d件選択中</item>
+    </plurals>
+    <string name="action_cancel_selection">選択を終了</string>
+    <string name="action_select_feeds">フィードを選択</string>
+    <plurals name="select_shown">
+        <item quantity="other">表示中の%d件を選択</item>
+    </plurals>
+    <string name="action_clear_selection">選択をすべて解除</string>
+    <plurals name="unsubscribe_selected">
+        <item quantity="other">選択した%d件の購読を解除</item>
+    </plurals>
+    <string name="feed_filter_all">すべて</string>
+    <string name="feed_filter_failed">失敗</string>
+    <string name="feed_filter_never">未取得</string>
+    <string name="feed_filter_http">HTTP保留</string>
+    <string name="feed_filter_waiting">再試行待ち</string>
+    <string name="feed_filter_paused">更新停止中</string>
+    <string name="filter_nothing_shown">この条件に当てはまるフィードはありません。</string>
+    <string name="problem_missing">見つかりません（404/410）</string>
+    <string name="problem_access">アクセス拒否（401/403）</string>
+    <string name="problem_busy">リクエスト過多（429）</string>
+    <string name="problem_server">サーバーエラー（5xx）</string>
+    <string name="problem_tls">証明書の問題</string>
+    <string name="problem_network">通信の問題（一時的なことが多い）</string>
+    <string name="problem_unreadable">フィードとして読めない</string>
+    <string name="problem_blocked">拒否されたアドレス／転送ループ</string>
+    <string name="problem_other">その他のエラー</string>
+    <plurals name="bulk_title">
+        <item quantity="other">%d件の購読を解除しますか？</item>
+    </plurals>
+    <string name="bulk_recovered">選択後に回復しています</string>
+    <string name="bulk_failures">連続失敗%d回</string>
+    <string name="bulk_last_success">最終成功 %s</string>
+    <string name="bulk_never_succeeded">一度も取得成功なし</string>
+    <string name="bulk_retry_after">%s以降に再試行</string>
+    <plurals name="bulk_more">
+        <item quantity="other">ほか%d件</item>
+    </plurals>
+    <plurals name="bulk_recovered_note">
+        <item quantity="other">%d件は回復しているため、購読したままにします。</item>
+    </plurals>
+    <string name="bulk_note">失敗しただけではサイトが閉鎖したとは言えません。404/410はアドレスの移転でも起こり、通信・混雑・サーバーのエラーは時間がたつと直ることがよくあります。記事・保存・既読・カテゴリは端末に残り、保存した記事は「保存」から読めます。解除の直後は取り消せ、あとで一覧から再購読もできます。古いOPMLを取り込むと、これらのフィードは再購読されます。</string>
+    <plurals name="msg_bulk_unsubscribed">
+        <item quantity="other">%d件の購読を解除しました。</item>
+    </plurals>
+    <plurals name="msg_bulk_kept_recovered">
+        <item quantity="other">回復済みの%d件は解除しませんでした。</item>
+    </plurals>
+    <string name="msg_bulk_nothing_changed">変更はありません。</string>
+    <string name="action_undo">元に戻す</string>
+    <string name="import_resubscribe_note">このファイルには、解除済みのフィードが含まれています。取り込むと購読が再開され、取得されます：</string>
+    <string name="import_resubscribe_more">ほか%d件</string>
+    <string name="msg_move_applied">アドレスを変更しました。記事・カテゴリ・既読/保存の状態は引き継がれます。</string>
+    <string name="msg_move_conflict">そのアドレスは別の購読（%s）が使っています。統合はしていません。</string>
+    <string name="msg_move_stale">その間にフィードの状態が変わったため、何も変更していません。</string>
+    <string name="discovery_title">移行先を探す</string>
+    <string name="discovery_intro">このフィードのサイト内でRSS/Atomのリンクを探し、それぞれが本物のフィードか確かめます。選択も変更も自動では行いません。</string>
+    <string name="discovery_find">サイト内を探す</string>
+    <string name="discovery_web_search">フィード名でWeb検索</string>
+    <string name="discovery_web_search_note">タップしたときだけ、端末の検索にフィード名と「RSS」を渡します。それ以外では何も送信しません。見つけたアドレスは下に貼り付けて確認できます。</string>
+    <string name="discovery_no_search_app">この端末にはWeb検索できるアプリがありません。</string>
+    <string name="discovery_enter_label">見つけたサイトまたはフィードのアドレス</string>
+    <string name="discovery_check_entered">このアドレスを確認</string>
+    <string name="discovery_failed">検索を実行できませんでした。</string>
+    <string name="discovery_page_read">サイトのページを読み、宣言されているフィードのリンクを一覧にしました。</string>
+    <string name="discovery_page_feed">このアドレスはフィードそのものです。</string>
+    <string name="discovery_page_no_site">このフィードのサイトアドレスが分かりません。下に入力してください。</string>
+    <string name="discovery_page_http">そのアドレスはhttp://で、設定で許可されていません。</string>
+    <string name="discovery_page_unreadable">ページを読み込めませんでした。</string>
+    <string name="discovery_none_found">RSS/Atomのリンクは見つかりませんでした。</string>
+    <string name="discovery_not_fetchable">フィードとして使えません</string>
+    <string name="discovery_entries">%d件の記事</string>
+    <string name="discovery_shared">登録中のフィードと共通の記事%d件</string>
+    <string name="discovery_same_title">フィード名が同じ</string>
+    <string name="discovery_no_evidence">共通の記事なし・名前も別：使う前に確認してください</string>
+    <string name="discovery_use">このアドレスを使う</string>
+    <string name="discovery_close">結果を閉じる</string>
+    <string name="discovery_history">過去のアドレス変更</string>
+    <string name="discovery_adopt_title">このフィードのアドレスを変更しますか？</string>
+    <string name="discovery_adopt_from">現在：%s</string>
+    <string name="discovery_adopt_to">新：%s</string>
+    <string name="discovery_adopt_note">記事・カテゴリ・既読/保存の状態は引き継がれます。新しいアドレスの記事は自身のIDとリンクで照合するため、一部が新着として再び現れることがあります。旧アドレスを書いた古いOPMLも、このフィードに対応づけられます。</string>
+    <string name="discovery_adopt_confirm">アドレスを変更</string>
 </resources>

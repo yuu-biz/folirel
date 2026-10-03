@@ -102,6 +102,7 @@ fun FeedDetailScreen(vm: SubscriptionsViewModel, feedId: String, onBack: () -> U
                 }
             }
             item { DiagnosticsSection(feed, info, diag) }
+            if (feed.subscribed) item { DiscoverySection(vm, feedId, feed.fetchUrl, info) }
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                     Text(stringResource(R.string.feed_pause), modifier = Modifier.weight(1f))
