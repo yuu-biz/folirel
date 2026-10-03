@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Compatibility trade-off (docs/04 section 6): Android cleartext permission is static, so the OS layer
+  permits it for arbitrary hosts. The app-level SafeHttpClient denies every http:// request unless the user
+  explicitly opted in from Settings. Certificate validation uses the system trust store only; no user CAs,
+  no trust-all.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

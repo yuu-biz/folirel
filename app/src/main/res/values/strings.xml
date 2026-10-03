@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">FeedDeck</string>
+    <string name="empty_no_subscriptions">No subscriptions yet. Import an OPML file or add a feed URL.</string>
+</resources>

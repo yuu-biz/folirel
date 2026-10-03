@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="empty_no_subscriptions">購読がありません。OPMLを読み込むか、フィードURLを追加してください。</string>
+</resources>
