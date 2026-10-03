@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0"><head><title>架空の購読</title></head><body>
+  <outline text="Tech">
+    <outline text="AI"><outline text="Alpha" type="rss" xmlUrl="https://example.com/alpha.xml" htmlUrl="https://example.com/alpha/" /></outline>
+    <outline text="Tools"><outline title="Beta 日本語" xmlUrl="https://example.org/beta.atom" /></outline>
+  </outline>
+  <outline text="News">
+    <outline text="Alpha 別名" xmlUrl="https://example.com/alpha.xml" />
+    <outline text="Gamma &amp; News" xmlUrl="https://example.net/gamma.rdf" />
+  </outline>
+  <outline text="未分類のニュース" xmlUrl="https://example.com/unfiled.xml" />
+  <outline text="Alpha duplicate" xmlUrl="https://example.com/alpha.xml" />
+</body></opml>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<a:feed xmlns:a="http://www.w3.org/2005/Atom" xml:base="https://example.org/base/">
+ <a:title>架空のAtom</a:title><a:id>urn:example:feed</a:id><a:updated>2026-10-03T01:00:00Z</a:updated><a:author><a:name>共通の著者</a:name></a:author>
+ <a:entry xml:base="articles/"><a:id>urn:uuid:atom-001</a:id><a:title type="html">&lt;b&gt;Atom 日本語&lt;/b&gt;</a:title><a:link href="1"/><a:link rel="self" href="1.atom"/><a:published>2026-10-02T19:00:00+09:00</a:published><a:updated>2026-10-03T01:00:00Z</a:updated><a:summary type="html">&lt;p&gt;概要です&lt;/p&gt;</a:summary></a:entry>
+</a:feed>

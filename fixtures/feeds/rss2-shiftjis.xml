@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="Shift_JIS"?>
+<rss version="2.0"><channel><title>日本語配信</title><link>https://example.com/</link><description>文字コード試験</description><item><guid isPermaLink="false">sjis-001</guid><title>日本語の文字化けを確認</title><link>https://example.com/sjis/1</link><description>ひらがな、カタカナ、漢字。</description></item></channel></rss>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0"><body>
+ <outline text="Valid" xmlUrl="https://example.com/news.xml" />
+ <outline text="Legacy HTTP" xmlUrl="http://example.org/legacy.xml" />
+ <outline text="Unsafe" xmlUrl="javascript:alert(1)" />
+ <outline text="Website only" type="link" htmlUrl="https://example.net/" />
+ <outline text="Folder/with/slashes"><outline text="Child" xmlUrl="https://example.com/slash.xml" /></outline>
+</body></opml>

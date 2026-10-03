@@ -1,0 +1,18 @@
+{
+  "contractInput": [
+    "IDのない 記事",
+    null,
+    "編集部",
+    "同じ 概要"
+  ],
+  "assertions": {
+    "articleCount": 1,
+    "articles": [
+      {
+        "entryKey": "fallback:39d3073db359e763f2c77f1baadc5b5ad2df80b24be867201bb148ce9e766c1a",
+        "linkUrl": null,
+        "publishedAt": null
+      }
+    ]
+  }
+}

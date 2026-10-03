@@ -1,0 +1,40 @@
+{
+  "equalPairs": [
+    [
+      "HTTPS://EXAMPLE.COM:443",
+      "https://example.com/"
+    ],
+    [
+      "https://example.com/news.xml#x",
+      "https://example.com/news.xml"
+    ]
+  ],
+  "distinctPairs": [
+    [
+      "http://example.com/a",
+      "https://example.com/a"
+    ],
+    [
+      "https://example.com/A",
+      "https://example.com/a"
+    ],
+    [
+      "https://example.com/a",
+      "https://example.com/a/"
+    ],
+    [
+      "https://example.com/a?x=1&y=2",
+      "https://example.com/a?y=2&x=1"
+    ],
+    [
+      "https://example.com/a?x=1&x=2",
+      "https://example.com/a?x=2"
+    ]
+  ],
+  "rejected": [
+    "file:///tmp/feed",
+    "content://provider/file",
+    "javascript:alert(1)",
+    "https://user:pass@example.com/feed"
+  ]
+}

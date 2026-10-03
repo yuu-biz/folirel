@@ -1,0 +1,3 @@
+<?xml version="1.0"?>
+<!DOCTYPE opml [<!ENTITY remote SYSTEM "https://example.invalid/never-fetch">]>
+<opml version="2.0"><body><outline text="&remote;" xmlUrl="https://example.com/news.xml" /></body></opml>

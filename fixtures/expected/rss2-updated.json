@@ -1,0 +1,13 @@
+{
+  "assertions": {
+    "entryKey": "id:alpha-001",
+    "title": "更新された日本語の見出し",
+    "preserveFields": [
+      "id",
+      "firstSeenAt",
+      "sortAt",
+      "ArticleState.isRead",
+      "ArticleState.isSaved"
+    ]
+  }
+}

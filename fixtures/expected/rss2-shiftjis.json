@@ -1,0 +1,12 @@
+{
+  "assertions": {
+    "feedTitle": "日本語配信",
+    "articles": [
+      {
+        "entryKey": "id:sjis-001",
+        "title": "日本語の文字化けを確認",
+        "summaryText": "ひらがな、カタカナ、漢字。"
+      }
+    ]
+  }
+}

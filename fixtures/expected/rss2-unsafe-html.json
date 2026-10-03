@@ -1,0 +1,13 @@
+{
+  "assertions": {
+    "articles": [
+      {
+        "entryKey": "id:unsafe-001",
+        "linkUrl": null,
+        "summaryText": "見える文章",
+        "imageUrl": "https://example.com/safe.jpg"
+      }
+    ],
+    "noAutomaticBrowserLaunch": true
+  }
+}

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+ <channel rdf:about="https://example.net/gamma.rdf"><title>架空のRDF</title><link>https://example.net/</link><description>試験用</description><items><rdf:Seq><rdf:li rdf:resource="https://example.net/news/001"/></rdf:Seq></items></channel>
+ <item rdf:about="https://example.net/news/001"><title>RSS1 日本語</title><link>https://example.net/news/001</link><description>RDFの概要</description><dc:date>2026-10-03T08:00:00+09:00</dc:date><dc:creator>RDF作者</dc:creator></item>
+</rdf:RDF>

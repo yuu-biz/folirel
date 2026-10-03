@@ -1,0 +1,21 @@
+{
+  "assertions": {
+    "feedTitle": "架空の技術ニュース",
+    "articleCount": 2,
+    "articles": [
+      {
+        "entryKey": "id:alpha-001",
+        "title": "日本語の見出し & RSS",
+        "linkUrl": "https://example.com/posts/1?x=1&x=2",
+        "publishedAtIso": "2026-10-03T00:00:00Z",
+        "summaryText": "段落 太字。",
+        "imageUrl": "https://example.com/thumb.jpg"
+      },
+      {
+        "entryKey": "id:opaque-no-link",
+        "linkUrl": null,
+        "publishedAt": null
+      }
+    ]
+  }
+}

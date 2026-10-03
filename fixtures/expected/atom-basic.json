@@ -1,0 +1,15 @@
+{
+  "assertions": {
+    "articleCount": 1,
+    "articles": [
+      {
+        "entryKey": "id:urn:uuid:atom-001",
+        "title": "Atom 日本語",
+        "linkUrl": "https://example.org/base/articles/1",
+        "author": "共通の著者",
+        "publishedAtIso": "2026-10-02T10:00:00Z",
+        "summaryText": "概要です"
+      }
+    ]
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "assertions": {
+    "uniqueFeedCount": 4,
+    "feedOccurrenceCount": 6,
+    "categoryPaths": [
+      [
+        "Tech"
+      ],
+      [
+        "Tech",
+        "AI"
+      ],
+      [
+        "Tech",
+        "Tools"
+      ],
+      [
+        "News"
+      ]
+    ],
+    "directMemberships": [
+      {
+        "url": "https://example.com/alpha.xml",
+        "path": [
+          "Tech",
+          "AI"
+        ]
+      },
+      {
+        "url": "https://example.com/alpha.xml",
+        "path": [
+          "News"
+        ]
+      },
+      {
+        "url": "https://example.org/beta.atom",
+        "path": [
+          "Tech",
+          "Tools"
+        ]
+      },
+      {
+        "url": "https://example.net/gamma.rdf",
+        "path": [
+          "News"
+        ]
+      }
+    ],
+    "unclassifiedUrls": [
+      "https://example.com/unfiled.xml"
+    ]
+  }
+}

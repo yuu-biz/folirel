@@ -1,0 +1,14 @@
+{
+  "assertions": {
+    "candidateCount": 3,
+    "httpsCount": 2,
+    "httpPendingCount": 1,
+    "invalidUrlCount": 1,
+    "unsupportedLeafCount": 1,
+    "categoryPaths": [
+      [
+        "Folder/with/slashes"
+      ]
+    ]
+  }
+}
