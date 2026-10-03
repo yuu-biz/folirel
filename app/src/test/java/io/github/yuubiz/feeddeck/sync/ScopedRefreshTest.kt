@@ -172,13 +172,16 @@ class ScopedRefreshTest {
     @Test
     fun s06_pastCompletionInsideAllIsNotReused() = runBlocking<Unit> {
         serve(slowMillis = 400)
-        val ids = subscribe("/target", "/slow0", "/slow1", "/slow2", "/slow3", "/slow4")
+        // "/a-target" sorts first, so All fetches it before the slow feeds (feeds come back ordered by URL).
+        val ids = subscribe("/a-target", "/slow0", "/slow1", "/slow2", "/slow3", "/slow4")
         val target = ids.first()
         val c = coordinator()
         val all = scope.async { c.refresh(RefreshScope.All, RefreshReason.MANUAL) }
-        waitFor { count("/target") == 1 && order.size >= 3 }
+        // Wait until All has finished and applied the target (not merely started it) while other feeds still run.
+        waitFor { runBlocking { articles(target) } == 1 }
+        assertTrue("All still running", !all.isCompleted)
         val narrow = c.refresh(RefreshScope.Feeds(listOf(target)), RefreshReason.MANUAL)
-        assertEquals("fetched again for the new manual request", 2, count("/target"))
+        assertEquals("fetched again for the new manual request", 2, count("/a-target"))
         assertEquals(1, narrow.updated)
         assertEquals(2, articles(target))
         all.await()
