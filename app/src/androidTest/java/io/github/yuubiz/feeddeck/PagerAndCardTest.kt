@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
@@ -281,7 +282,8 @@ class PagerAndCardTest {
         val last = many.keys.last()
         launch()
         waitForTag("category_pager")
-        compose.onNodeWithTag("tab_category:$last").performClick()
+        // The row is scrollable and this tab is off screen at 2x text: scroll to it as a user would, then tap.
+        compose.onNodeWithTag("tab_category:$last").performScrollTo().performClick()
         waitForScope(ArticleScope.Category(last))
         compose.waitForIdle()
         Thread.sleep(500)
