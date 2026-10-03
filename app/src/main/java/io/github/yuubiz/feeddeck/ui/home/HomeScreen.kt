@@ -443,10 +443,11 @@ private fun FilterBar(selection: Selection, onFilter: (ReadFilter) -> Unit, onTo
 
 @Composable
 private fun StatusBar(refresh: io.github.yuubiz.feeddeck.sync.RefreshState, offline: Boolean, structure: Structure, onOpenSubscriptions: () -> Unit) {
-    val report = refresh.lastReport
+    val report = refresh.latestFinished?.report
+    val progress = refresh.requests.lastOrNull { it.running }?.progress
     val lines = buildList {
         if (refresh.running) {
-            val p = refresh.progress
+            val p = progress
             val firstFetch = structure.subscribedFeeds.isNotEmpty() && structure.subscribedFeeds.none { it.initialized }
             add(
                 when {
@@ -472,7 +473,7 @@ private fun StatusBar(refresh: io.github.yuubiz.feeddeck.sync.RefreshState, offl
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, onClick = onOpenSubscriptions, modifier = Modifier.fillMaxWidth().testTag("status_bar")) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
             if (refresh.running) {
-                val p = refresh.progress
+                val p = progress
                 if (p != null && p.total > 0) {
                     LinearProgressIndicator(progress = { p.completed.toFloat() / p.total }, modifier = Modifier.fillMaxWidth())
                 } else {

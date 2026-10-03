@@ -58,7 +58,7 @@ class UpdateConstraintsTest {
         val calls = AtomicInteger()
         override val backendType = "FAKE"
         override val capabilities = BackendCapabilities(subscriptionEditing = true, remoteStateSync = false)
-        override suspend fun refresh(accountId: String, scope: RefreshScope, reason: RefreshReason, onProgress: (RefreshProgress) -> Unit): RefreshReport {
+        override suspend fun refresh(accountId: String, scope: RefreshScope, reason: RefreshReason, force: Boolean, onProgress: (RefreshProgress) -> Unit): RefreshReport {
             calls.incrementAndGet()
             return RefreshReport(total = 1, updated = 1)
         }

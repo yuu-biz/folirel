@@ -5,6 +5,8 @@ data class NormalizedFeed(
     val title: String?,
     val siteUrl: String?,
     val entries: List<NormalizedEntry>,
+    /** item/entry elements in the document before duplicate keys were merged (diagnostics). */
+    val rawEntryCount: Int = entries.size,
 )
 
 data class NormalizedEntry(

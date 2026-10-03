@@ -32,11 +32,20 @@ sealed interface FetchOutcome {
         val lastModified: String?,
         /** Target after the leading run of 301/308 hops, if any. */
         val permanentRedirectUrl: String?,
+        val httpStatus: Int = 200,
+        /** Whether stored validators were sent on the request that produced this response. */
+        val validatorsSent: Boolean = false,
     ) : FetchOutcome
 
     data object NotModified : FetchOutcome
 
-    data class Failure(val error: FetchError, val retryAfterMillis: Long? = null, val httpStatus: Int? = null) : FetchOutcome
+    data class Failure(
+        val error: FetchError,
+        val retryAfterMillis: Long? = null,
+        val httpStatus: Int? = null,
+        /** Which limit/problem, for diagnostics (e.g. BODY_SIZE). */
+        val detail: String? = null,
+    ) : FetchOutcome
 }
 
 /** GET only. Conditional requests, status classification and body limits (docs/04 section 4). */
@@ -45,12 +54,17 @@ class FeedFetcher(
     private val clock: Clock,
     private val maxBytes: Long = Limits.FEED_MAX_BYTES,
 ) {
-    suspend fun fetch(url: String, validators: ConditionalValidators?, initialized: Boolean): FetchOutcome {
-        val first = execute(url, if (initialized) validators else null)
+    /**
+     * [revalidate]: explicit "revalidate and refetch" (SYNC-03). The stored validators are not sent and
+     * `Cache-Control: no-cache` asks intermediaries to revalidate. This client has no local HTTP cache, so the
+     * header is only a request to caches on the way; it cannot force a server or CDN to return fresh content.
+     */
+    suspend fun fetch(url: String, validators: ConditionalValidators?, initialized: Boolean, revalidate: Boolean = false): FetchOutcome {
+        val first = execute(url, if (initialized && !revalidate) validators else null, revalidate)
         if (first !is Raw.NotModified) return first.toOutcome()
         if (initialized && first.validatorsSent) return FetchOutcome.NotModified
-        // 304 on a first fetch (or without validators): retry once unconditionally.
-        val second = execute(url, null)
+        // 304 on a first fetch (or without validators): retry once unconditionally. Never treated as success.
+        val second = execute(url, null, revalidate)
         if (second is Raw.NotModified) return FetchOutcome.Failure(FetchError.UNEXPECTED_NOT_MODIFIED, httpStatus = 304)
         return second.toOutcome()
     }
@@ -65,7 +79,7 @@ class FeedFetcher(
         }
     }
 
-    private suspend fun execute(url: String, validators: ConditionalValidators?): Raw {
+    private suspend fun execute(url: String, validators: ConditionalValidators?, revalidate: Boolean): Raw {
         val httpUrl = url.toHttpUrlOrNull() ?: return Raw.Done(FetchOutcome.Failure(FetchError.SECURITY))
         val trace = RedirectTrace()
         val request = Request.Builder()
@@ -73,6 +87,7 @@ class FeedFetcher(
             .get()
             .header("Accept", "application/rss+xml, application/atom+xml, application/rdf+xml, application/xml;q=0.9, text/xml;q=0.9, */*;q=0.5")
             .tag(RedirectTrace::class.java, trace)
+            .apply { if (revalidate) header("Cache-Control", "no-cache") }
             .apply { if (validators != null) tag(ConditionalValidators::class.java, validators) }
             .build()
         return try {
@@ -107,14 +122,14 @@ class FeedFetcher(
             return Raw.Done(FetchOutcome.Failure(failure, retryAfter, code))
         }
         val body = response.body
-        if (body.contentLength() > maxBytes) return Raw.Done(FetchOutcome.Failure(FetchError.LIMIT_EXCEEDED, httpStatus = code))
+        if (body.contentLength() > maxBytes) return Raw.Done(FetchOutcome.Failure(FetchError.LIMIT_EXCEEDED, httpStatus = code, detail = "BODY_SIZE"))
         val buffer = Buffer()
         val source = body.source()
         while (true) {
             val read = source.read(buffer, 64 * 1024)
             if (read == -1L) break
             // Counted after transparent gzip decompression.
-            if (buffer.size > maxBytes) return Raw.Done(FetchOutcome.Failure(FetchError.LIMIT_EXCEEDED, httpStatus = code))
+            if (buffer.size > maxBytes) return Raw.Done(FetchOutcome.Failure(FetchError.LIMIT_EXCEEDED, httpStatus = code, detail = "BODY_SIZE"))
         }
         var permanent: String? = null
         for (hop in trace.hops) {
@@ -129,6 +144,8 @@ class FeedFetcher(
                 etag = response.header("ETag"),
                 lastModified = response.header("Last-Modified"),
                 permanentRedirectUrl = permanent,
+                httpStatus = code,
+                validatorsSent = validators != null,
             ),
         )
     }

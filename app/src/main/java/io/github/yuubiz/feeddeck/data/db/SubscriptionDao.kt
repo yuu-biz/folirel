@@ -32,6 +32,21 @@ interface SubscriptionDao {
     @Query("SELECT * FROM feeds WHERE accountId = :accountId")
     suspend fun feeds(accountId: String): List<FeedEntity>
 
+    /** A feed already fetched from [url] (e.g. moved to HTTPS or permanently redirected there). */
+    @Query(
+        """SELECT * FROM feeds WHERE accountId = :accountId AND (fetchUrl = :url OR id IN
+           (SELECT feedId FROM feed_https_migrations WHERE httpsUrl = :url)) ORDER BY createdAt, id LIMIT 1""",
+    )
+    suspend fun feedByFetchUrl(accountId: String, url: String): FeedEntity?
+
+    // HTTP → HTTPS migration records
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertHttpsMigration(row: FeedHttpsMigrationEntity)
+
+    @Query("SELECT m.* FROM feed_https_migrations m JOIN feeds f ON f.id = m.feedId WHERE f.accountId = :accountId")
+    suspend fun httpsMigrations(accountId: String): List<FeedHttpsMigrationEntity>
+
     @Query("SELECT * FROM feeds WHERE accountId = :accountId")
     fun observeFeeds(accountId: String): Flow<List<FeedEntity>>
 

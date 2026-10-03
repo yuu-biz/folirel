@@ -6,7 +6,8 @@ import io.github.yuubiz.feeddeck.model.NormalizedEntry
 import io.github.yuubiz.feeddeck.model.NormalizedFeed
 import io.github.yuubiz.feeddeck.network.UrlNormalizer
 
-class FeedParseException(val error: FetchError, message: String) : Exception(message)
+/** [detail] names the limit or problem for diagnostics (e.g. ENTRY_COUNT, XML_DEPTH). */
+class FeedParseException(val error: FetchError, message: String, val detail: String? = null) : Exception(message)
 
 /**
  * RSS 2.0 / Atom 1.0 / RSS 1.0 (RDF) parser. Elements are matched by namespace URI + local name, never by
@@ -38,7 +39,7 @@ object FeedParser {
                 XmlRejectedException.Kind.LIMIT_EXCEEDED -> FetchError.LIMIT_EXCEEDED
                 XmlRejectedException.Kind.MALFORMED -> FetchError.FORMAT
             }
-            throw FeedParseException(error, e.message.orEmpty())
+            throw FeedParseException(error, e.message.orEmpty(), e.detail)
         }
         return when {
             root.namespace.isEmpty() && root.name == "rss" -> parseRss2(root)
@@ -82,6 +83,7 @@ object FeedParser {
             title = TextNormalizer.normalize(HtmlText.unescapeEntities(channel.childText("", "title")), Limits.TITLE_CODE_POINTS).ifEmpty { null },
             siteUrl = resolveUrl(channel.base, channel.childText("", "link")),
             entries = dedupe(entries),
+            rawEntryCount = entries.size,
         )
     }
 
@@ -109,6 +111,7 @@ object FeedParser {
             title = channel?.let { TextNormalizer.normalize(HtmlText.unescapeEntities(it.childText(RSS1, "title")), Limits.TITLE_CODE_POINTS) }?.ifEmpty { null },
             siteUrl = channel?.let { resolveUrl(it.base, it.childText(RSS1, "link")) },
             entries = dedupe(entries),
+            rawEntryCount = entries.size,
         )
     }
 
@@ -140,6 +143,7 @@ object FeedParser {
             title = TextNormalizer.normalize(atomTextAsPlain(root.child(ATOM, "title")), Limits.TITLE_CODE_POINTS).ifEmpty { null },
             siteUrl = atomAlternateLink(root),
             entries = dedupe(entries),
+            rawEntryCount = entries.size,
         )
     }
 
@@ -249,7 +253,7 @@ object FeedParser {
 
     private fun checkCount(count: Int) {
         if (count > Limits.FEED_MAX_ENTRIES) {
-            throw FeedParseException(FetchError.LIMIT_EXCEEDED, "More than ${Limits.FEED_MAX_ENTRIES} entries")
+            throw FeedParseException(FetchError.LIMIT_EXCEEDED, "More than ${Limits.FEED_MAX_ENTRIES} entries", "ENTRY_COUNT")
         }
     }
 

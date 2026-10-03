@@ -141,12 +141,11 @@ class HomeViewModel(
             }
         }
         viewModelScope.launch {
-            var lastSeen = coordinator.state.value.lastFinishedAt
+            val seen = coordinator.state.value.requests.filter { !it.running }.map { it.id }.toMutableSet()
             coordinator.state.collect { state ->
-                val finished = state.lastFinishedAt
-                if (finished != null && finished != lastSeen) {
-                    lastSeen = finished
-                    val added = state.lastReport?.newArticles ?: 0
+                for (request in state.requests) {
+                    if (request.running || !seen.add(request.id)) continue
+                    val added = request.report?.newArticles ?: 0
                     if (added > 0) _newArticlesBanner.value = added
                 }
             }

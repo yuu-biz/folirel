@@ -18,28 +18,53 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.time.Clock
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+
+/** One refresh request as the UI sees it: its own target, progress and result. */
+data class RequestStatus(
+    val id: Long,
+    val scope: RefreshScope,
+    val reason: RefreshReason,
+    val force: Boolean,
+    val startedAt: Long,
+    val progress: RefreshProgress? = null,
+    val report: RefreshReport? = null,
+    val finishedAt: Long? = null,
+) {
+    val running: Boolean get() = finishedAt == null
+}
 
 data class RefreshState(
-    val running: Boolean = false,
-    val progress: RefreshProgress? = null,
-    val lastReport: RefreshReport? = null,
-    val lastFinishedAt: Long? = null,
+    /** Running requests and the most recent finished ones (bounded), oldest first. */
+    val requests: List<RequestStatus> = emptyList(),
     /** True when the last automatic refresh was skipped by the network constraint. */
     val lastAutoBlocked: Boolean = false,
-)
+) {
+    val running: Boolean get() = requests.any { it.running }
+
+    fun runningFor(scope: RefreshScope): RequestStatus? = requests.lastOrNull { it.running && it.scope == scope }
+
+    /** The newest request (running or finished) whose target is exactly [scope]. */
+    fun latestFor(scope: RefreshScope): RequestStatus? = requests.lastOrNull { it.scope == scope }
+
+    val latestFinished: RequestStatus? get() = requests.filter { !it.running }.maxByOrNull { it.finishedAt ?: 0 }
+}
 
 /**
- * Single entry point for every refresh (manual, import, startup, periodic). Identical requests are joined;
- * a running "All" refresh absorbs narrower ones. Per-feed de-duplication happens in the backend.
- * Jobs run in the application [scope], so leaving a screen does not cancel a refresh.
+ * Single entry point for every refresh (manual, import, startup, periodic).
+ * - Each request acts on its own target: a running "All" no longer absorbs a narrower request. Overlap is
+ *   resolved per feed in the backend (a feed queued/running for one request is shared, never fetched twice).
+ * - Only an identical request (same target, same manual/automatic kind, same force) joins a running one.
+ * - Manual, import and startup requests run in the application [scope], so leaving a screen does not cancel them.
+ *   Periodic requests run in the calling worker's coroutine: stopping the worker releases its feeds, and fetches
+ *   that only it wanted are cancelled (finished feeds stay applied).
  */
 class RefreshCoordinator(
     private val backend: BackendSynchronizer,
     private val accountId: suspend () -> String,
     /** For automatic reasons only: whether the current network satisfies the auto-update constraint. */
     private val automaticAllowed: suspend () -> Boolean,
-    /** Called when any refresh (manual or automatic) actually starts; the startup 30-minute rule uses it. */
+    /** Called when a refresh request is accepted (manual or automatic); the startup 30-minute rule uses it. */
     private val onAttempt: suspend (Long) -> Unit,
     private val scope: CoroutineScope,
     private val clock: Clock,
@@ -47,47 +72,61 @@ class RefreshCoordinator(
     private val _state = MutableStateFlow(RefreshState())
     val state: StateFlow<RefreshState> = _state.asStateFlow()
 
-    private val mutex = Mutex()
-    private val running = HashMap<RefreshScope, Deferred<RefreshReport>>()
-    private val active = AtomicInteger()
+    private data class Key(val scope: RefreshScope, val automatic: Boolean, val force: Boolean)
 
-    suspend fun refresh(target: RefreshScope, reason: RefreshReason): RefreshReport {
+    private val mutex = Mutex()
+    private val joinable = HashMap<Key, Deferred<RefreshReport>>()
+    private val ids = AtomicLong()
+
+    suspend fun refresh(target: RefreshScope, reason: RefreshReason, force: Boolean = false): RefreshReport {
         if (reason.isAutomatic && !automaticAllowed()) {
             _state.update { it.copy(lastAutoBlocked = true) }
             return RefreshReport(total = 0, deferredConstraint = 1)
         }
         onAttempt(clock.millis())
+        if (reason == RefreshReason.PERIODIC) return run(target, reason, force)
+        val key = Key(target, reason.isAutomatic, force)
         val job = mutex.withLock {
-            running[RefreshScope.All] ?: running[target] ?: scope.async(start = CoroutineStart.LAZY) {
+            joinable[key] ?: scope.async(start = CoroutineStart.LAZY) {
                 try {
-                    run(target, reason)
+                    run(target, reason, force)
                 } finally {
-                    withContext(NonCancellable) { mutex.withLock { running.remove(target) } }
+                    withContext(NonCancellable) { mutex.withLock { joinable.remove(key) } }
                 }
-            }.also { running[target] = it }
+            }.also { joinable[key] = it }
         }
         job.start() // outside the lock; no-op when joining an already running job
         return job.await()
     }
 
-    private suspend fun run(target: RefreshScope, reason: RefreshReason): RefreshReport {
-        active.incrementAndGet()
-        _state.update { it.copy(running = true, lastAutoBlocked = if (reason.isAutomatic) false else it.lastAutoBlocked) }
+    private suspend fun run(target: RefreshScope, reason: RefreshReason, force: Boolean): RefreshReport {
+        val id = ids.incrementAndGet()
+        _state.update {
+            it.copy(
+                requests = it.requests + RequestStatus(id, target, reason, force, clock.millis()),
+                lastAutoBlocked = if (reason.isAutomatic) false else it.lastAutoBlocked,
+            )
+        }
         var report: RefreshReport? = null
         try {
-            report = backend.refresh(accountId(), target, reason) { p -> _state.update { it.copy(progress = p) } }
+            report = backend.refresh(accountId(), target, reason, force) { p -> updateRequest(id) { r -> r.copy(progress = p) } }
             return report
         } finally {
-            val stillRunning = active.decrementAndGet() > 0
             val finished = report
-            _state.update {
-                it.copy(
-                    running = stillRunning,
-                    progress = if (stillRunning) it.progress else null,
-                    lastReport = finished ?: it.lastReport,
-                    lastFinishedAt = clock.millis(),
-                )
+            val now = clock.millis()
+            _state.update { state ->
+                val updated = state.requests.map { if (it.id == id) it.copy(report = finished, finishedAt = now) else it }
+                val keepFinished = updated.filter { !it.running }.sortedBy { it.finishedAt }.takeLast(MAX_FINISHED).map { it.id }.toSet()
+                state.copy(requests = updated.filter { it.running || it.id in keepFinished })
             }
         }
+    }
+
+    private fun updateRequest(id: Long, transform: (RequestStatus) -> RequestStatus) {
+        _state.update { state -> state.copy(requests = state.requests.map { if (it.id == id) transform(it) else it }) }
+    }
+
+    private companion object {
+        const val MAX_FINISHED = 20
     }
 }

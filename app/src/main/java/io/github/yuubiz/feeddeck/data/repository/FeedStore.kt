@@ -1,10 +1,12 @@
 package io.github.yuubiz.feeddeck.data.repository
 
 import androidx.room.withTransaction
+import io.github.yuubiz.feeddeck.backend.FeedResult
 import io.github.yuubiz.feeddeck.backend.RefreshScope
 import io.github.yuubiz.feeddeck.data.db.AppDatabase
 import io.github.yuubiz.feeddeck.data.db.ArticleEntity
 import io.github.yuubiz.feeddeck.data.db.ArticleStateEntity
+import io.github.yuubiz.feeddeck.data.db.FeedDiagnosticsEntity
 import io.github.yuubiz.feeddeck.data.db.FeedEntity
 import io.github.yuubiz.feeddeck.data.db.FeedFetchStateEntity
 import io.github.yuubiz.feeddeck.model.FetchError
@@ -21,8 +23,21 @@ data class FetchMetadata(
     val permanentRedirectUrl: String?,
 )
 
+/** What one response body contained before parsing/merging, recorded with the applied result (DATA-01). */
+data class BodyStats(val bytes: Long, val rawEntries: Int)
+
+/** Diagnostics of one HTTP attempt. */
+data class AttemptInfo(val httpStatus: Int?, val validatorsSent: Boolean, val errorDetail: String? = null)
+
 sealed interface ApplyResult {
-    data class Applied(val newArticles: Int, val updatedArticles: Int) : ApplyResult
+    data class Applied(
+        val newArticles: Int,
+        val updatedArticles: Int,
+        val insertedIds: List<String> = emptyList(),
+        /** Entries not inserted again because the retention cleanup removed them earlier (as read). */
+        val skippedPruned: Int = 0,
+    ) : ApplyResult
+
     /** Feed was unsubscribed/paused/removed while the fetch was running; nothing was written. */
     data object SkippedInactive : ApplyResult
 }
@@ -30,6 +45,7 @@ sealed interface ApplyResult {
 /**
  * The only writer of fetched content. Receives normalized results from a backend and applies them per feed
  * in one transaction. Reading state is created on first insert only and never overwritten here.
+ * Also keeps the per-feed diagnostics (requested / attempted / applied) that explain each request's result.
  */
 class FeedStore(
     private val db: AppDatabase,
@@ -38,13 +54,14 @@ class FeedStore(
 ) {
     private val subscriptions = db.subscriptionDao()
     private val articles = db.articleDao()
+    private val diagnostics = db.diagnosticsDao()
 
     suspend fun feed(feedId: String): FeedEntity? = subscriptions.feed(feedId)
 
     suspend fun fetchState(feedId: String): FeedFetchStateEntity =
         subscriptions.fetchState(feedId) ?: FeedFetchStateEntity(feedId = feedId)
 
-    /** Subscribed, not paused feeds in [scope] (category scopes include descendants). */
+    /** Subscribed, not paused feeds in [scope] (category scopes include descendants; each feed once). */
     suspend fun activeFeeds(accountId: String, scope: RefreshScope = RefreshScope.All): List<FeedEntity> {
         val active = subscriptions.feeds(accountId).filter { it.isSubscribed && !it.isPaused }
         return when (scope) {
@@ -61,17 +78,33 @@ class FeedStore(
                 val feedIds = subscriptions.memberships(accountId).filter { it.categoryId in ids }.map { it.feedId }.toSet()
                 active.filter { it.id in feedIds }
             }
+            RefreshScope.Pending -> {
+                val pending = diagnostics.pendingFeedIds(accountId).toSet()
+                val failed = subscriptions.fetchStates(accountId).filter { it.lastErrorCode != null }.map { it.feedId }.toSet()
+                active.filter { it.id in pending || it.id in failed }
+            }
         }
     }
 
-    suspend fun applySuccess(feedId: String, feed: NormalizedFeed, meta: FetchMetadata): ApplyResult = db.withTransaction {
+    /**
+     * Applies every entry of one parsed response (no count or date cut-off). Existing entries are updated,
+     * new ones inserted as unread; reading state of existing articles is never touched.
+     */
+    suspend fun applySuccess(
+        feedId: String,
+        feed: NormalizedFeed,
+        meta: FetchMetadata,
+        body: BodyStats = BodyStats(0, feed.rawEntryCount),
+        attempt: AttemptInfo = AttemptInfo(200, false),
+    ): ApplyResult = db.withTransaction {
         val now = clock.millis()
         val current = subscriptions.feed(feedId)
         // Re-check right before applying: an unsubscribe/pause during the fetch wins.
         if (current == null || !current.isSubscribed || current.isPaused) return@withTransaction ApplyResult.SkippedInactive
         subscriptions.updateFeedMetadata(feedId, feed.title ?: current.feedTitle, feed.siteUrl ?: current.siteUrl)
-        var inserted = 0
         var updated = 0
+        var skippedPruned = 0
+        val insertedIds = ArrayList<String>()
         for (entry in feed.entries) {
             val existingId = articles.findId(current.accountId, feedId, entry.entryKey)
             if (existingId != null) {
@@ -87,6 +120,9 @@ class FeedStore(
                     lastSeenAt = now,
                 )
                 updated++
+            } else if (diagnostics.touchPruned(feedId, entry.entryKey, now) > 0) {
+                // Removed earlier by the retention cleanup (read, not saved): not resurrected as a new unread article.
+                skippedPruned++
             } else {
                 val id = ids.newId()
                 val published = entry.publishedAt
@@ -100,7 +136,7 @@ class FeedStore(
                     ),
                 )
                 articles.insertState(ArticleStateEntity(id, isRead = false, isSaved = false, updatedAt = now))
-                inserted++
+                insertedIds += id
             }
         }
         if (meta.permanentRedirectUrl != null && meta.permanentRedirectUrl != current.fetchUrl) {
@@ -119,39 +155,112 @@ class FeedStore(
                 failureCount = 0,
                 nextEligibleAt = null,
                 initialized = true,
+                retryAfterUntil = null,
             ),
         )
-        ApplyResult.Applied(inserted, updated)
+        val dates = feed.entries.mapNotNull { it.publishedAt }
+        ensureDiagnostics(listOf(feedId))
+        diagnostics.attemptFinished(feedId, now, attempt.httpStatus, attempt.validatorsSent, null, null, FeedResult.UPDATED.name)
+        diagnostics.bodyApplied(
+            feedId = feedId, now = now, bytes = body.bytes, raw = body.rawEntries, unique = feed.entries.size,
+            undated = feed.entries.size - dates.size, oldest = dates.minOrNull(), newest = dates.maxOrNull(),
+            inserted = insertedIds.size, updated = updated, skippedPruned = skippedPruned,
+        )
+        ApplyResult.Applied(insertedIds.size, updated, insertedIds, skippedPruned)
     }
 
-    /** 304 on an initialized feed: content unchanged, only the success time moves. */
+    /**
+     * 304 to a conditional request: content unchanged, only the success time moves. The last body statistics
+     * (entry counts) are kept as they were; a 304 never turns them into zero.
+     */
     suspend fun recordNotModified(feedId: String) = db.withTransaction {
         val now = clock.millis()
         val state = fetchState(feedId)
         subscriptions.insertFetchState(FeedFetchStateEntity(feedId = feedId))
         subscriptions.updateFetchState(
-            state.copy(lastAttemptAt = now, lastSuccessAt = now, lastErrorCode = null, failureCount = 0, nextEligibleAt = null),
+            state.copy(lastAttemptAt = now, lastSuccessAt = now, lastErrorCode = null, failureCount = 0, nextEligibleAt = null, retryAfterUntil = null),
         )
+        ensureDiagnostics(listOf(feedId))
+        diagnostics.attemptFinished(feedId, now, 304, true, null, null, FeedResult.NOT_MODIFIED.name)
     }
 
-    /** Failure keeps all previously fetched articles. Validators are kept; backoff is scheduled. */
-    suspend fun recordFailure(feedId: String, error: FetchError, retryAfterMillis: Long?) = db.withTransaction {
+    /**
+     * Failure keeps all previously fetched articles. Validators are kept; backoff is scheduled. A valid server
+     * Retry-After (429/5xx) also sets a hard wait that manual and forced requests respect.
+     */
+    suspend fun recordFailure(
+        feedId: String,
+        error: FetchError,
+        retryAfterMillis: Long?,
+        attempt: AttemptInfo = AttemptInfo(null, false),
+    ) = db.withTransaction {
         val now = clock.millis()
         val state = fetchState(feedId)
         val failures = state.failureCount + 1
+        val delay = RetryPolicy.delayMillis(error, failures, retryAfterMillis)
+        val serverWait = retryAfterMillis != null && retryAfterMillis > 0 && (error == FetchError.RATE_LIMITED || error == FetchError.SERVER)
         subscriptions.insertFetchState(FeedFetchStateEntity(feedId = feedId))
         subscriptions.updateFetchState(
             state.copy(
                 lastAttemptAt = now,
                 lastErrorCode = error.name,
                 failureCount = failures,
-                nextEligibleAt = now + RetryPolicy.delayMillis(error, failures, retryAfterMillis),
+                nextEligibleAt = now + delay,
+                retryAfterUntil = if (serverWait) now + delay else null,
             ),
         )
+        ensureDiagnostics(listOf(feedId))
+        diagnostics.attemptFinished(feedId, now, attempt.httpStatus, attempt.validatorsSent, error.name, attempt.errorDetail, FeedResult.FAILED.name)
+    }
+
+    /** The fetch finished but the feed was unsubscribed/paused meanwhile: nothing applied, no longer pending. */
+    suspend fun recordInactive(feedId: String) {
+        ensureDiagnostics(listOf(feedId))
+        diagnostics.attemptFinished(feedId, clock.millis(), null, false, null, null, FeedResult.INACTIVE.name)
+    }
+
+    // Request bookkeeping: diagnostics only. lastAttemptAt / lastSuccessAt are never moved by these.
+
+    private suspend fun ensureDiagnostics(feedIds: List<String>) {
+        diagnostics.insertDiagnostics(feedIds.map { FeedDiagnosticsEntity(feedId = it) })
+    }
+
+    suspend fun markRequested(feedIds: List<String>, requestId: String, reason: String, scope: String, force: Boolean) {
+        if (feedIds.isEmpty()) return
+        val now = clock.millis()
+        db.withTransaction {
+            feedIds.chunked(CHUNK).forEach { chunk ->
+                ensureDiagnostics(chunk)
+                diagnostics.markRequested(chunk, requestId, reason, scope, force, now)
+            }
+        }
+    }
+
+    suspend fun markSkipped(feedIds: List<String>, result: FeedResult, requestId: String, reason: String, scope: String, force: Boolean) {
+        if (feedIds.isEmpty()) return
+        val now = clock.millis()
+        db.withTransaction {
+            feedIds.chunked(CHUNK).forEach { chunk ->
+                ensureDiagnostics(chunk)
+                diagnostics.markSkipped(chunk, result.name, requestId, reason, scope, force, now)
+            }
+        }
+    }
+
+    suspend fun markUnfinished(feedIds: List<String>, result: FeedResult) {
+        if (feedIds.isEmpty()) return
+        val now = clock.millis()
+        db.withTransaction { feedIds.chunked(CHUNK).forEach { diagnostics.markUnfinished(it, result.name, now) } }
+    }
+
+    suspend fun attemptStarted(feedId: String) {
+        ensureDiagnostics(listOf(feedId))
+        diagnostics.attemptStarted(feedId, clock.millis())
     }
 
     companion object {
         const val FUTURE_TOLERANCE_MS = 24L * 60 * 60 * 1000
+        private const val CHUNK = 500
     }
 }
 
@@ -162,12 +271,15 @@ object RetryPolicy {
 
     /**
      * 429: a valid Retry-After (already converted to a delay) clamped to [1 min, 24 h]; missing/invalid/past → 15 min.
-     * Others: 15 min × 2^(failures-1), capped at 24 h.
+     * 5xx with a valid Retry-After: the same clamp. Others: 15 min × 2^(failures-1), capped at 24 h.
      */
     fun delayMillis(error: FetchError, failureCount: Int, retryAfterMillis: Long?): Long {
         if (error == FetchError.RATE_LIMITED) {
             return if (retryAfterMillis == null || retryAfterMillis <= 0) MIN_DELAY_MS
             else retryAfterMillis.coerceIn(MIN_RETRY_AFTER_MS, MAX_DELAY_MS)
+        }
+        if (error == FetchError.SERVER && retryAfterMillis != null && retryAfterMillis > 0) {
+            return retryAfterMillis.coerceIn(MIN_RETRY_AFTER_MS, MAX_DELAY_MS)
         }
         val exponent = (failureCount - 1).coerceIn(0, 10)
         return (MIN_DELAY_MS shl exponent).coerceAtMost(MAX_DELAY_MS)

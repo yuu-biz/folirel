@@ -7,7 +7,7 @@ import org.xmlpull.v1.XmlPullParserException
 import java.io.StringReader
 
 /** Rejection of an untrusted XML document. The whole document is refused; nothing is stored. */
-class XmlRejectedException(val kind: Kind, message: String) : Exception(message) {
+class XmlRejectedException(val kind: Kind, message: String, val detail: String? = null) : Exception(message) {
     enum class Kind { SECURITY, LIMIT_EXCEEDED, MALFORMED }
 }
 
@@ -82,20 +82,20 @@ object SafeXmlReader {
                             throw XmlRejectedException(XmlRejectedException.Kind.SECURITY, "XInclude is not allowed")
                         }
                         if (stack.size + 1 > limits.maxDepth) {
-                            throw XmlRejectedException(XmlRejectedException.Kind.LIMIT_EXCEEDED, "XML depth > ${limits.maxDepth}")
+                            throw XmlRejectedException(XmlRejectedException.Kind.LIMIT_EXCEEDED, "XML depth > ${limits.maxDepth}", "XML_DEPTH")
                         }
                         if (++elements > limits.maxElements) {
-                            throw XmlRejectedException(XmlRejectedException.Kind.LIMIT_EXCEEDED, "Too many XML elements")
+                            throw XmlRejectedException(XmlRejectedException.Kind.LIMIT_EXCEEDED, "Too many XML elements", "XML_ELEMENTS")
                         }
                         if (parser.attributeCount > limits.maxAttributes) {
-                            throw XmlRejectedException(XmlRejectedException.Kind.LIMIT_EXCEEDED, "Too many attributes")
+                            throw XmlRejectedException(XmlRejectedException.Kind.LIMIT_EXCEEDED, "Too many attributes", "XML_ATTRIBUTES")
                         }
                         val attrs = HashMap<String, String>(parser.attributeCount * 2)
                         var xmlBase: String? = null
                         for (i in 0 until parser.attributeCount) {
                             val value = parser.getAttributeValue(i)
                             if (value.length > limits.maxAttributeLength) {
-                                throw XmlRejectedException(XmlRejectedException.Kind.LIMIT_EXCEEDED, "Attribute too long")
+                                throw XmlRejectedException(XmlRejectedException.Kind.LIMIT_EXCEEDED, "Attribute too long", "XML_ATTRIBUTE_LENGTH")
                             }
                             val ns = parser.getAttributeNamespace(i).orEmpty()
                             val name = parser.getAttributeName(i)
