@@ -355,7 +355,7 @@ private fun BulkUnsubscribeDialog(snapshot: BulkSnapshot, structure: Structure, 
                             if (gone) add(stringResource(R.string.bulk_recovered))
                             else item.problem?.let { add(problemLabel(it)) }
                             item.httpStatus?.takeIf { item.problem != null && !gone }?.let { add("HTTP $it") }
-                            if (item.failureCount > 0 && !gone) add(stringResource(R.string.bulk_failures, item.failureCount))
+                            if (item.failureCount > 0 && !gone) add(pluralStringResource(R.plurals.bulk_failures, item.failureCount, item.failureCount))
                             add(
                                 formatTime(context, item.lastSuccessAt)?.let { stringResource(R.string.bulk_last_success, it) }
                                     ?: stringResource(R.string.bulk_never_succeeded),
@@ -475,7 +475,7 @@ private fun FeedRow(
                 val details = buildList {
                     add(problemLabel(problem))
                     diagnostics?.httpStatus?.let { add("HTTP $it") }
-                    if (feed.failureCount > 0) add(stringResource(R.string.bulk_failures, feed.failureCount))
+                    if (feed.failureCount > 0) add(pluralStringResource(R.plurals.bulk_failures, feed.failureCount, feed.failureCount))
                     add(formatTime(context, feed.lastSuccessAt)?.let { stringResource(R.string.bulk_last_success, it) } ?: stringResource(R.string.bulk_never_succeeded))
                     retryAt?.let { t -> formatTime(context, t)?.let { add(stringResource(R.string.bulk_retry_after, it)) } }
                 }

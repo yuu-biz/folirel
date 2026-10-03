@@ -2,6 +2,7 @@ package io.github.yuubiz.feeddeck.backend.local.icon
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.core.graphics.scale
 import io.github.yuubiz.feeddeck.data.db.FeedIconEntity
 import java.io.ByteArrayOutputStream
 import kotlin.math.max
@@ -53,12 +54,7 @@ class AndroidIconDecoder : IconDecoder {
         val longSide = max(bitmap.width, bitmap.height)
         if (longSide <= FeedIconEntity.MAX_SIDE_PX) return bitmap
         val ratio = FeedIconEntity.MAX_SIDE_PX.toFloat() / longSide
-        return Bitmap.createScaledBitmap(
-            bitmap,
-            (bitmap.width * ratio).toInt().coerceAtLeast(1),
-            (bitmap.height * ratio).toInt().coerceAtLeast(1),
-            true,
-        )
+        return bitmap.scale((bitmap.width * ratio).toInt().coerceAtLeast(1), (bitmap.height * ratio).toInt().coerceAtLeast(1), filter = true)
     }
 
     private companion object {

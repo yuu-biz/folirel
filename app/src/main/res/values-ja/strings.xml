@@ -358,7 +358,9 @@
     <string name="card_style_even">すべて同じ大きさ</string>
     <string name="settings_card_columns">大きなカードの最大列数</string>
     <string name="card_columns_auto">自動（画面幅と文字サイズに合わせる）</string>
-    <string name="card_columns_n">%1$d列</string>
+    <plurals name="card_columns_n">
+        <item quantity="other">%1$d列</item>
+    </plurals>
     <string name="settings_card_columns_note">雑誌風では、この列数の小さなカードの行と、横長・大きめのカードの行が交互に並びます。選んだ列数だと見出しが読めないほど狭くなる場合（小さなウィンドウ、大きな文字）は、列数を減らします。列数を保つために文字を縮小することはありません。</string>
     <string name="settings_card_columns_now">この画面では横に最大%1$d列で表示します。</string>
     <string name="settings_card_columns_reduced">（選択した%1$d列はここでは収まらないため減らしています。）</string>
@@ -401,7 +403,9 @@
         <item quantity="other">%d件の購読を解除しますか？</item>
     </plurals>
     <string name="bulk_recovered">選択後に回復しています</string>
-    <string name="bulk_failures">連続失敗%d回</string>
+    <plurals name="bulk_failures">
+        <item quantity="other">連続失敗%d回</item>
+    </plurals>
     <string name="bulk_last_success">最終成功 %s</string>
     <string name="bulk_never_succeeded">一度も取得成功なし</string>
     <string name="bulk_retry_after">%s以降に再試行</string>
@@ -441,8 +445,12 @@
     <string name="discovery_page_unreadable">ページを読み込めませんでした。</string>
     <string name="discovery_none_found">RSS/Atomのリンクは見つかりませんでした。</string>
     <string name="discovery_not_fetchable">フィードとして使えません</string>
-    <string name="discovery_entries">%d件の記事</string>
-    <string name="discovery_shared">登録中のフィードと共通の記事%d件</string>
+    <plurals name="discovery_entries">
+        <item quantity="other">%d件の記事</item>
+    </plurals>
+    <plurals name="discovery_shared">
+        <item quantity="other">登録中のフィードと共通の記事%d件</item>
+    </plurals>
     <string name="discovery_same_title">フィード名が同じ</string>
     <string name="discovery_no_evidence">共通の記事なし・名前も別：使う前に確認してください</string>
     <string name="discovery_use">このアドレスを使う</string>

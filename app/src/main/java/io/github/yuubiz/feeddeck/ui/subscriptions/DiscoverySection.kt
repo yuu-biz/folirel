@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -173,9 +174,9 @@ private fun CandidateCard(candidate: DiscoveryCandidate, onUse: () -> Unit) {
         val range = if (candidate.oldestAt != null && candidate.newestAt != null) {
             " · " + (formatTime(context, candidate.oldestAt) ?: "") + " – " + (formatTime(context, candidate.newestAt) ?: "")
         } else ""
-        Text(stringResource(R.string.discovery_entries, candidate.entryCount) + range, style = MaterialTheme.typography.labelMedium)
+        Text(pluralStringResource(R.plurals.discovery_entries, candidate.entryCount, candidate.entryCount) + range, style = MaterialTheme.typography.labelMedium)
         val evidence = buildList {
-            if (candidate.sharedEntries > 0) add(stringResource(R.string.discovery_shared, candidate.sharedEntries))
+            if (candidate.sharedEntries > 0) add(pluralStringResource(R.plurals.discovery_shared, candidate.sharedEntries, candidate.sharedEntries))
             if (candidate.sameTitle) add(stringResource(R.string.discovery_same_title))
             if (isEmpty()) add(stringResource(R.string.discovery_no_evidence))
         }

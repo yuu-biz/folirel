@@ -367,7 +367,10 @@
     <string name="card_style_even">Same size for every card</string>
     <string name="settings_card_columns">Most columns in large card style</string>
     <string name="card_columns_auto">Automatic (by screen width and text size)</string>
-    <string name="card_columns_n">%1$d columns</string>
+    <plurals name="card_columns_n">
+        <item quantity="one">%1$d column</item>
+        <item quantity="other">%1$d columns</item>
+    </plurals>
     <string name="settings_card_columns_note">In the magazine arrangement, rows of this many small cards alternate with wide and larger cards. If the chosen number of columns would make headlines too narrow to read (small window, large text), fewer columns are used. Text is never shrunk to keep columns.</string>
     <string name="settings_card_columns_now">Right now this screen shows up to %1$d column(s) across.</string>
     <string name="settings_card_columns_reduced">(Your choice of %1$d columns does not fit here, so it is reduced.)</string>
@@ -414,7 +417,10 @@
         <item quantity="other">Unsubscribe %d feeds?</item>
     </plurals>
     <string name="bulk_recovered">Works again since you selected it</string>
-    <string name="bulk_failures">%d failures in a row</string>
+    <plurals name="bulk_failures">
+        <item quantity="one">%d failure in a row</item>
+        <item quantity="other">%d failures in a row</item>
+    </plurals>
     <string name="bulk_last_success">last success %s</string>
     <string name="bulk_never_succeeded">never fetched successfully</string>
     <string name="bulk_retry_after">retry not before %s</string>
@@ -458,8 +464,14 @@
     <string name="discovery_page_unreadable">The page could not be read.</string>
     <string name="discovery_none_found">No RSS/Atom links were found there.</string>
     <string name="discovery_not_fetchable">Not usable as a feed</string>
-    <string name="discovery_entries">%d entries</string>
-    <string name="discovery_shared">%d articles shared with your feed</string>
+    <plurals name="discovery_entries">
+        <item quantity="one">%d entry</item>
+        <item quantity="other">%d entries</item>
+    </plurals>
+    <plurals name="discovery_shared">
+        <item quantity="one">%d article shared with your feed</item>
+        <item quantity="other">%d articles shared with your feed</item>
+    </plurals>
     <string name="discovery_same_title">same feed title</string>
     <string name="discovery_no_evidence">no articles in common, different title: check before using</string>
     <string name="discovery_use">Use this address</string>

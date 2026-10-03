@@ -171,7 +171,7 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Un
             item {
                 Choice(
                     stringResource(R.string.settings_card_columns),
-                    AppSettings.CARD_COLUMNS.map { it to if (it == 0) stringResource(R.string.card_columns_auto) else stringResource(R.string.card_columns_n, it) },
+                    AppSettings.CARD_COLUMNS.map { it to if (it == 0) stringResource(R.string.card_columns_auto) else pluralStringResource(R.plurals.card_columns_n, it, it) },
                     s.cardColumns,
                 ) { vm.update { setCardColumns(it) } }
             }
@@ -382,8 +382,9 @@ private fun intervalLabel(minutes: Int): String = when {
 /** What the column choice means on this screen right now, including when the choice is reduced to fit. */
 @Composable
 private fun CardColumnsNote(preference: Int) {
-    val widthDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.toFloat()
-    val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val widthDp = with(density) { androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.width.toDp().value }
+    val fontScale = density.fontScale
     val columns = CardGridLayout.columns(widthDp, fontScale, preference)
     Note(stringResource(R.string.settings_card_columns_note))
     Note(
