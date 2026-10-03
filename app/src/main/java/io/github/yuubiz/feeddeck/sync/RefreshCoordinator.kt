@@ -65,11 +65,9 @@ class RefreshCoordinator(
                 } finally {
                     withContext(NonCancellable) { mutex.withLock { running.remove(target) } }
                 }
-            }.also {
-                running[target] = it
-                it.start()
-            }
+            }.also { running[target] = it }
         }
+        job.start() // outside the lock; no-op when joining an already running job
         return job.await()
     }
 

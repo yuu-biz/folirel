@@ -82,3 +82,6 @@ class TestEnv(
         fun startServer(): MockWebServer = MockWebServer().apply { start(InetAddress.getByName("127.0.0.1"), 0) }
     }
 }
+
+/** URL with the 127.0.0.1 literal (server.url() may use a host name that reverse-resolves on this machine). */
+fun MockWebServer.literalUrl(path: String): okhttp3.HttpUrl = url(path).newBuilder().host("127.0.0.1").build()

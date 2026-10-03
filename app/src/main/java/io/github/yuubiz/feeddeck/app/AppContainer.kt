@@ -22,6 +22,7 @@ import io.github.yuubiz.feeddeck.network.AddressPolicy
 import io.github.yuubiz.feeddeck.network.AndroidNetworkStatus
 import io.github.yuubiz.feeddeck.network.HttpClients
 import io.github.yuubiz.feeddeck.network.NetworkGuard
+import io.github.yuubiz.feeddeck.sync.AutoRefreshPolicy
 import io.github.yuubiz.feeddeck.sync.RefreshCoordinator
 import io.github.yuubiz.feeddeck.sync.RefreshScheduler
 import android.util.Log
@@ -75,11 +76,7 @@ class AppContainer(context: Context) {
     val refresh = RefreshCoordinator(
         backend = backend,
         accountId = { subscriptions.ensureLocalAccount() },
-        automaticAllowed = {
-            val s = settings.current()
-            val net = networkStatus.current()
-            s.onboardingDone && s.refreshIntervalHours > 0 && net.connected && (!s.unmeteredOnly || !net.metered)
-        },
+        automaticAllowed = { AutoRefreshPolicy.networkAllowed(settings.current(), networkStatus.current()) },
         onAutomaticAttempt = { settings.setLastAutoRefreshAttempt(it) },
         scope = appScope,
         clock = clock,

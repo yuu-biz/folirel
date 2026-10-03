@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -155,7 +156,8 @@ class LocalBackend(
                 // Never let one feed's unexpected error cancel the sibling feeds.
                 FeedOutcome.Failed(FetchError.STORAGE)
             } finally {
-                lock.withLock { inFlight.remove(feed.id) }
+                // Must run even when cancelled (budget expiry), or a dead entry would block this feed forever.
+                withContext(NonCancellable) { lock.withLock { inFlight.remove(feed.id) } }
             }
         }
         inFlight[feed.id] = job

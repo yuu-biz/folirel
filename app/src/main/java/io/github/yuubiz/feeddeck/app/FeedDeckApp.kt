@@ -6,6 +6,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import io.github.yuubiz.feeddeck.backend.RefreshReason
 import io.github.yuubiz.feeddeck.backend.RefreshScope
+import io.github.yuubiz.feeddeck.sync.AutoRefreshPolicy
 import kotlinx.coroutines.launch
 
 class FeedDeckApp : Application() {
@@ -28,13 +29,9 @@ private class StartupRefreshObserver(private val container: AppContainer) : Defa
         container.appScope.launch {
             val settings = container.settings.current()
             val now = container.clock.millis()
-            if (now - settings.lastAutoRefreshAttemptAt >= STARTUP_MIN_INTERVAL_MS) {
+            if (AutoRefreshPolicy.startupDue(now, settings.lastAutoRefreshAttemptAt)) {
                 container.refresh.refresh(RefreshScope.All, RefreshReason.STARTUP)
             }
         }
-    }
-
-    companion object {
-        const val STARTUP_MIN_INTERVAL_MS = 30L * 60 * 1000
     }
 }

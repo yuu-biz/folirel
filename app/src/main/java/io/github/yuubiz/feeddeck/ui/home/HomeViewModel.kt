@@ -167,8 +167,12 @@ class HomeViewModel(
         return ArticleQuerySpec(account, selection.scope, selection.filter, selection.sort, selection.search, categoryIds)
     }
 
+    /**
+     * Position key. List mode is deliberately not part of it (docs/08 D13): switching Magazine/List keeps the
+     * same first visible article instead of starting a separate position.
+     */
     private fun listKey(spec: ArticleQuerySpec): String =
-        listOf(spec.accountId, spec.scope.encode(), spec.filter.name, spec.sort.name, spec.search, settings.value.listMode.name).joinToString("|")
+        listOf(spec.accountId, spec.scope.encode(), spec.filter.name, spec.sort.name, spec.search).joinToString("|")
 
     private fun updateSelection(transform: (Selection) -> Selection) {
         val updated = transform(_selection.value)
