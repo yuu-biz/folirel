@@ -81,45 +81,105 @@ class CardGridLayoutTest {
         assertFalse(CardGridLayout.isCompact(344f))
     }
 
-    // Magazine rhythm
+    // Magazine page: article-driven sizes, packed without gaps
 
-    @Test
-    fun mixedPageRepeatsSmallWideLargeWide() {
-        val sizes = MagazinePlan.rowSizes(14, MagazinePlan.pattern(3, CardLayoutStyle.MIXED))
-        // 3 small, 1 wide, 2 larger, 1 wide, then again 3 small, 1 wide, 2 larger, 1 wide.
-        assertEquals(listOf(3, 3, 3, 1, 2, 2, 1, 3, 3, 3, 1, 2, 2, 1), sizes.toList())
-        // Every row fills the 6 grid columns exactly.
-        var i = 0
-        while (i < sizes.size) {
-            val size = sizes[i]
-            assertEquals(MagazinePlan.GRID_SPANS, MagazinePlan.span(size) * size)
-            i += size
+    private fun ids(n: Int, prefix: String = "article-") = List(n) { "$prefix${it * 7919 + 13}" }
+
+    /** Rows of [spans]: each run of cards that adds up to the grid width. */
+    private fun rows(spans: IntArray): List<List<Int>> {
+        val rows = ArrayList<List<Int>>()
+        var current = ArrayList<Int>()
+        for (span in spans) {
+            current.add(span)
+            if (current.sum() >= MagazinePlan.GRID_SPANS) {
+                rows.add(current)
+                current = ArrayList()
+            }
         }
-        // Two columns: 2, wide, 2, wide. One column: every card full width.
-        assertEquals(listOf(2, 2, 1, 2, 2, 1), MagazinePlan.rowSizes(6, MagazinePlan.pattern(2, CardLayoutStyle.MIXED)).toList())
-        assertEquals(listOf(1, 1, 1), MagazinePlan.rowSizes(3, MagazinePlan.pattern(1, CardLayoutStyle.MIXED)).toList())
+        assertTrue("every row is complete", current.isEmpty())
+        return rows
     }
 
     @Test
-    fun aShortLastRowSharesTheWidthAndEvenKeepsOneSize() {
-        // 5 articles: a row of 3, a wide one, then one article alone takes the next pattern row (2) as a full row of 1.
-        assertEquals(listOf(3, 3, 3, 1, 1), MagazinePlan.rowSizes(5, MagazinePlan.pattern(3, CardLayoutStyle.MIXED)).toList())
-        // Two articles only: they share the row.
-        assertEquals(listOf(2, 2), MagazinePlan.rowSizes(2, MagazinePlan.pattern(3, CardLayoutStyle.MIXED)).toList())
-        assertEquals(emptyList<Int>(), MagazinePlan.rowSizes(0, MagazinePlan.pattern(3, CardLayoutStyle.MIXED)).toList())
-        val even = MagazinePlan.rowSizes(7, MagazinePlan.pattern(3, CardLayoutStyle.EVEN), even = true)
-        assertEquals(List(7) { 3 }, even.toList())
-        assertEquals(2, MagazinePlan.span(3))
-        assertEquals(6, MagazinePlan.span(1))
+    fun everyRowFillsTheGridExactlyWithoutGaps() {
+        for (maxColumns in 1..3) for (n in listOf(0, 1, 2, 3, 5, 8, 13, 100, 1001)) {
+            val spans = MagazinePlan.spans(ids(n), maxColumns, CardLayoutStyle.MIXED)
+            assertEquals(n, spans.size)
+            assertTrue("no card narrower than a third", spans.all { it >= MagazinePlan.SMALL || maxColumns == 0 })
+            rows(spans).forEach { assertEquals("columns=$maxColumns n=$n $it", MagazinePlan.GRID_SPANS, it.sum()) }
+        }
     }
 
     @Test
-    fun theSameCountAlwaysGivesTheSameLayout() {
-        val a = MagazinePlan.rowSizes(40, MagazinePlan.pattern(3, CardLayoutStyle.MIXED)).toList()
-        val b = MagazinePlan.rowSizes(40, MagazinePlan.pattern(3, CardLayoutStyle.MIXED)).toList()
-        assertEquals(a, b)
-        // A prefix of a longer list has the same card sizes (older articles keep their size when more are loaded).
-        val longer = MagazinePlan.rowSizes(60, MagazinePlan.pattern(3, CardLayoutStyle.MIXED)).toList()
-        assertEquals(a.take(36), longer.take(36))
+    fun rowsAreVariedNotARepeatingPattern() {
+        val spans = MagazinePlan.spans(ids(600), 3, CardLayoutStyle.MIXED)
+        val kinds = rows(spans).map { it.joinToString("+") }.toSet()
+        // Thirds, halves, two-thirds in both orders and full width all occur.
+        for (expected in listOf("2+2+2", "3+3", "4+2", "2+4", "6")) assertTrue("missing row kind $expected in $kinds", expected in kinds)
+        // And it is not a short cycle: the row sequence does not repeat with a period of 8 rows or fewer.
+        val sequence = rows(spans).map { it.joinToString("+") }
+        for (period in 1..8) assertFalse("period $period", (0 until sequence.size - period).all { sequence[it] == sequence[it + period] })
+    }
+
+    @Test
+    fun sizeChoicesFollowTheirSharesAndAreStablePerArticle() {
+        val many = ids(5000, "post-")
+        val counts = many.groupingBy { MagazinePlan.preferredSpan(it, 3) }.eachCount()
+        fun share(span: Int) = (counts[span] ?: 0) * 100.0 / many.size
+        assertEquals(40.0, share(MagazinePlan.SMALL), 4.0)
+        assertEquals(25.0, share(MagazinePlan.MEDIUM), 4.0)
+        assertEquals(25.0, share(MagazinePlan.LARGE), 4.0)
+        assertEquals(10.0, share(MagazinePlan.WIDE), 3.0)
+        // The same id asks for the same size every time, wherever it is.
+        many.take(200).forEach { id -> assertEquals(MagazinePlan.preferredSpan(id, 3), MagazinePlan.preferredSpan(id, 3)) }
+        assertEquals(MagazinePlan.bucket("x"), MagazinePlan.bucket("x"))
+        assertTrue(many.all { MagazinePlan.bucket(it) in 0..99 })
+    }
+
+    @Test
+    fun fewerColumnsUseOnlyHalvesAndFullWidthOrFullWidthOnly() {
+        val two = MagazinePlan.spans(ids(400), 2, CardLayoutStyle.MIXED)
+        assertTrue(two.all { it == MagazinePlan.MEDIUM || it == MagazinePlan.WIDE })
+        assertTrue("both occur", two.contains(MagazinePlan.MEDIUM) && two.contains(MagazinePlan.WIDE))
+        val one = MagazinePlan.spans(ids(50), 1, CardLayoutStyle.MIXED)
+        assertTrue(one.all { it == MagazinePlan.WIDE })
+    }
+
+    @Test
+    fun evenStyleGivesEveryCardTheSameWidth() {
+        assertEquals(List(9) { 2 }, MagazinePlan.spans(ids(9), 3, CardLayoutStyle.EVEN).toList())
+        assertEquals(List(5) { 3 }, MagazinePlan.spans(ids(5), 2, CardLayoutStyle.EVEN).toList())
+        assertEquals(List(4) { 6 }, MagazinePlan.spans(ids(4), 1, CardLayoutStyle.EVEN).toList())
+    }
+
+    @Test
+    fun anArticleKeepsItsSizeWhenOlderOnesAreLoadedAfterIt() {
+        val short = ids(60)
+        val long = short + ids(40, "older-")
+        val a = MagazinePlan.spans(short, 3, CardLayoutStyle.MIXED)
+        val b = MagazinePlan.spans(long, 3, CardLayoutStyle.MIXED)
+        // Everything up to the last complete row of the shorter list is identical.
+        val completeRows = rows(a).dropLast(1) // the last row of the shorter list may have been stretched
+        val keep = completeRows.sumOf { it.size }
+        assertEquals(a.take(keep), b.take(keep))
+    }
+
+    @Test
+    fun rowStartsGroupCardsIntoTheirRows() {
+        val spans = intArrayOf(2, 4, 6, 3, 3, 2, 2, 2)
+        assertEquals(listOf(0, 0, 2, 3, 3, 5, 5, 5), MagazinePlan.rowStarts(spans).toList())
+    }
+
+    @Test
+    fun spanWidthsAddUpToTheScreenAndTileImagesShareOneHeight() {
+        for (span in listOf(2, 3, 4, 6)) assertTrue(CardGridLayout.spanWidthDp(800f, span) > 0)
+        // 3 thirds + 2 gaps + edges = the width; half + half likewise; two thirds + a third likewise.
+        val w = 733f
+        assertEquals(w, 3 * CardGridLayout.spanWidthDp(w, 2) + 2 * CardGridLayout.GAP_DP + 2 * CardGridLayout.EDGE_DP, 0.01f)
+        assertEquals(w, 2 * CardGridLayout.spanWidthDp(w, 3) + CardGridLayout.GAP_DP + 2 * CardGridLayout.EDGE_DP, 0.01f)
+        assertEquals(w, CardGridLayout.spanWidthDp(w, 4) + CardGridLayout.spanWidthDp(w, 2) + CardGridLayout.GAP_DP + 2 * CardGridLayout.EDGE_DP, 0.01f)
+        // The image height follows the narrowest tile (a third at 733 dp is about 131 dp) and is capped.
+        assertEquals(131f, CardGridLayout.tileImageHeightDp(w, 3), 1f)
+        assertTrue(CardGridLayout.tileImageHeightDp(2000f, 1) <= CardGridLayout.MAX_IMAGE_HEIGHT_DP)
     }
 }

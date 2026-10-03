@@ -35,7 +35,7 @@ enum class ListMode { MAGAZINE, LIST, CARD }
 
 /** How the cards of the card list are arranged. */
 enum class CardLayoutStyle {
-    /** Rows of different sizes in a fixed rhythm, like a magazine page: small cards, a wide one, larger cards, a wide one. */
+    /** Cards of different sizes packed into irregular, gap-free rows, like a magazine page (see MagazinePlan). */
     MIXED,
 
     /** Every card the same size. */

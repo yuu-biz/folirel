@@ -588,30 +588,30 @@ private fun ArticleList(
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val widthDp = maxWidth.value
                 val columns = CardGridLayout.columns(widthDp, LocalDensity.current.fontScale, cardColumns)
-                // Rows of different sizes in a fixed rhythm (or one size for all); a row's size depends on its position only.
+                // Every article asks for a card size by its id; cards are packed into gap-free rows (magazine style).
                 val even = cardStyle == CardLayoutStyle.EVEN
-                val rowSizes = remember(items.size, columns.count, cardStyle) {
-                    MagazinePlan.rowSizes(items.size, MagazinePlan.pattern(columns.count, cardStyle), even)
+                val spans = remember(items, columns.count, cardStyle) {
+                    MagazinePlan.spans(items.map { it.id }, columns.count, cardStyle)
                 }
-                val metricsBySize = remember(widthDp, columns.count, cardStyle) {
-                    (1..CardGridLayout.MAX_COLUMNS).associateWith { size ->
-                        CardMetrics(size, CardGridLayout.cardWidthDp(widthDp, size), wide = size == 1 && columns.count > 1 && !even)
+                val tileImageHeight = CardGridLayout.tileImageHeightDp(widthDp, columns.count)
+                val metricsBySpan = remember(widthDp, columns.count, cardStyle) {
+                    (1..MagazinePlan.GRID_SPANS).associateWith { span ->
+                        CardMetrics(
+                            span, CardGridLayout.spanWidthDp(widthDp, span),
+                            wide = span == MagazinePlan.GRID_SPANS && columns.count > 1 && !even,
+                            imageHeightDp = tileImageHeight,
+                        )
                     }
                 }
-                val metricsNoImage = remember(metricsBySize) {
-                    metricsBySize.mapValues { (_, m) -> CardMetrics(m.columns, m.widthDp, m.wide, rowHasImage = false) }
+                val metricsNoImage = remember(metricsBySpan) {
+                    metricsBySpan.mapValues { (_, m) -> CardMetrics(m.span, m.widthDp, m.wide, rowHasImage = false, imageHeightDp = m.imageHeightDp) }
                 }
                 // Per article: does any card of its row have an image? (Rows without one do not reserve a picture area.)
-                val rowHasImage = remember(items, rowSizes, showImages) {
-                    BooleanArray(items.size).also { flags ->
-                        var i = 0
-                        while (i < items.size) {
-                            val end = minOf(items.size, i + rowSizes[i].coerceAtLeast(1))
-                            val any = showImages && (i until end).any { items[it].imageUrl != null }
-                            for (j in i until end) flags[j] = any
-                            i = end
-                        }
-                    }
+                val rowHasImage = remember(items, spans, showImages) {
+                    val starts = MagazinePlan.rowStarts(spans)
+                    val rowFlags = HashMap<Int, Boolean>()
+                    if (showImages) items.forEachIndexed { i, row -> if (row.imageUrl != null) rowFlags[starts[i]] = true }
+                    BooleanArray(items.size) { i -> rowFlags[starts[i]] == true }
                 }
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(MagazinePlan.GRID_SPANS),
@@ -624,12 +624,12 @@ private fun ArticleList(
                     itemsIndexed(
                         items,
                         key = { _, row -> row.id },
-                        span = { index, _ -> GridItemSpan(MagazinePlan.span(rowSizes.getOrElse(index) { 1 })) },
-                        contentType = { index, _ -> rowSizes.getOrElse(index) { 1 } },
+                        span = { index, _ -> GridItemSpan(spans.getOrElse(index) { MagazinePlan.GRID_SPANS }) },
+                        contentType = { index, _ -> spans.getOrElse(index) { MagazinePlan.GRID_SPANS } },
                     ) { index, row ->
                         ArticleItem(
                             row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"),
-                            (if (rowHasImage.getOrElse(index) { true }) metricsBySize else metricsNoImage).getValue(rowSizes.getOrElse(index) { 1 }),
+                            (if (rowHasImage.getOrElse(index) { true }) metricsBySpan else metricsNoImage).getValue(spans.getOrElse(index) { MagazinePlan.GRID_SPANS }),
                         )
                     }
                 }

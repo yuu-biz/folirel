@@ -49,6 +49,19 @@ object CardGridLayout {
 
     fun cardWidthDp(widthDp: Float, columns: Int): Float = (widthDp - 2 * EDGE_DP - GAP_DP * (columns - 1)) / columns
 
+    /** Width of a card that spans [span] of the [MagazinePlan.GRID_SPANS] grid columns, gaps included. */
+    fun spanWidthDp(widthDp: Float, span: Int): Float {
+        val cell = (widthDp - 2 * EDGE_DP - GAP_DP * (MagazinePlan.GRID_SPANS - 1)) / MagazinePlan.GRID_SPANS
+        return span * cell + GAP_DP * (span - 1)
+    }
+
+    /**
+     * One image height for every tile of the page (the 16:9 height of the narrowest tile, capped), so cards of
+     * different widths in one row line up and the page keeps an even rhythm.
+     */
+    fun tileImageHeightDp(widthDp: Float, columns: Int): Float =
+        imageHeightDp(spanWidthDp(widthDp, MagazinePlan.GRID_SPANS / columns.coerceIn(1, MAX_COLUMNS)))
+
     fun imageHeightDp(cardWidthDp: Float): Float = min(cardWidthDp * 9f / 16f, MAX_IMAGE_HEIGHT_DP)
 
     fun isHorizontal(columns: Int, cardWidthDp: Float): Boolean = columns == 1 && cardWidthDp >= HORIZONTAL_FROM_CARD_DP
@@ -57,43 +70,90 @@ object CardGridLayout {
 }
 
 /**
- * The rhythm of the mixed card list (UX-GRID, magazine style). Rows follow each other in the list order (newest to
- * oldest, left to right); a row's size depends only on its position, so the same list always looks the same:
- * with three columns available `3 → wide → 2 → wide` repeats, with two `2 → wide`, with one every card is full width.
- * A last row that has fewer articles than its pattern calls for shares the width among them.
+ * The mixed card list (UX-GRID, magazine style). Every article prefers a card size, chosen from its id alone
+ * (a fixed hash, so the same article always asks for the same size, whatever its position, the sort order or when
+ * the list is redrawn; nothing is random at run time). Cards are packed left to right into rows of [GRID_SPANS]
+ * sixths: small (1/3), medium (1/2), large (2/3) and wide (full width). The result looks irregular, like a magazine
+ * page, with rows such as 1/3+1/3+1/3, 1/2+1/2, 2/3+1/3, 1/3+2/3 and a full-width card, and no row ever has a gap:
+ * a card that does not fit the rest of its row takes exactly the rest.
+ *
+ * Wider screens use thirds; with only two columns available only halves and full-width cards are used; with one
+ * column every card is full width.
  */
 object MagazinePlan {
-    /** Grid columns that every row size (1, 2, 3) divides evenly. */
+    /** Grid columns that thirds, halves and two-thirds all divide evenly. */
     const val GRID_SPANS = 6
+    const val SMALL = 2
+    const val MEDIUM = 3
+    const val LARGE = 4
+    const val WIDE = 6
 
-    private val THREE = listOf(3, 1, 2, 1)
-    private val TWO = listOf(2, 1)
-    private val ONE = listOf(1)
+    /** Share (percent) of each preferred size when thirds are available: 40 / 25 / 25 / 10. */
+    private const val SMALL_UNTIL = 40
+    private const val MEDIUM_UNTIL = 65
+    private const val LARGE_UNTIL = 90
 
-    fun pattern(maxColumns: Int, style: CardLayoutStyle): List<Int> = when {
-        maxColumns <= 1 -> ONE
-        style == CardLayoutStyle.EVEN -> listOf(maxColumns.coerceAtMost(CardGridLayout.MAX_COLUMNS))
-        maxColumns == 2 -> TWO
-        else -> THREE
-    }
+    /** Share (percent) of half-width cards when only two columns fit; the rest are full width. */
+    private const val HALF_SHARE = 85
 
-    /** For each of [count] articles, how many cards share its row (1, 2 or 3). */
-    fun rowSizes(count: Int, pattern: List<Int>, even: Boolean = false): IntArray {
-        val sizes = IntArray(count)
-        var i = 0
-        var step = 0
-        while (i < count) {
-            val wanted = pattern[step % pattern.size]
-            // Even grids keep every card the size of a full row; mixed ones let a short last row share the width.
-            val actual = if (even) wanted else minOf(wanted, count - i)
-            val take = minOf(wanted, count - i)
-            for (j in 0 until take) sizes[i + j] = actual
-            i += take
-            step++
+    /** 0..99, stable for an id (32-bit FNV-1a). */
+    fun bucket(articleId: String): Int {
+        var hash = -0x7ee3623b // 2166136261
+        for (c in articleId) {
+            hash = hash xor c.code
+            hash *= 16777619
         }
-        return sizes
+        return ((hash.toLong() and 0xffffffffL) % 100).toInt()
     }
 
-    /** Grid span (of [GRID_SPANS]) of a card in a row of [rowSize]. */
-    fun span(rowSize: Int): Int = GRID_SPANS / rowSize.coerceIn(1, CardGridLayout.MAX_COLUMNS)
+    /** The size (in sixths) an article asks for. Depends only on its id and the number of columns that fit. */
+    fun preferredSpan(articleId: String, maxColumns: Int): Int {
+        val b = bucket(articleId)
+        return when {
+            maxColumns <= 1 -> WIDE
+            maxColumns == 2 -> if (b < HALF_SHARE) MEDIUM else WIDE
+            b < SMALL_UNTIL -> SMALL
+            b < MEDIUM_UNTIL -> MEDIUM
+            b < LARGE_UNTIL -> LARGE
+            else -> WIDE
+        }
+    }
+
+    /**
+     * Span (in sixths) of every article, in list order. Each row sums to exactly [GRID_SPANS]: a card that does not
+     * fit the rest of its row takes the rest, a card that would leave a single sixth takes it too, and a short final
+     * row is stretched. [EVEN] gives every card the same width.
+     */
+    fun spans(ids: List<String>, maxColumns: Int, style: CardLayoutStyle): IntArray {
+        val columns = maxColumns.coerceIn(1, CardGridLayout.MAX_COLUMNS)
+        val out = IntArray(ids.size)
+        if (style == CardLayoutStyle.EVEN) {
+            out.fill(GRID_SPANS / columns)
+            return out
+        }
+        var remaining = GRID_SPANS
+        for (i in ids.indices) {
+            var span = minOf(preferredSpan(ids[i], columns), remaining)
+            if (remaining - span == 1) span = remaining
+            out[i] = span
+            remaining -= span
+            if (remaining == 0) remaining = GRID_SPANS
+        }
+        if (remaining != GRID_SPANS && ids.isNotEmpty()) out[ids.size - 1] += remaining
+        return out
+    }
+
+    /** Row number of every article for [spans] (rows are runs of cards that add up to [GRID_SPANS]). */
+    fun rowStarts(spans: IntArray): IntArray {
+        val starts = IntArray(spans.size)
+        var rowStart = 0
+        var filled = 0
+        for (i in spans.indices) {
+            if (filled == 0) rowStart = i
+            starts[i] = rowStart
+            filled += spans[i]
+            if (filled >= GRID_SPANS) filled = 0
+        }
+        return starts
+    }
 }

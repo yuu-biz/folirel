@@ -69,22 +69,27 @@ class ArticleActions(
 )
 
 /**
- * Size of one card in the card list: how many cards share its row ([columns]) and how wide it is (dp). [wide] marks
- * the full-width card of a mixed (magazine) page, drawn with the image beside the text.
+ * Size of one card in the card list: how much of the row it spans and how wide it is (dp). [wide] marks the
+ * full-width card of a mixed (magazine) page, drawn with the image beside the text.
  */
 @Immutable
-class CardMetrics(val columns: Int, val widthDp: Float, val wide: Boolean = false, val rowHasImage: Boolean = true) {
-    val multiColumn: Boolean get() = columns > 1
-    val horizontal: Boolean get() = wide || CardGridLayout.isHorizontal(columns, widthDp)
-
-    /** Half-width cards of a mixed page get larger type than the small three-across ones. */
-    val large: Boolean get() = columns == 2 && widthDp >= 260f
+class CardMetrics(
+    /** Sixths of the row this card spans (2 = a third, 3 = a half, 4 = two thirds, 6 = full width). */
+    val span: Int,
+    val widthDp: Float,
+    val wide: Boolean = false,
+    val rowHasImage: Boolean = true,
+    /** The image height every tile of the page shares. */
+    val imageHeightDp: Float = CardGridLayout.imageHeightDp(widthDp),
+) {
+    val multiColumn: Boolean get() = span < MagazinePlan.GRID_SPANS
+    val horizontal: Boolean get() = wide || (!multiColumn && CardGridLayout.isHorizontal(1, widthDp))
     val compact: Boolean get() = CardGridLayout.isCompact(widthDp)
-    val imageHeight: Dp get() = CardGridLayout.imageHeightDp(widthDp).dp
+    val imageHeight: Dp get() = imageHeightDp.dp
 
     companion object {
         /** One ordinary phone-width column (used where no grid measured the width). */
-        val SingleColumn = CardMetrics(1, 360f)
+        val SingleColumn = CardMetrics(MagazinePlan.GRID_SPANS, 360f)
     }
 }
 
@@ -231,11 +236,13 @@ private fun ArticleCard(
 ) {
     val multi = metrics.multiColumn
     val hasImage = showImages && row.imageUrl != null
-    val titleSize = if (!multi) 18 else if (metrics.large) 17 else 15
-    val titleLine = if (!multi) 24 else if (metrics.large) 22 else 20
-    val summarySize = if (multi && !metrics.large) 13 else 14
-    val summaryLine = if (!multi) 20 else if (metrics.large) 19 else 18
-    val baseSummaryLines = if (metrics.large) 3 else 2
+    // One type size for all tiles (like the reference magazine page); larger only for a card of its own.
+    val titleSize = if (!multi) 18 else 16
+    val titleLine = if (!multi) 24 else 21
+    val summarySize = if (!multi) 14 else 13
+    val summaryLine = if (!multi) 20 else 18
+    // Enough of the article to tell what it is about: four lines on every card, five beside a wide card's image.
+    val baseSummaryLines = 4
     val density = LocalDensity.current
     val textPadding = if (multi) 10.dp else 14.dp
     // Several columns: the text area has a fixed height of 3 title lines + 2 summary lines, plus the image height
@@ -255,7 +262,7 @@ private fun ArticleCard(
         val titleHeight = with(density) { (titleLine * 3 + 4).sp.toDp() }
         val lineDp = with(density) { summaryLine.sp.toDp() }
         ((area - titleHeight) / lineDp).toInt().coerceAtLeast(baseSummaryLines)
-    } else if (metrics.horizontal) 3 else 2
+    } else if (metrics.horizontal) 5 else baseSummaryLines
 
     ElevatedCard(modifier.fillMaxWidth()) {
         val textBlock: @Composable (Modifier) -> Unit = { m ->
