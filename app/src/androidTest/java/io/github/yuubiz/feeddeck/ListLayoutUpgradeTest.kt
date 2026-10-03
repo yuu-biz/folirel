@@ -7,10 +7,10 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import io.github.yuubiz.feeddeck.app.MainActivity
 import io.github.yuubiz.feeddeck.data.preferences.SettingsMigrations
@@ -49,7 +49,6 @@ class ListLayoutUpgradeTest {
     val compose = createAndroidComposeRule<MainActivity>()
 
     private val context: Context get() = ApplicationProvider.getApplicationContext()
-    private val legacyKey = stringPreferencesKey("list_mode")
 
     private enum class Drawn { GRID_OF_CARDS, ONE_COLUMN_WITH_SUMMARY, ONE_DENSE_ROW_EACH }
 
@@ -61,9 +60,8 @@ class ListLayoutUpgradeTest {
     /** The settings of a user who last ran 0.3.1 with [stored] chosen, upgraded to this build. */
     private fun upgradedLayout(stored: String): ListMode {
         val file = File(context.cacheDir, "upgrade-$stored-${System.nanoTime()}.preferences_pb")
-        val old = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        runBlocking { PreferenceDataStoreFactory.create(scope = old, produceFile = { file }).edit { it[legacyKey] = stored } }
-        old.cancel()
+        // The file 0.3.1 left: a PreferenceMap with one entry, list_mode = <stored> (field 5 of Value is the string).
+        file.writeBytes(preferenceMapWithString("list_mode", stored))
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         try {
             val store = PreferenceDataStoreFactory.create(scope = scope, migrations = SettingsMigrations.all, produceFile = { file })
@@ -71,6 +69,12 @@ class ListLayoutUpgradeTest {
         } finally {
             scope.cancel()
         }
+    }
+
+    private fun preferenceMapWithString(key: String, value: String): ByteArray {
+        fun delimited(number: Int, payload: ByteArray) = byteArrayOf((number shl 3 or 2).toByte(), payload.size.toByte()) + payload
+        val entry = delimited(1, key.toByteArray()) + delimited(2, delimited(5, value.toByteArray()))
+        return delimited(1, entry)
     }
 
     private fun row(n: Int) = ArticleRow(
@@ -92,11 +96,14 @@ class ListLayoutUpgradeTest {
             compose.activity.setContentView(view)
             view.setContent {
                 io.github.yuubiz.feeddeck.ui.theme.FeedDeckTheme(io.github.yuubiz.feeddeck.data.preferences.ThemeMode.SYSTEM, 1.0f) {
+                    // A wide viewport (like a tablet) so that the Magazine layout has room for several cards side by side.
+                    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.requiredWidth(840.dp)) {
                     ArticleList(
                         host = host, state = ArticlesState("layout-check", items, loaded = true), mode = mode, showImages = false,
                         cardColumns = 0, cardStyle = CardLayoutStyle.MIXED, imageLoader = ImageLoader.Builder(context).build(),
                         actions = actions, newIds = emptySet(), newestFirst = true, isCurrent = true, scrollToTopTick = 0,
                     )
+                    }
                 }
             }
         }
