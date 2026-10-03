@@ -57,6 +57,7 @@ import io.github.yuubiz.feeddeck.data.preferences.ThemeMode
 import io.github.yuubiz.feeddeck.data.repository.ArticleRepository
 import io.github.yuubiz.feeddeck.data.repository.RetentionManager
 import io.github.yuubiz.feeddeck.data.repository.RetentionPreview
+import io.github.yuubiz.feeddeck.model.CardLayoutStyle
 import io.github.yuubiz.feeddeck.model.ListMode
 import io.github.yuubiz.feeddeck.ui.home.CardGridLayout
 import kotlinx.coroutines.Dispatchers
@@ -156,6 +157,16 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Un
                     ),
                     s.listMode,
                 ) { vm.update { setListMode(it) } }
+            }
+            item {
+                Choice(
+                    stringResource(R.string.settings_card_style),
+                    listOf(
+                        CardLayoutStyle.MIXED to stringResource(R.string.card_style_mixed),
+                        CardLayoutStyle.EVEN to stringResource(R.string.card_style_even),
+                    ),
+                    s.cardStyle,
+                ) { vm.update { setCardStyle(it) } }
             }
             item {
                 Choice(

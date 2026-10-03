@@ -34,10 +34,13 @@ object TestData {
         c.settings.setLastFilter(ReadFilter.ALL)
         c.settings.setSortOrder(SortOrder.NEWEST)
         c.settings.setTextScale(1.0f)
+        c.settings.setConfirmHttpOpen(true)
+        c.settings.setCardColumns(0)
+        c.settings.setCardStyle(io.github.yuubiz.feeddeck.model.CardLayoutStyle.MIXED)
     }
 
     /** One subscribed feed with [count] articles; index 0 is the newest. Returns article ids newest first. */
-    fun seedArticles(count: Int, withLinks: Boolean = true): List<String> = runBlocking {
+    fun seedArticles(count: Int, withLinks: Boolean = true, link: String = "https://www.example.com/"): List<String> = runBlocking {
         val c = container
         val account = c.subscriptions.ensureLocalAccount()
         val opml = """<opml version="2.0"><body><outline text="テスト"><outline text="架空フィード" xmlUrl="https://feed.example.com/rss.xml"/></outline></body></opml>"""
@@ -47,7 +50,7 @@ object TestData {
             NormalizedEntry(
                 entryKey = "id:item-$i",
                 title = "記事 $i 長い日本語の見出しが折り返しても行の高さが崩れないことを確認するためのテキスト",
-                linkUrl = if (withLinks) "https://www.example.com/" else null,
+                linkUrl = if (withLinks) link else null,
                 summaryText = "概要 $i",
                 author = null,
                 publishedAt = now - i * 60_000L,

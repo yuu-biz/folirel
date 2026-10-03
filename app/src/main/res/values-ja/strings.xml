@@ -353,11 +353,14 @@
         <item quantity="other">%d分ごと</item>
     </plurals>
     <string name="https_reason_redirect_unconfirmed">別のサイトへ転送され、同じフィードか確認できない（HTTPを許可すると比較して判定）</string>
-    <string name="settings_card_columns">大きなカードの列数</string>
+    <string name="settings_card_style">大きなカードの並べ方</string>
+    <string name="card_style_mixed">大きさ混在（雑誌風）</string>
+    <string name="card_style_even">すべて同じ大きさ</string>
+    <string name="settings_card_columns">大きなカードの最大列数</string>
     <string name="card_columns_auto">自動（画面幅と文字サイズに合わせる）</string>
     <string name="card_columns_n">%1$d列</string>
-    <string name="settings_card_columns_note">選んだ列数だと見出しが読めないほど狭くなる場合（小さなウィンドウ、大きな文字）は、列数を減らします。列数を保つために文字を縮小することはありません。</string>
-    <string name="settings_card_columns_now">この画面では現在%1$d列で表示します。</string>
+    <string name="settings_card_columns_note">雑誌風では、この列数の小さなカードの行と、横長・大きめのカードの行が交互に並びます。選んだ列数だと見出しが読めないほど狭くなる場合（小さなウィンドウ、大きな文字）は、列数を減らします。列数を保つために文字を縮小することはありません。</string>
+    <string name="settings_card_columns_now">この画面では横に最大%1$d列で表示します。</string>
     <string name="settings_card_columns_reduced">（選択した%1$d列はここでは収まらないため減らしています。）</string>
     <string name="status_result_compact">%1$dフィード：%2$s</string>
     <string name="status_part_ok">正常%1$d</string>

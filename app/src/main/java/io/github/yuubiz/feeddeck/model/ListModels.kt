@@ -33,6 +33,15 @@ enum class SortOrder { NEWEST, OLDEST }
 /** MAGAZINE: text + side thumbnail. LIST: compact one line. CARD: large card with a wide image on top. */
 enum class ListMode { MAGAZINE, LIST, CARD }
 
+/** How the cards of the card list are arranged. */
+enum class CardLayoutStyle {
+    /** Rows of different sizes in a fixed rhythm, like a magazine page: small cards, a wide one, larger cards, a wide one. */
+    MIXED,
+
+    /** Every card the same size. */
+    EVEN,
+}
+
 /** Fully resolved list query. [categoryIds] already contains the selected category and its descendants. */
 data class ArticleQuerySpec(
     val accountId: String,

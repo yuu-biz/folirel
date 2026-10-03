@@ -20,7 +20,8 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -101,6 +102,7 @@ import io.github.yuubiz.feeddeck.data.preferences.AppSettings
 import io.github.yuubiz.feeddeck.data.preferences.BrowserMode
 import io.github.yuubiz.feeddeck.model.ArticleRow
 import io.github.yuubiz.feeddeck.model.ArticleScope
+import io.github.yuubiz.feeddeck.model.CardLayoutStyle
 import io.github.yuubiz.feeddeck.model.FetchError
 import io.github.yuubiz.feeddeck.model.ListMode
 import io.github.yuubiz.feeddeck.model.ReadFilter
@@ -485,6 +487,7 @@ private fun ScopePage(
                 mode = settings.listMode,
                 showImages = settings.showImages,
                 cardColumns = settings.cardColumns,
+                cardStyle = settings.cardStyle,
                 imageLoader = imageLoader,
                 actions = actions,
                 newIds = newIds,
@@ -528,6 +531,7 @@ private fun ArticleList(
     mode: ListMode,
     showImages: Boolean,
     cardColumns: Int,
+    cardStyle: CardLayoutStyle,
     imageLoader: ImageLoader,
     actions: ArticleActions,
     newIds: Set<String>,
@@ -584,17 +588,34 @@ private fun ArticleList(
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val widthDp = maxWidth.value
                 val columns = CardGridLayout.columns(widthDp, LocalDensity.current.fontScale, cardColumns)
-                val metrics = CardMetrics(columns.count, CardGridLayout.cardWidthDp(widthDp, columns.count))
+                // Rows of different sizes in a fixed rhythm (or one size for all); a row's size depends on its position only.
+                val even = cardStyle == CardLayoutStyle.EVEN
+                val rowSizes = remember(items.size, columns.count, cardStyle) {
+                    MagazinePlan.rowSizes(items.size, MagazinePlan.pattern(columns.count, cardStyle), even)
+                }
+                val metricsBySize = remember(widthDp, columns.count, cardStyle) {
+                    (1..CardGridLayout.MAX_COLUMNS).associateWith { size ->
+                        CardMetrics(size, CardGridLayout.cardWidthDp(widthDp, size), wide = size == 1 && columns.count > 1 && !even)
+                    }
+                }
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(columns.count),
+                    columns = GridCells.Fixed(MagazinePlan.GRID_SPANS),
                     state = gridState,
                     modifier = Modifier.fillMaxSize().testTag("article_list"),
                     contentPadding = PaddingValues(start = CardGridLayout.EDGE_DP.dp, end = CardGridLayout.EDGE_DP.dp, top = 4.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(CardGridLayout.GAP_DP.dp),
                     horizontalArrangement = Arrangement.spacedBy(CardGridLayout.GAP_DP.dp),
                 ) {
-                    items(items, key = { it.id }, contentType = { mode }) { row ->
-                        ArticleItem(row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"), metrics)
+                    itemsIndexed(
+                        items,
+                        key = { _, row -> row.id },
+                        span = { index, _ -> GridItemSpan(MagazinePlan.span(rowSizes.getOrElse(index) { 1 })) },
+                        contentType = { index, _ -> rowSizes.getOrElse(index) { 1 } },
+                    ) { index, row ->
+                        ArticleItem(
+                            row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"),
+                            metricsBySize.getValue(rowSizes.getOrElse(index) { 1 }),
+                        )
                     }
                 }
             }

@@ -7,10 +7,12 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -66,11 +68,17 @@ class ArticleActions(
     val showSummary: (ArticleRow) -> Unit,
 )
 
-/** Size of one card in the card list: how many columns share the width and how wide this card is (dp). */
+/**
+ * Size of one card in the card list: how many cards share its row ([columns]) and how wide it is (dp). [wide] marks
+ * the full-width card of a mixed (magazine) page, drawn with the image beside the text.
+ */
 @Immutable
-class CardMetrics(val columns: Int, val widthDp: Float) {
+class CardMetrics(val columns: Int, val widthDp: Float, val wide: Boolean = false) {
     val multiColumn: Boolean get() = columns > 1
-    val horizontal: Boolean get() = CardGridLayout.isHorizontal(columns, widthDp)
+    val horizontal: Boolean get() = wide || CardGridLayout.isHorizontal(columns, widthDp)
+
+    /** Half-width cards of a mixed page get larger type than the small three-across ones. */
+    val large: Boolean get() = columns == 2 && widthDp >= 260f
     val compact: Boolean get() = CardGridLayout.isCompact(widthDp)
     val imageHeight: Dp get() = CardGridLayout.imageHeightDp(widthDp).dp
 
@@ -223,24 +231,25 @@ private fun ArticleCard(
 ) {
     val multi = metrics.multiColumn
     val hasImage = showImages && row.imageUrl != null
-    val titleSize = if (multi) 15 else 18
-    val titleLine = if (multi) 20 else 24
-    val summarySize = if (multi) 13 else 14
-    val summaryLine = if (multi) 18 else 20
+    val titleSize = if (!multi) 18 else if (metrics.large) 17 else 15
+    val titleLine = if (!multi) 24 else if (metrics.large) 22 else 20
+    val summarySize = if (multi && !metrics.large) 13 else 14
+    val summaryLine = if (!multi) 20 else if (metrics.large) 19 else 18
+    val baseSummaryLines = if (metrics.large) 3 else 2
     val density = LocalDensity.current
     val textPadding = if (multi) 10.dp else 14.dp
     // Several columns: the text area has a fixed height of 3 title lines + 2 summary lines, plus the image height
     // for an article that has no image (so all cards of a row are equally tall).
     val fixedTextHeight: Dp? = if (multi) {
-        val base = with(density) { (titleLine * 3 + 4 + summaryLine * 2).sp.toDp() }
+        val base = with(density) { (titleLine * 3 + 4 + summaryLine * baseSummaryLines).sp.toDp() }
         if (showImages && !hasImage) base + metrics.imageHeight else base
     } else null
     val summaryLines = if (multi) {
         val area = fixedTextHeight ?: 0.dp
         val titleHeight = with(density) { (titleLine * 3 + 4).sp.toDp() }
         val lineDp = with(density) { summaryLine.sp.toDp() }
-        ((area - titleHeight) / lineDp).toInt().coerceAtLeast(2)
-    } else 2
+        ((area - titleHeight) / lineDp).toInt().coerceAtLeast(baseSummaryLines)
+    } else if (metrics.horizontal) 3 else 2
 
     ElevatedCard(modifier.fillMaxWidth()) {
         val textBlock: @Composable (Modifier) -> Unit = { m ->
@@ -259,9 +268,13 @@ private fun ArticleCard(
             }
         }
         if (metrics.horizontal) {
-            Row(clickModifier) {
-                if (hasImage) CardImage(row.imageUrl, imageLoader, Modifier.width(216.dp).height((216 * 9 / 16).dp))
-                textBlock(Modifier.weight(1f).padding(start = textPadding, end = textPadding, top = 12.dp))
+            // Wide card: image on the left (about 40 % of the width, at most 280 dp), headline and summary on the right.
+            val imageWidth = minOf(metrics.widthDp * 0.4f, 280f).dp
+            Row(clickModifier.height(IntrinsicSize.Min)) {
+                if (hasImage) {
+                    CardImage(row.imageUrl, imageLoader, Modifier.width(imageWidth).heightIn(min = imageWidth * 9 / 16).fillMaxHeight())
+                }
+                textBlock(Modifier.weight(1f).padding(start = 14.dp, end = 14.dp, top = 12.dp))
             }
         } else {
             Column(clickModifier) {

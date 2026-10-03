@@ -83,6 +83,56 @@ class MigrationTest {
         }
     }
 
+    /** R01 / DB v3: 2→3 only adds tables; subscriptions, articles and reading state are kept, and 1→3 chains. */
+    @Test
+    fun migration2To3IsValidAndKeepsData() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(db)
+        helper.createDatabase(db, 2).apply {
+            execSQL("INSERT INTO accounts (id, backendType, displayName, createdAt) VALUES ('acc', 'LOCAL', 'Local', 0)")
+            execSQL(
+                "INSERT INTO feeds (id, accountId, subscriptionUrl, fetchUrl, siteUrl, feedTitle, userTitle, isSubscribed, isPaused, createdAt) " +
+                    "VALUES ('f1', 'acc', 'https://example.com/a.xml', 'https://example.com/a.xml', NULL, 'A', NULL, 1, 0, 0)",
+            )
+            execSQL(
+                "INSERT INTO articles (id, accountId, feedId, entryKey, externalEntryId, linkUrl, title, summaryText, author, publishedAt, firstSeenAt, sortAt, imageUrl, lastSeenAt) " +
+                    "VALUES ('a1', 'acc', 'f1', 'id:1', NULL, 'https://example.com/1', 't', 's', NULL, 1, 1, 1, NULL, 1)",
+            )
+            execSQL("INSERT INTO article_states (articleId, isRead, isSaved, updatedAt) VALUES ('a1', 1, 1, 1)")
+            close()
+        }
+        helper.runMigrationsAndValidate(db, 3, true, io.github.yuubiz.feeddeck.data.db.Migrations.MIGRATION_2_3).close()
+        val room = Room.databaseBuilder(context, AppDatabase::class.java, db).addMigrations(*AppDatabase.MIGRATIONS).build()
+        try {
+            runBlocking {
+                val state = room.articleDao().state("a1")!!
+                assertTrue(state.isRead && state.isSaved)
+                assertEquals("A", room.subscriptionDao().feed("f1")!!.feedTitle)
+                assertEquals(0, room.iconDao().count("OK"))
+                assertEquals(emptyList<Any>(), room.subscriptionDao().urlMoves("acc"))
+            }
+        } finally {
+            room.close()
+            context.deleteDatabase(db)
+        }
+    }
+
+    @Test
+    fun migration1To3ChainsBothSteps() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(db)
+        helper.createDatabase(db, 1).apply {
+            execSQL("INSERT INTO accounts (id, backendType, displayName, createdAt) VALUES ('acc', 'LOCAL', 'Local', 0)")
+            close()
+        }
+        helper.runMigrationsAndValidate(
+            db, 3, true,
+            io.github.yuubiz.feeddeck.data.db.Migrations.MIGRATION_1_2,
+            io.github.yuubiz.feeddeck.data.db.Migrations.MIGRATION_2_3,
+        ).close()
+        context.deleteDatabase(db)
+    }
+
     @Test
     fun unknownNewerVersionFailsInsteadOfWiping() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

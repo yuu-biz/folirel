@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.yuubiz.feeddeck.model.ArticleScope
+import io.github.yuubiz.feeddeck.model.CardLayoutStyle
 import io.github.yuubiz.feeddeck.model.ListMode
 import io.github.yuubiz.feeddeck.model.ReadFilter
 import io.github.yuubiz.feeddeck.model.SortOrder
@@ -27,6 +28,8 @@ data class AppSettings(
     val textScale: Float = 1.0f,
     /** Columns of the card list: 0 = automatic by width and text size, otherwise 1..3 (reduced when they do not fit). */
     val cardColumns: Int = 0,
+    /** Mixed sizes (magazine page) or one size for every card. */
+    val cardStyle: CardLayoutStyle = CardLayoutStyle.MIXED,
     val showImages: Boolean = true,
     val browserMode: BrowserMode = BrowserMode.CUSTOM_TABS,
     /** Periodic update interval in minutes; 0 = off. Default 2 hours. */
@@ -69,6 +72,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val listMode = stringPreferencesKey("list_mode")
         val textScale = floatPreferencesKey("text_scale")
         val cardColumns = intPreferencesKey("card_columns")
+        val cardStyle = stringPreferencesKey("card_style")
         val showImages = booleanPreferencesKey("show_images")
         val browserMode = stringPreferencesKey("browser_mode")
         /** v0.1 key (hours). Read only for migration; never written. */
@@ -93,6 +97,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             theme = enumOr(p[Keys.theme], defaults.theme),
             listMode = enumOr(p[Keys.listMode], defaults.listMode),
             textScale = p[Keys.textScale]?.takeIf { it in AppSettings.TEXT_SCALES } ?: defaults.textScale,
+            cardStyle = enumOr(p[Keys.cardStyle], defaults.cardStyle),
             cardColumns = p[Keys.cardColumns]?.takeIf { it in AppSettings.CARD_COLUMNS } ?: defaults.cardColumns,
             showImages = p[Keys.showImages] ?: defaults.showImages,
             browserMode = enumOr(p[Keys.browserMode], defaults.browserMode),
@@ -124,6 +129,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setListMode(value: ListMode) = store.edit { it[Keys.listMode] = value.name }
     suspend fun setTextScale(value: Float) = store.edit { it[Keys.textScale] = value }
     suspend fun setCardColumns(value: Int) = store.edit { it[Keys.cardColumns] = value }
+    suspend fun setCardStyle(value: CardLayoutStyle) = store.edit { it[Keys.cardStyle] = value.name }
     suspend fun setShowImages(value: Boolean) = store.edit { it[Keys.showImages] = value }
     suspend fun setBrowserMode(value: BrowserMode) = store.edit { it[Keys.browserMode] = value.name }
     suspend fun setRefreshIntervalMinutes(minutes: Int) = store.edit { it[Keys.refreshMinutes] = minutes }

@@ -362,11 +362,14 @@
         <item quantity="other">Every %d minutes</item>
     </plurals>
     <string name="https_reason_redirect_unconfirmed">Redirected to another site; not confirmed as the same feed (allowing HTTP lets the check compare)</string>
-    <string name="settings_card_columns">Columns in large card style</string>
+    <string name="settings_card_style">Large card arrangement</string>
+    <string name="card_style_mixed">Mixed sizes, like a magazine page</string>
+    <string name="card_style_even">Same size for every card</string>
+    <string name="settings_card_columns">Most columns in large card style</string>
     <string name="card_columns_auto">Automatic (by screen width and text size)</string>
     <string name="card_columns_n">%1$d columns</string>
-    <string name="settings_card_columns_note">If the chosen number of columns would make headlines too narrow to read (small window, large text), fewer columns are used. Text is never shrunk to keep columns.</string>
-    <string name="settings_card_columns_now">Right now this screen shows %1$d column(s).</string>
+    <string name="settings_card_columns_note">In the magazine arrangement, rows of this many small cards alternate with wide and larger cards. If the chosen number of columns would make headlines too narrow to read (small window, large text), fewer columns are used. Text is never shrunk to keep columns.</string>
+    <string name="settings_card_columns_now">Right now this screen shows up to %1$d column(s) across.</string>
     <string name="settings_card_columns_reduced">(Your choice of %1$d columns does not fit here, so it is reduced.)</string>
     <string name="status_result_compact">%1$d feeds: %2$s</string>
     <string name="status_part_ok">OK %1$d</string>
