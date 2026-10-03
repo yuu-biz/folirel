@@ -40,6 +40,8 @@ data class DiscoveryResult(
     val pageUrl: String?,
     val page: PageStatus,
     val candidates: List<DiscoveryCandidate>,
+    /** The fetch URL of the subscription the candidates were found for; adopting one is valid only while it is still the feed's URL. */
+    val sourceFetchUrl: String? = null,
 ) {
     enum class PageStatus {
         /** A page was read. */

@@ -574,9 +574,8 @@ private fun ArticleList(
     // New articles count as seen once they are on screen, judged on this list's own state (REV-02 / N06).
     LaunchedEffect(scroll.owner, isCurrent) {
         if (!isCurrent) return@LaunchedEffect
-        snapshotFlow { currentScroll.visibleKeys.mapNotNull { it as? String } }.collect { visible ->
-            vm.markNewSeen(visible.filter { it in currentNew })
-        }
+        // Both sides are observed: a marker added later for an article that is already shown is consumed too (V3-R03).
+        NewArticleSeen.visibleNew({ currentScroll.visibleKeys }, { currentNew }).collect { vm.markNewSeen(it) }
     }
     // The banner counts only the new articles this list shows and jumps to the first of them in the current order.
     val firstNewIndex by remember(scroll.owner) { derivedStateOf { currentItems.indexOfFirst { it.id in currentNew } } }

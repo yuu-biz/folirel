@@ -128,6 +128,47 @@ class StaleFetchResponseTest {
         return report
     }
 
+
+    @Test
+    fun moveDuringAFetchAndDifferentIdSpellingTogetherKeepEveryArticleOnceWithItsState() = runBlocking<Unit> {
+        // R01 × R02: the old address answers late with a changed feed while the new one spells every id differently.
+        fun linkOnly(vararg n: Int) = MockResponse.Builder().code(200).setHeader("Content-Type", "application/rss+xml").body(
+            """<rss version="2.0"><channel><title>site</title>""" + n.joinToString("") {
+                "<item><title>t$it</title><link>https://site.example/p/$it</link><pubDate>Sat, 0$it Aug 2026 10:00:00 GMT</pubDate></item>"
+            } + "</channel></rss>",
+        ).build()
+        val feedId = subscribeA()
+        serve()
+        aRelease.countDown()
+        aResponse.set(linkOnly(1, 2, 3))
+        refresh()
+        val before = runBlocking { env.db.articleDao().articlesOfFeed(feedId) }.associateBy { it.linkUrl!!.substringAfterLast('/') }
+        env.articles.setRead(before.getValue("1").id, true)
+        env.articles.setSaved(before.getValue("2").id, true)
+
+        // The next update of A is in flight and will bring article 4; meanwhile the user adopts B.
+        env.clock.advanceMinutes(60)
+        aResponse.set(linkOnly(1, 2, 3, 4))
+        bResponse.set(
+            MockResponse.Builder().code(200).setHeader("Content-Type", "application/rss+xml").body(
+                """<rss version="2.0"><channel><title>site</title>""" +
+                    "<item><guid>https://site.example/p/1</guid><title>t1</title><link>https://site.example/p/1</link><pubDate>Sat, 01 Aug 2026 10:00:00 GMT</pubDate></item>" +
+                    "<item><guid>http://site.example/p/2</guid><title>t2</title><link>https://site.example/p/2</link><pubDate>Sat, 02 Aug 2026 10:00:00 GMT</pubDate></item>" +
+                    "<item><guid>https://www.site.example/p/3</guid><title>t3</title><link>https://site.example/p/3</link><pubDate>Sat, 03 Aug 2026 10:00:00 GMT</pubDate></item>" +
+                    "</channel></rss>",
+            ).build(),
+        )
+        val report = moveWhileAIsInFlight(feedId) { env.subscriptions.applyUrlMove(feedId, a(), b()) }
+
+        val after = runBlocking { env.db.articleDao().articlesOfFeed(feedId) }
+        assertEquals("A's late article 4 is not applied; B's spellings are the old articles", 3, after.size)
+        assertEquals(before.values.map { it.id }.toSet(), after.map { it.id }.toSet())
+        assertEquals(0, report.newArticles)
+        assertEquals(true, runBlocking { env.db.articleDao().state(before.getValue("1").id)!!.isRead })
+        assertEquals(true, runBlocking { env.db.articleDao().state(before.getValue("2").id)!!.isSaved })
+        assertEquals(b(), env.db.subscriptionDao().feed(feedId)!!.fetchUrl)
+    }
+
     @Test
     fun oldAddressSuccessDoesNotOverwriteNewAddress() = runBlocking<Unit> {
         val feedId = subscribeA()

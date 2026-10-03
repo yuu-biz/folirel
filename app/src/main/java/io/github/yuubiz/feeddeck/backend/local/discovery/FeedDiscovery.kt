@@ -44,7 +44,10 @@ class FeedDiscovery(
     )
 
     /** [enteredUrl]: an address typed by the user (site page or feed); it replaces the site of the subscription. */
-    suspend fun discover(known: Known, enteredUrl: String? = null): DiscoveryResult {
+    suspend fun discover(known: Known, enteredUrl: String? = null): DiscoveryResult =
+        discoverFrom(known, enteredUrl).copy(sourceFetchUrl = known.fetchUrl)
+
+    private suspend fun discoverFrom(known: Known, enteredUrl: String?): DiscoveryResult {
         val entered = enteredUrl?.takeIf { it.isNotBlank() }
         val start = if (entered != null) {
             UrlNormalizer.normalizedOrNull(entered) ?: return DiscoveryResult(null, DiscoveryResult.PageStatus.UNREADABLE, emptyList())
@@ -63,7 +66,8 @@ class FeedDiscovery(
         val links: List<HtmlLinks.FeedLink>
         val via: CandidateVia
         val status: DiscoveryResult.PageStatus
-        if (HtmlLinks.looksLikeHtml(page.bytes, page.contentType) && !startsLikeFeed(page.bytes)) {
+        // A feed is told by its root element; "<?xml" in front says nothing (XHTML pages begin with it too).
+        if (HtmlLinks.looksLikeHtml(page.bytes, page.contentType) && !HtmlLinks.isFeedDocument(page.bytes)) {
             val charset = page.contentType?.let { Regex("charset=([^;\\s]+)", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1) }
             links = HtmlLinks.feedLinks(HtmlLinks.parse(page.bytes, charset, page.finalUrl))
             via = CandidateVia.SITE_PAGE
@@ -81,11 +85,6 @@ class FeedDiscovery(
             .map { check(it, via, known, knownKeys) }
             .sortedWith(compareByDescending<DiscoveryCandidate> { it.fetchable }.thenByDescending { it.sharedEntries > 0 }.thenByDescending { it.sameTitle })
         return DiscoveryResult(page.finalUrl, status, candidates)
-    }
-
-    private fun startsLikeFeed(bytes: ByteArray): Boolean {
-        val head = String(bytes, 0, minOf(bytes.size, 1024), Charsets.ISO_8859_1).trimStart().lowercase()
-        return head.startsWith("<?xml") || head.startsWith("<rss") || head.startsWith("<feed") || head.startsWith("<rdf:rdf")
     }
 
     private suspend fun check(link: HtmlLinks.FeedLink, via: CandidateVia, known: Known, knownKeys: Set<String>): DiscoveryCandidate {

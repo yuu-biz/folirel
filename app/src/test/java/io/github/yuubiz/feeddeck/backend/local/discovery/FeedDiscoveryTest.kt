@@ -174,6 +174,82 @@ class FeedDiscoveryTest {
         assertEquals(FetchError.REDIRECT_LOOP, c.failure)
     }
 
+
+    // V3-R05: what a page is follows from its root element, not from a leading "<?xml".
+
+    private val bom = "﻿"
+    private val alternate = """<link rel="alternate" type="application/rss+xml" href="/new.xml"/>"""
+
+    private fun page(body: String, type: String) = { MockResponse.Builder().code(200).setHeader("Content-Type", type).body(body).build() }
+
+    private suspend fun readPage(vararg route: Pair<String, () -> MockResponse>): DiscoveryResult {
+        serve("/new.xml" to rss("My Blog", "https://site.example/a"), *route)
+        return discovery.discover(known(url("/")))
+    }
+
+    @Test
+    fun anXhtmlSiteWithAnXmlDeclarationIsReadForItsFeedLinks() = runBlocking<Unit> {
+        val xhtml = """<?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+            <html xmlns="http://www.w3.org/1999/xhtml"><head><title>Blog</title>$alternate</head><body>hello</body></html>"""
+        for (type in listOf("application/xhtml+xml; charset=utf-8", "text/html; charset=utf-8", "application/xml")) {
+            val result = readPage("/" to page(xhtml, type))
+            assertEquals(type, DiscoveryResult.PageStatus.READ, result.page)
+            assertEquals(type, CandidateVia.SITE_PAGE, result.candidates.single().via)
+            assertTrue(type, result.candidates.single().fetchable)
+        }
+    }
+
+    @Test
+    fun bomCommentsAndProcessingInstructionsBeforeTheRootDoNotChangeWhatItIs() = runBlocking<Unit> {
+        val xhtml = bom + """<?xml version="1.0"?><!-- generated --><?xml-stylesheet href="s.css"?>
+            <!-- <rss> in a comment is not the root -->
+            <html xmlns="http://www.w3.org/1999/xhtml"><head>$alternate</head></html>"""
+        assertEquals(DiscoveryResult.PageStatus.READ, readPage("/" to page(xhtml, "text/html")).page)
+        val feed = bom + """<?xml version="1.0"?><!-- generated --><!-- <html> in a comment is not the root -->
+            <rss version="2.0"><channel><title>My Blog</title></channel></rss>"""
+        val entered = readPage("/" to page(feed, "text/html"))
+        assertEquals("a feed served with a wrong type is still a feed", DiscoveryResult.PageStatus.FEED_ENTERED, entered.page)
+    }
+
+    @Test
+    fun plainHtmlRealFeedsAndErrorPagesAreToldApart() = runBlocking<Unit> {
+        val html = """<!DOCTYPE html><html><head>$alternate</head><body></body></html>"""
+        assertEquals(DiscoveryResult.PageStatus.READ, readPage("/" to page(html, "text/html")).page)
+        val feeds = mapOf(
+            "rss" to """<?xml version="1.0"?><rss version="2.0"><channel><title>My Blog</title></channel></rss>""",
+            "atom" to """<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>My Blog</title></feed>""",
+            "rdf" to """<?xml version="1.0"?><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/"><channel rdf:about="x"><title>My Blog</title></channel></rdf:RDF>""",
+            "atom with prefix" to """<?xml version="1.0"?><a:feed xmlns:a="http://www.w3.org/2005/Atom"><a:title>My Blog</a:title></a:feed>""",
+        )
+        for ((name, body) in feeds) {
+            for (type in listOf("application/xml", "text/html")) {
+                val result = readPage("/" to page(body, type))
+                assertEquals("$name as $type", DiscoveryResult.PageStatus.FEED_ENTERED, result.page)
+                assertEquals("$name as $type", CandidateVia.ENTERED_URL, result.candidates.single().via)
+            }
+        }
+        // An HTML error page with a 200: read as a page, no link, no candidate.
+        val error = readPage("/" to page("<html><head><title>Not found</title></head><body>No such page</body></html>", "text/html"))
+        assertEquals(DiscoveryResult.PageStatus.READ, error.page)
+        assertEquals(emptyList<Any>(), error.candidates)
+    }
+
+    @Test
+    fun candidatesRememberTheAddressTheyWereFoundFor() = runBlocking<Unit> {
+        val result = readPage("/" to page("<html><head>$alternate</head></html>", "text/html"))
+        assertEquals(url("/old-feed.xml"), result.sourceFetchUrl)
+    }
+
+    @Test
+    fun aCandidateFoundForAnOlderAddressIsRefusedByTheRepository() = runBlocking<Unit> {
+        val id = subscribe("https://a.example.com/f")
+        // The discovery ran for a.example.com; meanwhile the feed moved on another way.
+        assertEquals(MoveResult.Applied, env.subscriptions.applyUrlMove(id, "https://a.example.com/f", "https://b.example.com/f"))
+        assertEquals(MoveResult.Stale, env.subscriptions.applyUrlMove(id, "https://a.example.com/f", "https://c.example.com/f"))
+        assertEquals("https://b.example.com/f", env.db.subscriptionDao().feed(id)!!.fetchUrl)
+    }
+
     // U14
 
     private suspend fun subscribe(fetchUrl: String): String =

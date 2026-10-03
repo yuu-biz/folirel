@@ -32,7 +32,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.ZoneOffset
@@ -282,24 +281,13 @@ class SubscriptionsViewModel(
 
     // Finding where a feed moved (SUB-DISCOVERY)
 
-    private val _discovery = MutableStateFlow<DiscoveryState>(DiscoveryState.Idle)
-    val discoveryState: StateFlow<DiscoveryState> = _discovery.asStateFlow()
-    private var discoveryJob: Job? = null
+    private val discoveryRuns = DiscoveryController(viewModelScope) { feedId, entered -> discovery.run(feedId, entered) }
+    val discoveryState: StateFlow<DiscoveryState> = discoveryRuns.state
 
     /** Reads the feed site (or the address the user entered) for feed links. Changes nothing. */
-    fun startDiscovery(feedId: String, enteredUrl: String? = null) {
-        discoveryJob?.cancel()
-        _discovery.value = DiscoveryState.Running(feedId)
-        discoveryJob = viewModelScope.launch {
-            val result = runCatching { discovery.run(feedId, enteredUrl) }.getOrNull()
-            _discovery.value = DiscoveryState.Done(feedId, result, enteredUrl)
-        }
-    }
+    fun startDiscovery(feedId: String, enteredUrl: String? = null) = discoveryRuns.start(feedId, enteredUrl)
 
-    fun clearDiscovery() {
-        discoveryJob?.cancel()
-        _discovery.value = DiscoveryState.Idle
-    }
+    fun clearDiscovery() = discoveryRuns.clear()
 
     suspend fun searchName(feedId: String): String? = discovery.searchName(feedId)
 

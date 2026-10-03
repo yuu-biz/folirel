@@ -18,6 +18,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,7 +52,8 @@ fun DiscoverySection(vm: SubscriptionsViewModel, feedId: String, feedFetchUrl: S
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var entered by rememberSaveable { mutableStateOf("") }
-    var adopting by remember { mutableStateOf<DiscoveryCandidate?>(null) }
+    // The candidate and the address of the feed it was found for, fixed when the user taps it.
+    var adopting by remember { mutableStateOf<Pair<DiscoveryCandidate, String>?>(null) }
     var noSearchApp by remember { mutableStateOf(false) }
     val running = (state as? DiscoveryState.Running)?.feedId == feedId
 
@@ -94,6 +96,9 @@ fun DiscoverySection(vm: SubscriptionsViewModel, feedId: String, feedFetchUrl: S
         }
         if (running) LinearProgressIndicator(Modifier.fillMaxWidth())
         val done = state as? DiscoveryState.Done
+        // Candidates were found for one address of the feed; if it has changed since, they no longer apply (V3-R04).
+        val staleSource = done?.let { it.feedId == feedId && it.result?.sourceFetchUrl.let { src -> src != null && src != feedFetchUrl } } == true
+        LaunchedEffect(staleSource) { if (staleSource) vm.clearDiscovery() }
         if (done != null && done.feedId == feedId) {
             val result = done.result
             if (result == null) {
@@ -101,7 +106,7 @@ fun DiscoverySection(vm: SubscriptionsViewModel, feedId: String, feedFetchUrl: S
             } else {
                 Text(pageStatusText(result), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("discovery_status"))
                 if (result.pageUrl != null) Text(result.pageUrl, style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                result.candidates.forEach { candidate -> CandidateCard(candidate, onUse = { adopting = candidate }) }
+                result.candidates.forEach { candidate -> CandidateCard(candidate, onUse = { adopting = candidate to (result.sourceFetchUrl ?: feedFetchUrl) }) }
                 if (result.candidates.isEmpty() && result.page in setOf(DiscoveryResult.PageStatus.READ, DiscoveryResult.PageStatus.FEED_ENTERED)) {
                     Text(stringResource(R.string.discovery_none_found), style = MaterialTheme.typography.bodySmall)
                 }
@@ -119,19 +124,19 @@ fun DiscoverySection(vm: SubscriptionsViewModel, feedId: String, feedFetchUrl: S
             }
         }
     }
-    adopting?.let { candidate ->
+    adopting?.let { (candidate, sourceUrl) ->
         AlertDialog(
             onDismissRequest = { adopting = null },
             title = { Text(stringResource(R.string.discovery_adopt_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(stringResource(R.string.discovery_adopt_from, feedFetchUrl), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.discovery_adopt_from, sourceUrl), style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.discovery_adopt_to, candidate.url), style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.discovery_adopt_note), style = MaterialTheme.typography.bodySmall)
                 }
             },
             confirmButton = {
-                TextButton(onClick = { vm.applyMove(feedId, feedFetchUrl, candidate.url); adopting = null }, modifier = Modifier.testTag("adopt_confirm")) {
+                TextButton(onClick = { vm.applyMove(feedId, sourceUrl, candidate.url); adopting = null }, modifier = Modifier.testTag("adopt_confirm")) {
                     Text(stringResource(R.string.discovery_adopt_confirm))
                 }
             },
