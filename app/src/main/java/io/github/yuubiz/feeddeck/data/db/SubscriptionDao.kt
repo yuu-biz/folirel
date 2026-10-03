@@ -65,6 +65,10 @@ interface SubscriptionDao {
     )
     suspend fun clearFetchFailure(feedId: String): Int
 
+    /** Approved URL moves plus HTTPS migrations of the feed: whether its address was ever changed on purpose. */
+    @Query("SELECT (SELECT COUNT(*) FROM feed_url_moves WHERE feedId = :feedId) + (SELECT COUNT(*) FROM feed_https_migrations WHERE feedId = :feedId)")
+    suspend fun addressChangeCount(feedId: String): Int
+
     @Query("SELECT * FROM feeds WHERE id = :id")
     fun observeFeed(id: String): Flow<FeedEntity?>
 

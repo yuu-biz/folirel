@@ -11,6 +11,7 @@ import io.github.yuubiz.feeddeck.data.db.FeedEntity
 import io.github.yuubiz.feeddeck.data.db.FeedFetchStateEntity
 import io.github.yuubiz.feeddeck.data.db.FeedIconEntity
 import io.github.yuubiz.feeddeck.data.db.IconStatus
+import io.github.yuubiz.feeddeck.model.EntryKeyAliases
 import io.github.yuubiz.feeddeck.model.FetchError
 import io.github.yuubiz.feeddeck.model.NormalizedFeed
 import java.time.Clock
@@ -120,6 +121,8 @@ class FeedStore(
         icons.changeDeclared(feedId, feed.iconUrl)
         // A feed that now names its site, or has its first articles, may reveal an icon an earlier lookup could not find.
         if ((current.siteUrl == null && feed.siteUrl != null) || !subscriptions.fetchState(feedId)?.initialized.orFalse()) icons.retryIfNoIcon(feedId)
+        // A feed whose address was changed on purpose may spell the same articles differently (V3-R02).
+        val aliasing = subscriptions.addressChangeCount(feedId) > 0
         var updated = 0
         var skippedPruned = 0
         val insertedIds = ArrayList<String>()
@@ -128,6 +131,7 @@ class FeedStore(
             // moved to HTTPS) is the same article, not a new unread one.
             val existingId = articles.findId(current.accountId, feedId, entry.entryKey)
                 ?: schemeVariant(entry.entryKey)?.let { articles.findId(current.accountId, feedId, it) }
+                ?: if (aliasing) sameAddressArticle(current.accountId, feedId, entry.entryKey) else null
             if (existingId != null) {
                 articles.updateMetadata(
                     id = existingId,
@@ -141,7 +145,7 @@ class FeedStore(
                     lastSeenAt = now,
                 )
                 updated++
-            } else if (touchPruned(feedId, entry.entryKey, now)) {
+            } else if (touchPruned(feedId, entry.entryKey, now, aliasing)) {
                 // Removed earlier by the retention cleanup (read, not saved): not resurrected as a new unread article.
                 skippedPruned++
             } else {
@@ -249,10 +253,19 @@ class FeedStore(
         diagnostics.attemptFinished(feedId, clock.millis(), null, false, null, null, FeedResult.INACTIVE.name)
     }
 
-    /** The pruned record of [entryKey], or of its http/https twin (same rule as for stored articles), seen again now. */
-    private suspend fun touchPruned(feedId: String, entryKey: String, now: Long): Boolean =
+    /** The pruned record of [entryKey], its http/https twin, or (after an address change) another spelling of the same address, seen again now. */
+    private suspend fun touchPruned(feedId: String, entryKey: String, now: Long, aliasing: Boolean): Boolean =
         diagnostics.touchPruned(feedId, entryKey, now) > 0 ||
-            (schemeVariant(entryKey)?.let { diagnostics.touchPruned(feedId, it, now) > 0 } ?: false)
+            (schemeVariant(entryKey)?.let { diagnostics.touchPruned(feedId, it, now) > 0 } ?: false) ||
+            (aliasing && EntryKeyAliases.variants(entryKey).let { it.isNotEmpty() && diagnostics.touchPrunedAny(feedId, it, now) > 0 })
+
+    /** The stored article of this feed that names the same address as [key] in another spelling (id:/url:, scheme, www.). */
+    private suspend fun sameAddressArticle(accountId: String, feedId: String, key: String): String? {
+        val variants = EntryKeyAliases.variants(key)
+        if (variants.isEmpty()) return null
+        val found = articles.findByKeys(accountId, feedId, variants).associate { it.entryKey to it.id }
+        return variants.firstNotNullOfOrNull { found[it] }
+    }
 
     // Request bookkeeping: diagnostics only. lastAttemptAt / lastSuccessAt are never moved by these.
 

@@ -9,10 +9,17 @@ import androidx.sqlite.db.SupportSQLiteQuery
 import io.github.yuubiz.feeddeck.model.ArticleRow
 import kotlinx.coroutines.flow.Flow
 
+/** id and key of a stored article. */
+data class ArticleKeyRow(val id: String, val entryKey: String)
+
 @Dao
 interface ArticleDao {
     @Query("SELECT id FROM articles WHERE accountId = :accountId AND feedId = :feedId AND entryKey = :entryKey")
     suspend fun findId(accountId: String, feedId: String, entryKey: String): String?
+
+    /** The articles of one feed whose key is one of [keys] (spellings of the same address, V3-R02). */
+    @Query("SELECT id, entryKey FROM articles WHERE accountId = :accountId AND feedId = :feedId AND entryKey IN (:keys)")
+    suspend fun findByKeys(accountId: String, feedId: String, keys: List<String>): List<ArticleKeyRow>
 
     /** ABORT on conflict. Never REPLACE: SQLite REPLACE deletes the row and cascades to article_states. */
     @Insert(onConflict = OnConflictStrategy.ABORT)

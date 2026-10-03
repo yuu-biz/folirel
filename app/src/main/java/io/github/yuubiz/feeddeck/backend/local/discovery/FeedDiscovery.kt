@@ -3,7 +3,6 @@ package io.github.yuubiz.feeddeck.backend.local.discovery
 import io.github.yuubiz.feeddeck.backend.local.FeedFetcher
 import io.github.yuubiz.feeddeck.backend.local.FetchOutcome
 import io.github.yuubiz.feeddeck.backend.local.HtmlLinks
-import io.github.yuubiz.feeddeck.backend.local.HttpsUpgradeChecker
 import io.github.yuubiz.feeddeck.backend.local.ResourceResult
 import io.github.yuubiz.feeddeck.backend.local.SmallResourceFetcher
 import io.github.yuubiz.feeddeck.backend.local.parser.FeedParseException
@@ -13,6 +12,7 @@ import io.github.yuubiz.feeddeck.backend.local.parser.XmlCharset
 import io.github.yuubiz.feeddeck.model.CandidateVia
 import io.github.yuubiz.feeddeck.model.DiscoveryCandidate
 import io.github.yuubiz.feeddeck.model.DiscoveryResult
+import io.github.yuubiz.feeddeck.model.EntryKeyAliases
 import io.github.yuubiz.feeddeck.model.FetchError
 import io.github.yuubiz.feeddeck.model.Limits
 import io.github.yuubiz.feeddeck.network.UrlNormalizer
@@ -74,7 +74,7 @@ class FeedDiscovery(
             via = CandidateVia.ENTERED_URL
             status = DiscoveryResult.PageStatus.FEED_ENTERED
         }
-        val knownKeys = known.entryKeys.mapTo(HashSet()) { comparable(it) }
+        val knownKeys = known.entryKeys.mapTo(HashSet()) { EntryKeyAliases.comparable(it) }
         val candidates = links
             .filter { it.url != known.fetchUrl }
             .take(MAX_CANDIDATES)
@@ -98,7 +98,7 @@ class FeedDiscovery(
         } catch (e: FeedParseException) {
             return base.copy(failure = e.error)
         }
-        val keys = parsed.entries.mapTo(HashSet()) { comparable(it.entryKey) }
+        val keys = parsed.entries.mapTo(HashSet()) { EntryKeyAliases.comparable(it.entryKey) }
         val dates = parsed.entries.mapNotNull { it.publishedAt }
         return base.copy(
             // A redirect inside the candidate keeps working; adopting uses the final address.
@@ -113,19 +113,6 @@ class FeedDiscovery(
             sameTitle = known.feedTitle != null && parsed.title != null &&
                 TextNormalizer.normalize(known.feedTitle).equals(TextNormalizer.normalize(parsed.title), ignoreCase = true),
         )
-    }
-
-    /**
-     * An article key without the difference of http/https, `www.`, and of whether the address came from the id or the
-     * link of the entry: the same permalink as a guid in one feed and as a link in another is the same article.
-     */
-    private fun comparable(key: String): String {
-        val rest = key.removePrefix("id:").takeIf { it != key } ?: key.removePrefix("url:").takeIf { it != key }
-        return if (rest != null && (rest.startsWith("http://") || rest.startsWith("https://"))) {
-            "url:" + HttpsUpgradeChecker.comparableKey(rest)
-        } else {
-            HttpsUpgradeChecker.comparableKey(key)
-        }
     }
 
     private fun dominantOrigin(links: List<String>): String? {

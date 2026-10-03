@@ -90,6 +90,9 @@ interface DiagnosticsDao {
     @Query("UPDATE pruned_entries SET lastSeenAt = :now WHERE feedId = :feedId AND entryKey = :entryKey")
     suspend fun touchPruned(feedId: String, entryKey: String, now: Long): Int
 
+    @Query("UPDATE pruned_entries SET lastSeenAt = :now WHERE feedId = :feedId AND entryKey IN (:keys)")
+    suspend fun touchPrunedAny(feedId: String, keys: List<String>, now: Long): Int
+
     @Query("DELETE FROM pruned_entries WHERE lastSeenAt < :before")
     suspend fun forgetPrunedBefore(before: Long): Int
 
