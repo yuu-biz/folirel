@@ -42,7 +42,11 @@ class UpdateConstraintsTest {
         assertFalse(AutoRefreshPolicy.networkAllowed(ready, metered))
         assertTrue(AutoRefreshPolicy.networkAllowed(ready.copy(unmeteredOnly = false), metered))
         assertFalse(AutoRefreshPolicy.networkAllowed(ready, offline))
-        assertFalse(AutoRefreshPolicy.networkAllowed(ready.copy(refreshIntervalHours = 0), unmetered))
+        assertFalse(AutoRefreshPolicy.networkAllowed(ready.copy(refreshIntervalMinutes = 0), unmetered))
+        // Startup refresh has its own switch.
+        assertTrue(AutoRefreshPolicy.networkAllowed(ready.copy(refreshIntervalMinutes = 0), unmetered, RefreshReason.STARTUP))
+        assertFalse(AutoRefreshPolicy.networkAllowed(ready.copy(startupRefresh = false), unmetered, RefreshReason.STARTUP))
+        assertFalse(AutoRefreshPolicy.networkAllowed(ready, metered, RefreshReason.STARTUP))
         assertFalse(AutoRefreshPolicy.networkAllowed(AppSettings(onboardingDone = false), unmetered))
     }
 
@@ -110,12 +114,17 @@ class UpdateConstraintsTest {
         assertEquals(NetworkType.UNMETERED, twoHours.constraints.requiredNetworkType)
         assertEquals(TimeUnit.HOURS.toMillis(2), twoHours.periodicityInfo!!.repeatIntervalMillis)
 
-        scheduler.apply(ready.copy(refreshIntervalHours = 6, unmeteredOnly = false))
+        scheduler.apply(ready.copy(refreshIntervalMinutes = 360, unmeteredOnly = false))
         val six = info()!!
         assertEquals(NetworkType.CONNECTED, six.constraints.requiredNetworkType)
         assertEquals(TimeUnit.HOURS.toMillis(6), six.periodicityInfo!!.repeatIntervalMillis)
 
-        scheduler.apply(ready.copy(refreshIntervalHours = 0))
+        scheduler.apply(ready.copy(refreshIntervalMinutes = 15))
+        assertEquals(TimeUnit.MINUTES.toMillis(15), info()!!.periodicityInfo!!.repeatIntervalMillis)
+        scheduler.apply(ready.copy(refreshIntervalMinutes = 30))
+        assertEquals(TimeUnit.MINUTES.toMillis(30), info()!!.periodicityInfo!!.repeatIntervalMillis)
+
+        scheduler.apply(ready.copy(refreshIntervalMinutes = 0))
         assertEquals(null, info())
     }
 }

@@ -25,7 +25,8 @@ object TestData {
     fun reset(onboardingDone: Boolean = true, showImages: Boolean = false) = runBlocking {
         val c = container
         c.database.clearAllTables()
-        c.settings.setRefreshInterval(0) // no automatic network activity during UI tests
+        c.settings.setRefreshIntervalMinutes(0) // no automatic network activity during UI tests
+        c.settings.setStartupRefresh(false)
         c.settings.setOnboardingDone(onboardingDone)
         c.settings.setShowImages(showImages)
         c.settings.setListMode(ListMode.MAGAZINE)

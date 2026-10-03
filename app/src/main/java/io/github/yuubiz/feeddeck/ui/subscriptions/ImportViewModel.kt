@@ -27,7 +27,8 @@ sealed interface ImportState {
     data class Rejected(val reason: OpmlRejectedException.Reason?) : ImportState
     data object ReadFailed : ImportState
     data object Committing : ImportState
-    data class Done(val result: ImportResult) : ImportState
+    /** [httpFeeds]: subscribed feeds still fetched over http:// (offer the HTTPS check once). */
+    data class Done(val result: ImportResult, val httpFeeds: Int = 0, val httpsAnswered: Boolean = false) : ImportState
     data object CommitFailed : ImportState
 }
 
@@ -75,12 +76,18 @@ class ImportViewModel(
                 _state.value = ImportState.CommitFailed
                 return@launch
             }
-            _state.value = ImportState.Done(result)
+            val httpFeeds = runCatching { subscriptions.httpFeeds(subscriptions.ensureLocalAccount()).size }.getOrDefault(0)
+            _state.value = ImportState.Done(result, httpFeeds)
             // DB registration is final regardless of the fetch outcome; the fetch result is shown separately.
             if (result.feedIdsToFetch.isNotEmpty()) {
                 coordinator.refresh(RefreshScope.Feeds(result.feedIdsToFetch), RefreshReason.IMPORT)
             }
         }
+    }
+
+    /** The HTTPS question was answered ("check and change" or "not now"); it is not asked again for this import. */
+    fun httpsAnswered() {
+        (_state.value as? ImportState.Done)?.let { _state.value = it.copy(httpsAnswered = true) }
     }
 
     fun reset() {

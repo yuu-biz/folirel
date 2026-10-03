@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,11 +16,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
@@ -82,7 +84,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.ImageLoader
 import io.github.yuubiz.feeddeck.R
+import io.github.yuubiz.feeddeck.backend.FeedResult
+import io.github.yuubiz.feeddeck.backend.RefreshScope
 import io.github.yuubiz.feeddeck.browser.BrowserLauncher
+import io.github.yuubiz.feeddeck.data.preferences.AppSettings
 import io.github.yuubiz.feeddeck.data.preferences.BrowserMode
 import io.github.yuubiz.feeddeck.model.ArticleRow
 import io.github.yuubiz.feeddeck.model.ArticleScope
@@ -91,6 +96,10 @@ import io.github.yuubiz.feeddeck.model.ListMode
 import io.github.yuubiz.feeddeck.model.ReadFilter
 import io.github.yuubiz.feeddeck.model.SortOrder
 import io.github.yuubiz.feeddeck.model.Structure
+import io.github.yuubiz.feeddeck.sync.HttpsUpgradeState
+import io.github.yuubiz.feeddeck.sync.RefreshState
+import io.github.yuubiz.feeddeck.sync.RequestStatus
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class HomeNavigation(
@@ -107,16 +116,21 @@ fun HomeScreen(
     imageLoader: ImageLoader,
     browser: BrowserLauncher,
     nav: HomeNavigation,
+    httpsState: StateFlow<HttpsUpgradeState>,
 ) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     val selection by vm.selection.collectAsStateWithLifecycle()
     val structure by vm.structure.collectAsStateWithLifecycle()
-    val list by vm.articleList.collectAsStateWithLifecycle()
+    val pages by vm.pageScopes.collectAsStateWithLifecycle()
+    val currentListFlow = remember(selection.scope) { vm.pageList(selection.scope) }
+    val list by currentListFlow.collectAsStateWithLifecycle()
     val refresh by vm.refreshState.collectAsStateWithLifecycle()
     val network by vm.network.collectAsStateWithLifecycle()
     val searchActive by vm.searchActive.collectAsStateWithLifecycle()
     val searchText by vm.searchText.collectAsStateWithLifecycle()
-    val banner by vm.newArticlesBanner.collectAsStateWithLifecycle()
+    val newIds by vm.newArticleIds.collectAsStateWithLifecycle()
+    val https by httpsState.collectAsStateWithLifecycle()
+    val checkingHttps = https.running
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -169,9 +183,12 @@ fun HomeScreen(
 
     val scopeTitle = scopeTitle(selection.scope, structure)
     val unreadInList = list.items.count { !it.isRead }
+    val target = HomeViewModel.refreshTargetFor(selection)
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        // A closed drawer opens from the menu button only, so horizontal swipes belong to the category pager.
+        gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             HomeDrawer(
                 structure = structure,
@@ -247,11 +264,21 @@ fun HomeScreen(
                                 Icon(Icons.Filled.MoreVert, stringResource(R.string.action_more))
                             }
                             DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
-                                val nextMode = if (settings.listMode == ListMode.MAGAZINE) ListMode.LIST else ListMode.MAGAZINE
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(if (nextMode == ListMode.LIST) R.string.menu_list_mode_compact else R.string.menu_list_mode_magazine)) },
-                                    onClick = { overflowOpen = false; vm.setListMode(nextMode) },
-                                )
+                                listOf(
+                                    ListMode.MAGAZINE to R.string.list_mode_magazine,
+                                    ListMode.LIST to R.string.list_mode_list,
+                                    ListMode.CARD to R.string.list_mode_card,
+                                ).forEach { (mode, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(label)) },
+                                        leadingIcon = {
+                                            if (settings.listMode == mode) Icon(Icons.Filled.Check, null) else Spacer(Modifier.size(24.dp))
+                                        },
+                                        onClick = { overflowOpen = false; vm.setListMode(mode) },
+                                        modifier = Modifier.testTag("menu_mode_${mode.name}"),
+                                    )
+                                }
+                                HorizontalDivider()
                                 DropdownMenuItem(
                                     text = { Text(stringResource(if (selection.sort == SortOrder.NEWEST) R.string.sort_oldest else R.string.sort_newest)) },
                                     onClick = { overflowOpen = false; vm.toggleSort() },
@@ -277,29 +304,42 @@ fun HomeScreen(
             },
         ) { padding ->
             Column(Modifier.padding(padding).fillMaxSize()) {
-                if (selection.scope !is ArticleScope.Feed && structure.subscribedFeeds.isNotEmpty()) {
-                    ScopeTabs(structure, selection.scope, vm::selectScope)
-                }
+                val pagerMode = selection.scope !is ArticleScope.Feed && structure.subscribedFeeds.isNotEmpty()
+                if (pagerMode) ScopeTabs(structure, pages, selection.scope, vm::selectScope)
                 FilterBar(selection, vm::selectFilter, vm::toggleSort)
-                StatusBar(refresh = refresh, offline = !network.connected, structure = structure, onOpenSubscriptions = nav.subscriptions)
+                StatusBar(
+                    refresh = refresh,
+                    target = target,
+                    offline = !network.connected,
+                    structure = structure,
+                    checkingHttps = checkingHttps,
+                    onOpenSubscriptions = nav.subscriptions,
+                    onRetry = vm::retryPending,
+                )
                 PullToRefreshBox(
-                    isRefreshing = refresh.running,
+                    isRefreshing = refresh.runningFor(target) != null,
                     onRefresh = { requestRefresh() },
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    when {
-                        !structure.loaded || !list.loaded -> Unit
-                        structure.feeds.isEmpty() -> NoSubscriptions(nav.importOpml, nav.addFeed)
-                        list.items.isEmpty() -> EmptyList(selection, refresh.running, !network.connected) { requestRefresh() }
-                        else -> ArticleList(
+                    val page: @Composable (ArticleScope) -> Unit = { pageScope ->
+                        ScopePage(
                             vm = vm,
-                            state = list,
-                            mode = settings.listMode,
-                            showImages = settings.showImages,
+                            pageScope = pageScope,
+                            selection = selection,
+                            settings = settings,
                             imageLoader = imageLoader,
                             actions = actions,
-                            newArticles = banner,
+                            newIds = newIds,
+                            refreshing = refresh.runningFor(HomeViewModel.scopeOf(pageScope)) != null,
+                            offline = !network.connected,
+                            onRefresh = { requestRefresh() },
                         )
+                    }
+                    when {
+                        !structure.loaded -> Unit
+                        structure.feeds.isEmpty() -> NoSubscriptions(nav.importOpml, nav.addFeed)
+                        pagerMode -> CategoryPager(vm, pages, selection.scope, page)
+                        else -> page(selection.scope)
                     }
                 }
             }
@@ -347,6 +387,67 @@ fun HomeScreen(
     }
 }
 
+/**
+ * All / Uncategorized / categories as horizontally swipeable pages (UX-01). One selection state: tab, drawer and
+ * swipe all end in [HomeViewModel.selectScope]; a page change caused by the selection does not feed back.
+ * Not circular. Only the visible page (and its neighbour while swiping) is composed and queries the DB.
+ */
+@Composable
+private fun CategoryPager(vm: HomeViewModel, pages: List<ArticleScope>, selected: ArticleScope, page: @Composable (ArticleScope) -> Unit) {
+    val pagerState = rememberPagerState(initialPage = pages.indexOf(selected).coerceAtLeast(0)) { pages.size }
+    val selectedIndex = pages.indexOf(selected)
+    LaunchedEffect(selectedIndex, pages) {
+        if (selectedIndex >= 0 && pagerState.currentPage != selectedIndex && !pagerState.isScrollInProgress) {
+            pagerState.animateScrollToPage(selectedIndex)
+        }
+    }
+    val currentPages by rememberUpdatedState(pages)
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }.collect { index ->
+            val scopeAtPage = currentPages.getOrNull(index) ?: return@collect
+            if (scopeAtPage != vm.selection.value.scope) vm.selectScope(scopeAtPage)
+        }
+    }
+    HorizontalPager(
+        state = pagerState,
+        key = { index -> pages.getOrNull(index)?.encode() ?: "page-$index" },
+        modifier = Modifier.fillMaxSize().testTag("category_pager"),
+    ) { index ->
+        page(pages.getOrNull(index) ?: ArticleScope.All)
+    }
+}
+
+@Composable
+private fun ScopePage(
+    vm: HomeViewModel,
+    pageScope: ArticleScope,
+    selection: Selection,
+    settings: AppSettings,
+    imageLoader: ImageLoader,
+    actions: ArticleActions,
+    newIds: Set<String>,
+    refreshing: Boolean,
+    offline: Boolean,
+    onRefresh: () -> Unit,
+) {
+    val flow = remember(pageScope) { vm.pageList(pageScope) }
+    val list by flow.collectAsStateWithLifecycle()
+    when {
+        !list.loaded -> Box(Modifier.fillMaxSize())
+        list.items.isEmpty() -> EmptyList(selection, refreshing, offline, onRefresh)
+        else -> ArticleList(
+            vm = vm,
+            state = list,
+            mode = settings.listMode,
+            showImages = settings.showImages,
+            imageLoader = imageLoader,
+            actions = actions,
+            newIds = newIds,
+            newestFirst = selection.sort == SortOrder.NEWEST,
+        )
+    }
+}
+
 @Composable
 private fun ArticleList(
     vm: HomeViewModel,
@@ -355,27 +456,36 @@ private fun ArticleList(
     showImages: Boolean,
     imageLoader: ImageLoader,
     actions: ArticleActions,
-    newArticles: Int,
+    newIds: Set<String>,
+    newestFirst: Boolean,
 ) {
     val items = state.items
-    // Restore from the saved anchor (article id + offset); if it is gone, use the nearest remaining article.
+    // Restore from this list's own anchor (article id + offset); if it is gone, use the nearest remaining article.
     val listState = remember(state.key) {
         val anchor = vm.anchorFor(state.key)
         val index = anchor?.let { a ->
             items.indexOfFirst { it.id == a.articleId }.takeIf { it >= 0 }
-                ?: items.indexOfFirst { if (state.key.contains("|NEWEST|")) it.sortAt <= a.sortAt else it.sortAt >= a.sortAt }.takeIf { it >= 0 }
+                ?: items.indexOfFirst { if (newestFirst) it.sortAt <= a.sortAt else it.sortAt >= a.sortAt }.takeIf { it >= 0 }
                 ?: (items.size - 1)
         } ?: 0
         LazyListState(index.coerceAtLeast(0), if (anchor != null && items.getOrNull(index)?.id == anchor.articleId) anchor.offset else 0)
     }
     val currentItems by rememberUpdatedState(items)
+    val currentNew by rememberUpdatedState(newIds)
     LaunchedEffect(listState, state.key) {
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }.collect { (index, offset) ->
             currentItems.getOrNull(index)?.let { vm.saveAnchor(ListAnchor(state.key, it.id, it.sortAt, offset)) }
-            if (index == 0 && offset == 0) vm.dismissNewArticlesBanner()
         }
     }
-    val atTop by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 } }
+    // New articles count as seen once they are on screen, judged on this list's own state (REV-02 / N06).
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? String } }.collect { visible ->
+            vm.markNewSeen(visible.filter { it in currentNew })
+        }
+    }
+    // The banner counts only the new articles this list shows and jumps to the first of them in the current order.
+    val firstNewIndex by remember(listState) { derivedStateOf { currentItems.indexOfFirst { it.id in currentNew } } }
+    val newCount = remember(items, newIds) { items.count { it.id in newIds } }
     val scope = rememberCoroutineScope()
     val now = remember(items) { System.currentTimeMillis() }
     Box(Modifier.fillMaxSize()) {
@@ -384,25 +494,30 @@ private fun ArticleList(
                 ArticleItem(row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"))
             }
         }
-        if (newArticles > 0 && !atTop) {
+        if (newCount > 0 && firstNewIndex >= 0) {
             // New arrivals never move the list on their own; the user jumps explicitly.
             FilledTonalButton(
                 onClick = {
-                    vm.dismissNewArticlesBanner()
-                    scope.launch { listState.scrollToItem(0) }
+                    val jumpTo = firstNewIndex
+                    scope.launch { if (jumpTo >= 0) listState.scrollToItem(jumpTo) }
                 },
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp).testTag("new_articles_banner"),
-            ) { Text(pluralStringResource(R.plurals.new_articles_banner, newArticles, newArticles)) }
+            ) { Text(pluralStringResource(R.plurals.new_articles_banner, newCount, newCount)) }
         }
     }
 }
 
 @Composable
-private fun ScopeTabs(structure: Structure, current: ArticleScope, onSelect: (ArticleScope) -> Unit) {
-    val tabs = buildList {
-        add(ArticleScope.All to stringResource(R.string.tab_all))
-        if (structure.hasUncategorized) add(ArticleScope.Uncategorized to stringResource(R.string.scope_uncategorized))
-        structure.tabCategories.forEach { add(ArticleScope.Category(it.id) to it.display) }
+private fun ScopeTabs(structure: Structure, pages: List<ArticleScope>, current: ArticleScope, onSelect: (ArticleScope) -> Unit) {
+    val all = stringResource(R.string.tab_all)
+    val uncategorized = stringResource(R.string.scope_uncategorized)
+    val tabs = pages.map { scope ->
+        scope to when (scope) {
+            ArticleScope.All -> all
+            ArticleScope.Uncategorized -> uncategorized
+            is ArticleScope.Category -> structure.categories.firstOrNull { it.id == scope.categoryId }?.display.orEmpty()
+            is ArticleScope.Feed -> ""
+        }
     }
     val selected = tabs.indexOfFirst { it.first == current }
     PrimaryScrollableTabRow(selectedTabIndex = selected.coerceAtLeast(0), edgePadding = 8.dp, minTabWidth = 48.dp) {
@@ -411,7 +526,7 @@ private fun ScopeTabs(structure: Structure, current: ArticleScope, onSelect: (Ar
                 selected = index == selected,
                 onClick = { onSelect(scope) },
                 text = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                modifier = Modifier.heightIn(min = 48.dp),
+                modifier = Modifier.heightIn(min = 48.dp).testTag("tab_${scope.encode()}"),
             )
         }
     }
@@ -441,13 +556,28 @@ private fun FilterBar(selection: Selection, onFilter: (ReadFilter) -> Unit, onTo
     }
 }
 
+/**
+ * Progress and result of the request for the shown scope (not of some other refresh), plus a short line when a
+ * different refresh is running. Partial results are never shown as complete (SYNC-02/04).
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StatusBar(refresh: io.github.yuubiz.feeddeck.sync.RefreshState, offline: Boolean, structure: Structure, onOpenSubscriptions: () -> Unit) {
-    val report = refresh.latestFinished?.report
-    val progress = refresh.requests.lastOrNull { it.running }?.progress
+private fun StatusBar(
+    refresh: RefreshState,
+    target: RefreshScope,
+    offline: Boolean,
+    structure: Structure,
+    checkingHttps: Boolean,
+    onOpenSubscriptions: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    val own: RequestStatus? = refresh.latestFor(target)
+    val other = refresh.requests.lastOrNull { it.running && it.scope != target }
+    val report = own?.report?.takeIf { !own.running }
+    var showRetry = false
     val lines = buildList {
-        if (refresh.running) {
-            val p = progress
+        if (own?.running == true) {
+            val p = own.progress
             val firstFetch = structure.subscribedFeeds.isNotEmpty() && structure.subscribedFeeds.none { it.initialized }
             add(
                 when {
@@ -457,30 +587,48 @@ private fun StatusBar(refresh: io.github.yuubiz.feeddeck.sync.RefreshState, offl
                 },
             )
         }
+        if (other != null) {
+            val p = other.progress
+            add(
+                if (p != null && p.total > 0) stringResource(R.string.status_other_refresh_progress, p.completed, p.total)
+                else stringResource(R.string.status_other_refresh),
+            )
+        }
+        if (checkingHttps) add(stringResource(R.string.status_https_checking))
         if (offline) add(stringResource(R.string.status_offline))
-        if (!refresh.running && report != null) {
-            if (report.failed.isNotEmpty()) {
-                val storage = report.failed.values.count { it == FetchError.STORAGE }
-                if (storage > 0) add(pluralStringResource(R.plurals.status_storage_failed, storage, storage))
-                add(pluralStringResource(R.plurals.status_partial_failure, report.failed.size, report.failed.size))
-            }
-            if (report.notAttempted > 0) add(pluralStringResource(R.plurals.status_not_attempted, report.notAttempted, report.notAttempted))
+        if (own != null && !own.running && own.report == null) add(stringResource(R.string.status_interrupted))
+        if (report != null && report.total > 0) {
+            val results = report.perFeed.values
+            val ok = results.count { it.result == FeedResult.UPDATED || it.result == FeedResult.NOT_MODIFIED }
+            val waiting = results.count { it.result == FeedResult.BACKOFF || it.result == FeedResult.OFFLINE }
+            add(stringResource(R.string.status_result, report.total, ok, report.failed.size, waiting, report.notAttempted, report.httpPending))
+            val storage = report.failed.values.count { it == FetchError.STORAGE }
+            if (storage > 0) add(pluralStringResource(R.plurals.status_storage_failed, storage, storage))
             if (report.deferredConstraint > 0 && report.offline && !offline) add(stringResource(R.string.status_deferred_offline))
-            if (report.httpPending > 0) add(pluralStringResource(R.plurals.status_http_pending, report.httpPending, report.httpPending))
+            showRetry = (report.notAttempted > 0 || report.failed.isNotEmpty()) && !refresh.running
         }
     }
-    if (lines.isEmpty() && !refresh.running) return
+    if (lines.isEmpty()) return
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, onClick = onOpenSubscriptions, modifier = Modifier.fillMaxWidth().testTag("status_bar")) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
-            if (refresh.running) {
-                val p = progress
+            if (own?.running == true) {
+                val p = own.progress
                 if (p != null && p.total > 0) {
                     LinearProgressIndicator(progress = { p.completed.toFloat() / p.total }, modifier = Modifier.fillMaxWidth())
                 } else {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
             }
-            Text(lines.joinToString(" · "), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FlowRow(itemVerticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    lines.joinToString(" · "),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (showRetry) {
+                    TextButton(onClick = onRetry, modifier = Modifier.testTag("retry_unfinished")) { Text(stringResource(R.string.action_retry_unfinished)) }
+                }
+            }
         }
     }
 }
@@ -504,9 +652,8 @@ private fun EmptyList(selection: Selection, refreshing: Boolean, offline: Boolea
         else -> stringResource(R.string.empty_articles)
     }
     CenteredMessage(message) {
-        if (selection.search.isEmpty() && selection.filter == ReadFilter.ALL && !refreshing) {
-            OutlinedButton(onClick = onRefresh) { Text(stringResource(R.string.menu_refresh)) }
-        }
+        // A refresh covers the scope's feeds; filter and search never narrow it, so it is offered on every empty list.
+        if (!refreshing) OutlinedButton(onClick = onRefresh, modifier = Modifier.testTag("empty_refresh")) { Text(stringResource(R.string.menu_refresh)) }
     }
 }
 

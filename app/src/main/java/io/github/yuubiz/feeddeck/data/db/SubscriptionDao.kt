@@ -44,6 +44,15 @@ interface SubscriptionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertHttpsMigration(row: FeedHttpsMigrationEntity)
 
+    @Query("SELECT * FROM feed_https_migrations WHERE feedId = :feedId")
+    fun observeHttpsMigration(feedId: String): Flow<FeedHttpsMigrationEntity?>
+
+    @Query("SELECT * FROM feeds WHERE id = :id")
+    fun observeFeed(id: String): Flow<FeedEntity?>
+
+    @Query("SELECT * FROM feed_fetch_state WHERE feedId = :feedId")
+    fun observeFetchState(feedId: String): Flow<FeedFetchStateEntity?>
+
     @Query("SELECT m.* FROM feed_https_migrations m JOIN feeds f ON f.id = m.feedId WHERE f.accountId = :accountId")
     suspend fun httpsMigrations(accountId: String): List<FeedHttpsMigrationEntity>
 

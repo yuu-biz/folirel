@@ -30,7 +30,8 @@ enum class ReadFilter { ALL, UNREAD, SAVED }
 
 enum class SortOrder { NEWEST, OLDEST }
 
-enum class ListMode { MAGAZINE, LIST }
+/** MAGAZINE: text + side thumbnail. LIST: compact one line. CARD: large card with a wide image on top. */
+enum class ListMode { MAGAZINE, LIST, CARD }
 
 /** Fully resolved list query. [categoryIds] already contains the selected category and its descendants. */
 data class ArticleQuerySpec(

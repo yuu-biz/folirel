@@ -29,6 +29,20 @@ class XmlElement(
     val children = ArrayList<XmlElement>()
     internal val textBuilder = StringBuilder()
 
+    /** Character data and child elements in document order (mixed content such as XHTML). */
+    internal val content = ArrayList<Any>()
+
+    internal fun appendText(text: String) {
+        textBuilder.append(text)
+        val last = content.lastOrNull()
+        if (last is StringBuilder) last.append(text) else content.add(StringBuilder(text))
+    }
+
+    internal fun addChild(child: XmlElement) {
+        children.add(child)
+        content.add(child)
+    }
+
     /** Direct character data of this element (CDATA, text and entity references). */
     val text: String get() = textBuilder.toString()
 
@@ -43,15 +57,22 @@ class XmlElement(
 
     fun childText(namespace: String, name: String): String? = child(namespace, name)?.text
 
-    /** All descendant character data, in document order. */
+    /** All descendant character data in document order: `<div>A<b>B</b>C</div>` → "ABC". */
     fun deepText(): String {
         val sb = StringBuilder()
         fun walk(e: XmlElement) {
-            sb.append(e.textBuilder)
-            e.children.forEach(::walk)
+            for (node in e.content) if (node is XmlElement) walk(node) else sb.append(node)
         }
         walk(this)
         return sb.toString()
+    }
+
+    /** Descendant elements in document order (depth first). */
+    fun descendants(): Sequence<XmlElement> = sequence {
+        for (child in children) {
+            yield(child)
+            yieldAll(child.descendants())
+        }
     }
 }
 
@@ -112,7 +133,7 @@ object SafeXmlReader {
                         }
                         val element = XmlElement(parser.namespace.orEmpty(), parser.name, attrs, base)
                         if (parent != null) {
-                            parent.children.add(element)
+                            parent.addChild(element)
                         } else {
                             if (root != null) throw XmlRejectedException(XmlRejectedException.Kind.MALFORMED, "Multiple roots")
                             root = element
@@ -121,13 +142,13 @@ object SafeXmlReader {
                     }
                     XmlPullParser.END_TAG -> stack.removeLastOrNull()
                     XmlPullParser.TEXT, XmlPullParser.CDSECT, XmlPullParser.IGNORABLE_WHITESPACE ->
-                        stack.lastOrNull()?.textBuilder?.append(parser.text)
+                        stack.lastOrNull()?.appendText(parser.text)
                     XmlPullParser.ENTITY_REF -> {
                         val name = parser.name.orEmpty()
                         if (name !in BUILTIN_ENTITIES && !name.startsWith("#")) {
                             throw XmlRejectedException(XmlRejectedException.Kind.SECURITY, "Undeclared entity reference")
                         }
-                        stack.lastOrNull()?.textBuilder?.append(parser.text.orEmpty())
+                        stack.lastOrNull()?.appendText(parser.text.orEmpty())
                     }
                     else -> Unit // comments and processing instructions are ignored
                 }

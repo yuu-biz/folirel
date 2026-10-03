@@ -38,6 +38,7 @@ import io.github.yuubiz.feeddeck.ui.settings.SettingsViewModel
 import io.github.yuubiz.feeddeck.ui.subscriptions.AddFeedDialog
 import io.github.yuubiz.feeddeck.ui.subscriptions.CategoriesScreen
 import io.github.yuubiz.feeddeck.ui.subscriptions.FeedDetailScreen
+import io.github.yuubiz.feeddeck.ui.subscriptions.HttpsUpgradeScreen
 import io.github.yuubiz.feeddeck.ui.subscriptions.ImportScreen
 import io.github.yuubiz.feeddeck.ui.subscriptions.ImportViewModel
 import io.github.yuubiz.feeddeck.ui.subscriptions.SubscriptionEvents
@@ -93,7 +94,10 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
     val subscriptionsVm: SubscriptionsViewModel = viewModel(
         factory = viewModelFactory {
             initializer {
-                SubscriptionsViewModel(container.subscriptions, container.refresh, container.documents, { container.settings.current().allowHttp }, container.clock)
+                SubscriptionsViewModel(
+                    container.subscriptions, container.refresh, container.httpsUpgrade, container.documents,
+                    { container.settings.current().allowHttp }, container.clock,
+                )
             }
         },
     )
@@ -101,7 +105,7 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
         factory = viewModelFactory {
             initializer {
                 SettingsViewModel(
-                    container.settings, container.articles, container.imageLoader,
+                    container.settings, container.articles, container.retention, container.imageLoader,
                     accountId = { container.subscriptions.ensureLocalAccount() },
                     databaseFileBytes = { container.databaseFileBytes() },
                 )
@@ -129,7 +133,8 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
         if (!settings.onboardingDone) {
             OnboardingScreen { autoUpdate, next ->
                 scope.launch {
-                    container.settings.setRefreshInterval(if (autoUpdate) 2 else 0)
+                    container.settings.setRefreshIntervalMinutes(if (autoUpdate) 120 else 0)
+                    container.settings.setStartupRefresh(autoUpdate)
                     container.settings.setOnboardingDone(true)
                 }
                 when (next) {
@@ -145,6 +150,7 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
                     vm = homeVm,
                     imageLoader = container.imageLoader,
                     browser = container.browser,
+                    httpsState = container.httpsUpgrade.state,
                     nav = HomeNavigation(
                         importOpml = pickOpml,
                         addFeed = { addFeedOpen = true },
@@ -152,7 +158,16 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
                         settings = { push(ROUTE_SETTINGS) },
                     ),
                 )
-                route == ROUTE_IMPORT -> ImportScreen(importVm, onPickAgain = pickOpml, onClose = { importVm.reset(); pop() })
+                route == ROUTE_IMPORT -> ImportScreen(
+                    importVm,
+                    onPickAgain = pickOpml,
+                    onClose = { importVm.reset(); pop() },
+                    onHttpsCheck = { start ->
+                        // "Check and change" in the consent dialog is the user's consent for the whole batch.
+                        if (start) subscriptionsVm.startHttpsUpgrade()
+                        push(ROUTE_HTTPS)
+                    },
+                )
                 route == ROUTE_SUBSCRIPTIONS -> SubscriptionsScreen(
                     vm = subscriptionsVm,
                     onBack = ::pop,
@@ -161,10 +176,12 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
                     onImport = pickOpml,
                     onExport = exportOpml,
                     onCategories = { push(ROUTE_CATEGORIES) },
+                    onHttpsCheck = { push(ROUTE_HTTPS) },
                 )
+                route == ROUTE_HTTPS -> HttpsUpgradeScreen(subscriptionsVm, onBack = ::pop)
                 route == ROUTE_CATEGORIES -> CategoriesScreen(subscriptionsVm, onBack = ::pop)
                 route.startsWith(ROUTE_FEED_PREFIX) -> FeedDetailScreen(subscriptionsVm, route.removePrefix(ROUTE_FEED_PREFIX), onBack = ::pop)
-                route == ROUTE_SETTINGS -> SettingsScreen(settingsVm, onBack = ::pop, onExport = exportOpml)
+                route == ROUTE_SETTINGS -> SettingsScreen(settingsVm, onBack = ::pop, onExport = exportOpml, onHttpsCheck = { push(ROUTE_HTTPS) })
             }
         }
         SnackbarHost(rootSnackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
@@ -186,3 +203,4 @@ private const val ROUTE_SUBSCRIPTIONS = "subscriptions"
 private const val ROUTE_CATEGORIES = "categories"
 private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_FEED_PREFIX = "feed/"
+private const val ROUTE_HTTPS = "https"

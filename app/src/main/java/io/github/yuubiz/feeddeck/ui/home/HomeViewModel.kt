@@ -83,34 +83,47 @@ class HomeViewModel(
 
     val network: StateFlow<NetworkState> = network.stateIn(viewModelScope, SharingStarted.Eagerly, NetworkState(true, false))
 
-    /** Number of new articles from the latest refresh, shown as a banner until dismissed. */
-    private val _newArticlesBanner = MutableStateFlow(0)
-    val newArticlesBanner: StateFlow<Int> = _newArticlesBanner.asStateFlow()
+    /**
+     * Articles inserted by finished refreshes and not yet seen. Each list counts only the ones it contains, so a
+     * banner never announces arrivals that the current category, filter or search does not show (REV-02).
+     */
+    private val _newArticleIds = MutableStateFlow<Set<String>>(emptySet())
+    val newArticleIds: StateFlow<Set<String>> = _newArticleIds.asStateFlow()
+
+    /** Pages of the category pager, in tab order: All, Uncategorized (when present), categories with feeds. */
+    val pageScopes: StateFlow<List<ArticleScope>> = structure
+        .map { s ->
+            buildList {
+                add(ArticleScope.All)
+                if (s.hasUncategorized) add(ArticleScope.Uncategorized)
+                s.tabCategories.forEach { add(ArticleScope.Category(it.id)) }
+            }
+        }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, listOf(ArticleScope.All))
+
+    private val pageLists = HashMap<ArticleScope, StateFlow<ArticlesState>>()
 
     private val events = Channel<HomeEvent>(Channel.BUFFERED)
     val eventFlow: Flow<HomeEvent> = events.receiveAsFlow()
 
     private val _selectionReady = MutableStateFlow(false)
 
-    @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
-    val articleList: StateFlow<ArticlesState> = combine(
-        accountId.filterNotNull(),
-        _selection,
-        structure,
-        _selectionReady,
-    ) { account, selection, structure, ready ->
-        if (!ready || !structure.loaded) null else specFor(account, selection, structure)
-    }
-        .distinctUntilChanged()
-        .flatMapLatest { spec ->
-            if (spec == null) {
-                emptyFlow()
-            } else {
-                val key = listKey(spec)
-                articles.observe(spec).map { ArticlesState(key, it, loaded = true) }
-            }
+    /**
+     * Articles of one pager page (or of the single-feed view) with the shared filter, sort and search. Only
+     * pages that are composed collect their flow, so hidden categories do not keep a DB query open (REV-05).
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun pageList(scope: ArticleScope): StateFlow<ArticlesState> = pageLists.getOrPut(scope) {
+        combine(accountId.filterNotNull(), _selection, structure, _selectionReady) { account, selection, structure, ready ->
+            if (!ready || !structure.loaded) null else specFor(account, selection.copy(scope = scope), structure)
         }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, ArticlesState("", emptyList(), loaded = false))
+            .distinctUntilChanged()
+            .flatMapLatest { spec ->
+                if (spec == null) emptyFlow() else articles.observe(spec).map { ArticlesState(listKey(spec), it, loaded = true) }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ArticlesState("", emptyList(), loaded = false))
+    }
 
     init {
         viewModelScope.launch {
@@ -145,8 +158,8 @@ class HomeViewModel(
             coordinator.state.collect { state ->
                 for (request in state.requests) {
                     if (request.running || !seen.add(request.id)) continue
-                    val added = request.report?.newArticles ?: 0
-                    if (added > 0) _newArticlesBanner.value = added
+                    val added = request.report?.newArticleIds.orEmpty()
+                    if (added.isNotEmpty()) _newArticleIds.update { (it + added).toList().takeLast(MAX_NEW_IDS).toSet() }
                 }
             }
         }
@@ -256,31 +269,47 @@ class HomeViewModel(
         events.send(if (changed == null) HomeEvent.Message(HomeEvent.Message.Kind.UPDATE_FAILED) else HomeEvent.BulkMarked(changed))
     }
 
+    /** Manual refresh of the shown scope. Filter, sort and search are display conditions only (SYNC-02). */
     fun refreshCurrentScope() {
-        val target = when (val scope = _selection.value.scope) {
-            ArticleScope.All -> RefreshScope.All
-            ArticleScope.Uncategorized -> RefreshScope.Uncategorized
-            is ArticleScope.Category -> RefreshScope.Category(scope.categoryId)
-            is ArticleScope.Feed -> RefreshScope.Feeds(listOf(scope.feedId))
-        }
+        val target = refreshTargetFor(_selection.value)
         viewModelScope.launch { coordinator.refresh(target, RefreshReason.MANUAL) }
     }
 
-    fun dismissNewArticlesBanner() {
-        _newArticlesBanner.update { 0 }
+    /** Feeds whose last request did not finish or failed; a valid Retry-After is still respected. */
+    fun retryPending() {
+        viewModelScope.launch { coordinator.refresh(RefreshScope.Pending, RefreshReason.MANUAL) }
     }
 
-    // Position restore (anchor article id + pixel offset), survives rotation and process death.
+    /** New articles that were shown (or jumped to) are no longer announced. */
+    fun markNewSeen(ids: Collection<String>) {
+        if (ids.isEmpty()) return
+        _newArticleIds.update { current -> if (ids.none { it in current }) current else current - ids.toSet() }
+    }
+
+    // Position restore per list (scope + filter + sort + search): article id + pixel offset, bounded history.
+    // Survives rotation and process death; switching category and coming back restores each list (REV-01).
+
+    private val anchors = LinkedHashMap<String, ListAnchor>().apply {
+        savedState.get<Array<String>>(KEY_ANCHORS)?.forEach { line ->
+            val parts = line.split(ANCHOR_SEPARATOR)
+            if (parts.size == 4) {
+                val sortAt = parts[2].toLongOrNull() ?: return@forEach
+                put(parts[0], ListAnchor(parts[0], parts[1], sortAt, parts[3].toIntOrNull() ?: 0))
+            }
+        }
+    }
 
     fun saveAnchor(anchor: ListAnchor) {
-        savedState[KEY_ANCHOR] = arrayOf(anchor.listKey, anchor.articleId, anchor.sortAt.toString(), anchor.offset.toString())
+        if (anchors[anchor.listKey] == anchor) return
+        anchors.remove(anchor.listKey)
+        anchors[anchor.listKey] = anchor
+        while (anchors.size > MAX_ANCHORS) anchors.remove(anchors.keys.first())
+        savedState[KEY_ANCHORS] = anchors.values
+            .map { listOf(it.listKey, it.articleId, it.sortAt.toString(), it.offset.toString()).joinToString(ANCHOR_SEPARATOR) }
+            .toTypedArray()
     }
 
-    fun anchorFor(listKey: String): ListAnchor? {
-        val raw = savedState.get<Array<String>>(KEY_ANCHOR) ?: return null
-        if (raw.size != 4 || raw[0] != listKey) return null
-        return ListAnchor(raw[0], raw[1], raw[2].toLongOrNull() ?: return null, raw[3].toIntOrNull() ?: 0)
-    }
+    fun anchorFor(listKey: String): ListAnchor? = anchors[listKey]
 
     companion object {
         const val SEARCH_DEBOUNCE_MS = 250L
@@ -289,6 +318,18 @@ class HomeViewModel(
         private const val KEY_SORT = "sort"
         private const val KEY_SEARCH = "search"
         private const val KEY_SEARCH_ACTIVE = "search_active"
-        private const val KEY_ANCHOR = "anchor"
+        private const val KEY_ANCHORS = "anchors"
+        private const val ANCHOR_SEPARATOR = "\u0001"
+        private const val MAX_ANCHORS = 40
+        private const val MAX_NEW_IDS = 5_000
+
+        fun refreshTargetFor(selection: Selection): RefreshScope = when (val scope = selection.scope) {
+            ArticleScope.All -> RefreshScope.All
+            ArticleScope.Uncategorized -> RefreshScope.Uncategorized
+            is ArticleScope.Category -> RefreshScope.Category(scope.categoryId)
+            is ArticleScope.Feed -> RefreshScope.Feeds(listOf(scope.feedId))
+        }
+
+        fun scopeOf(scope: ArticleScope): RefreshScope = refreshTargetFor(Selection(scope = scope))
     }
 }

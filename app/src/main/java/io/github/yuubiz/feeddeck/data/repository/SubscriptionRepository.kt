@@ -8,11 +8,17 @@ import io.github.yuubiz.feeddeck.data.db.CategoryEntity
 import io.github.yuubiz.feeddeck.data.db.FeedCategoryEntity
 import io.github.yuubiz.feeddeck.data.db.FeedEntity
 import io.github.yuubiz.feeddeck.data.db.FeedFetchStateEntity
+import io.github.yuubiz.feeddeck.data.db.FeedDiagnosticsEntity
 import io.github.yuubiz.feeddeck.data.db.FeedHttpsMigrationEntity
+import io.github.yuubiz.feeddeck.backend.FeedResult
+import io.github.yuubiz.feeddeck.model.FeedDiagnostics
+import io.github.yuubiz.feeddeck.model.FeedFetchInfo
+import io.github.yuubiz.feeddeck.model.FetchError
 import io.github.yuubiz.feeddeck.model.Structure
 import io.github.yuubiz.feeddeck.network.UrlNormalizer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import java.time.Clock
 
 /** Diff of an OPML document against the current DB, shown before anything is written (docs/02 S30). */
@@ -66,6 +72,40 @@ class SubscriptionRepository(
     ) { feeds, categories, memberships, states -> Structure.build(feeds, categories, memberships, states) }
 
     suspend fun fetchState(feedId: String): FeedFetchStateEntity? = dao.fetchState(feedId)
+
+    /** Per-feed fetch diagnostics of the account, by feed id. */
+    fun observeDiagnostics(accountId: String): Flow<Map<String, FeedDiagnostics>> =
+        db.diagnosticsDao().observeAllDiagnostics(accountId).map { rows -> rows.associate { it.feedId to it.toModel() } }
+
+    fun observeFeedDiagnostics(feedId: String): Flow<FeedDiagnostics?> =
+        db.diagnosticsDao().observeDiagnostics(feedId).map { it?.toModel() }
+
+    fun observeFetchInfo(feedId: String): Flow<FeedFetchInfo?> = combine(
+        dao.observeFeed(feedId),
+        dao.observeFetchState(feedId),
+        db.articleDao().observeFeedCounts(feedId),
+        dao.observeHttpsMigration(feedId),
+    ) { feed, state, counts, https ->
+        feed?.let {
+            FeedFetchInfo(
+                fetchUrl = it.fetchUrl, siteUrl = it.siteUrl, feedTitle = it.feedTitle, userTitle = it.userTitle,
+                lastAttemptAt = state?.lastAttemptAt, lastSuccessAt = state?.lastSuccessAt, nextEligibleAt = state?.nextEligibleAt,
+                retryAfterUntil = state?.retryAfterUntil, failureCount = state?.failureCount ?: 0,
+                storedArticles = counts.total, unreadArticles = counts.unread, savedArticles = counts.saved,
+                httpsFromUrl = https?.takeIf { m -> m.httpsUrl == it.fetchUrl }?.httpUrl,
+            )
+        }
+    }
+
+    private fun FeedDiagnosticsEntity.toModel() = FeedDiagnostics(
+        feedId = feedId, requestReason = requestReason, requestScope = requestScope, requestForce = requestForce,
+        requestedAt = requestedAt, result = FeedResult.fromStored(result), resultAt = resultAt, pendingSince = pendingSince,
+        attemptStartedAt = attemptStartedAt, attemptFinishedAt = attemptFinishedAt, httpStatus = httpStatus,
+        validatorsSent = validatorsSent, error = FetchError.fromStored(errorCode), errorDetail = errorDetail,
+        bodyAt = bodyAt, bodyBytes = bodyBytes, rawEntries = rawEntries, uniqueEntries = uniqueEntries,
+        undatedEntries = undatedEntries, oldestPublishedAt = oldestPublishedAt, newestPublishedAt = newestPublishedAt,
+        insertedArticles = insertedArticles, updatedArticles = updatedArticles, skippedPruned = skippedPruned,
+    )
 
     suspend fun feed(feedId: String): FeedEntity? = dao.feed(feedId)
 

@@ -27,8 +27,10 @@ data class AppSettings(
     val textScale: Float = 1.0f,
     val showImages: Boolean = true,
     val browserMode: BrowserMode = BrowserMode.CUSTOM_TABS,
-    /** 0 = off. */
-    val refreshIntervalHours: Int = 2,
+    /** Periodic update interval in minutes; 0 = off. Default 2 hours. */
+    val refreshIntervalMinutes: Int = 120,
+    /** Refresh once when the app comes to the foreground (at most every 30 minutes, same network rule). */
+    val startupRefresh: Boolean = true,
     val unmeteredOnly: Boolean = true,
     val allowHttp: Boolean = false,
     val onboardingDone: Boolean = false,
@@ -37,10 +39,18 @@ data class AppSettings(
     val sortOrder: SortOrder = SortOrder.NEWEST,
     /** Last refresh attempt of any kind (docs/04 §5: the startup rule is based on the last attempt). */
     val lastRefreshAttemptAt: Long = 0,
+    /** Articles to keep on the device (0 = no limit). Unread and saved articles are never removed. */
+    val retentionLimit: Int = 0,
+    /** Thumbnail disk cache size; applied at the next app start. */
+    val imageCacheMb: Int = 128,
 ) {
     companion object {
         val TEXT_SCALES = listOf(0.9f, 1.0f, 1.15f, 1.3f)
-        val REFRESH_INTERVALS = listOf(0, 1, 2, 6, 12, 24)
+        val REFRESH_INTERVALS_MINUTES = listOf(0, 15, 30, 60, 120, 360, 720, 1440)
+        /** Values of the v0.1 "refresh_interval_hours" key, migrated x60. */
+        val LEGACY_INTERVAL_HOURS = listOf(0, 1, 2, 6, 12, 24)
+        val RETENTION_LIMITS = listOf(0, 1_000, 3_000, 5_000, 10_000, 30_000)
+        val IMAGE_CACHE_MB = listOf(64, 128, 256, 512)
     }
 }
 
@@ -51,7 +61,12 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val textScale = floatPreferencesKey("text_scale")
         val showImages = booleanPreferencesKey("show_images")
         val browserMode = stringPreferencesKey("browser_mode")
-        val refreshInterval = intPreferencesKey("refresh_interval_hours")
+        /** v0.1 key (hours). Read only for migration; never written. */
+        val legacyRefreshHours = intPreferencesKey("refresh_interval_hours")
+        val refreshMinutes = intPreferencesKey("refresh_interval_minutes")
+        val startupRefresh = booleanPreferencesKey("startup_refresh")
+        val retentionLimit = intPreferencesKey("retention_limit")
+        val imageCacheMb = intPreferencesKey("image_cache_mb")
         val unmeteredOnly = booleanPreferencesKey("unmetered_only")
         val allowHttp = booleanPreferencesKey("allow_http")
         val onboardingDone = booleanPreferencesKey("onboarding_done")
@@ -69,7 +84,9 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             textScale = p[Keys.textScale]?.takeIf { it in AppSettings.TEXT_SCALES } ?: defaults.textScale,
             showImages = p[Keys.showImages] ?: defaults.showImages,
             browserMode = enumOr(p[Keys.browserMode], defaults.browserMode),
-            refreshIntervalHours = p[Keys.refreshInterval]?.takeIf { it in AppSettings.REFRESH_INTERVALS } ?: defaults.refreshIntervalHours,
+            refreshIntervalMinutes = intervalMinutes(p),
+            // Existing users: startup refresh used to follow the automatic-update switch.
+            startupRefresh = p[Keys.startupRefresh] ?: (intervalMinutes(p) > 0),
             unmeteredOnly = p[Keys.unmeteredOnly] ?: defaults.unmeteredOnly,
             allowHttp = p[Keys.allowHttp] ?: defaults.allowHttp,
             onboardingDone = p[Keys.onboardingDone] ?: defaults.onboardingDone,
@@ -77,8 +94,16 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             lastFilter = enumOr(p[Keys.lastFilter], defaults.lastFilter),
             sortOrder = enumOr(p[Keys.sortOrder], defaults.sortOrder),
             lastRefreshAttemptAt = p[Keys.lastAttempt] ?: 0,
+            retentionLimit = p[Keys.retentionLimit]?.takeIf { it in AppSettings.RETENTION_LIMITS } ?: defaults.retentionLimit,
+            imageCacheMb = p[Keys.imageCacheMb]?.takeIf { it in AppSettings.IMAGE_CACHE_MB } ?: defaults.imageCacheMb,
         )
     }
+
+    /** Minutes key first; otherwise the v0.1 hours value x60 (2 hours stays 2 hours, never 2 minutes). */
+    private fun intervalMinutes(p: Preferences): Int =
+        p[Keys.refreshMinutes]?.takeIf { it in AppSettings.REFRESH_INTERVALS_MINUTES }
+            ?: p[Keys.legacyRefreshHours]?.takeIf { it in AppSettings.LEGACY_INTERVAL_HOURS }?.let { it * 60 }
+            ?: AppSettings().refreshIntervalMinutes
 
     suspend fun current(): AppSettings = settings.first()
 
@@ -87,7 +112,10 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setTextScale(value: Float) = store.edit { it[Keys.textScale] = value }
     suspend fun setShowImages(value: Boolean) = store.edit { it[Keys.showImages] = value }
     suspend fun setBrowserMode(value: BrowserMode) = store.edit { it[Keys.browserMode] = value.name }
-    suspend fun setRefreshInterval(hours: Int) = store.edit { it[Keys.refreshInterval] = hours }
+    suspend fun setRefreshIntervalMinutes(minutes: Int) = store.edit { it[Keys.refreshMinutes] = minutes }
+    suspend fun setStartupRefresh(value: Boolean) = store.edit { it[Keys.startupRefresh] = value }
+    suspend fun setRetentionLimit(value: Int) = store.edit { it[Keys.retentionLimit] = value }
+    suspend fun setImageCacheMb(value: Int) = store.edit { it[Keys.imageCacheMb] = value }
     suspend fun setUnmeteredOnly(value: Boolean) = store.edit { it[Keys.unmeteredOnly] = value }
     suspend fun setAllowHttp(value: Boolean) = store.edit { it[Keys.allowHttp] = value }
     suspend fun setOnboardingDone(value: Boolean) = store.edit { it[Keys.onboardingDone] = value }

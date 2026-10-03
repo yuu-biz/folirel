@@ -29,19 +29,20 @@ class RefreshScheduler(private val context: Context) {
     private var applied: Pair<Int, Boolean>? = null
 
     fun apply(settings: AppSettings) {
-        val wanted = if (settings.onboardingDone) settings.refreshIntervalHours to settings.unmeteredOnly else 0 to true
+        val wanted = if (settings.onboardingDone) settings.refreshIntervalMinutes to settings.unmeteredOnly else 0 to true
         if (wanted == applied) return
         applied = wanted
         val workManager = WorkManager.getInstance(context)
-        val (hours, unmeteredOnly) = wanted
-        if (hours <= 0) {
+        val (minutes, unmeteredOnly) = wanted
+        if (minutes <= 0) {
             workManager.cancelUniqueWork(WORK_NAME)
             return
         }
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(if (unmeteredOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
             .build()
-        val request = PeriodicWorkRequestBuilder<RefreshWorker>(hours.toLong(), TimeUnit.HOURS)
+        // The minimum period is 15 minutes; the OS may run the work later than asked.
+        val request = PeriodicWorkRequestBuilder<RefreshWorker>(minutes.toLong().coerceAtLeast(15), TimeUnit.MINUTES)
             .setConstraints(constraints)
             .build()
         workManager.enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)

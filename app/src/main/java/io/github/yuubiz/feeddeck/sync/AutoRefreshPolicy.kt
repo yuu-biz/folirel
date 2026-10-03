@@ -1,19 +1,26 @@
 package io.github.yuubiz.feeddeck.sync
 
+import io.github.yuubiz.feeddeck.backend.RefreshReason
 import io.github.yuubiz.feeddeck.data.preferences.AppSettings
 import io.github.yuubiz.feeddeck.network.NetworkState
 
 /**
  * Rules for automatic (startup and periodic) refresh. Manual refresh does not use them.
- * - nothing automatic before onboarding, or when automatic update is off
+ * - nothing automatic before onboarding; periodic needs the interval on, startup needs the startup switch on
  * - the unmetered-only constraint applies to startup refresh too (opening the app does not bypass it)
  * - startup refresh at most once per 30 minutes, measured from the last refresh attempt of any kind (not success)
  */
 object AutoRefreshPolicy {
     const val STARTUP_MIN_INTERVAL_MS = 30L * 60 * 1000
 
-    fun networkAllowed(settings: AppSettings, network: NetworkState): Boolean =
-        settings.onboardingDone && settings.refreshIntervalHours > 0 && network.connected && (!settings.unmeteredOnly || !network.metered)
+    /** Periodic: needs the interval switched on. Startup: needs the startup switch. Both: the same network rule. */
+    fun networkAllowed(settings: AppSettings, network: NetworkState, reason: RefreshReason = RefreshReason.PERIODIC): Boolean {
+        val enabled = when (reason) {
+            RefreshReason.STARTUP -> settings.startupRefresh
+            else -> settings.refreshIntervalMinutes > 0
+        }
+        return settings.onboardingDone && enabled && network.connected && (!settings.unmeteredOnly || !network.metered)
+    }
 
     fun startupDue(nowMillis: Long, lastAttemptAt: Long): Boolean =
         nowMillis - lastAttemptAt >= STARTUP_MIN_INTERVAL_MS

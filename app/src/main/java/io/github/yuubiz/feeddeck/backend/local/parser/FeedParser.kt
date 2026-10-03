@@ -131,6 +131,7 @@ object FeedParser {
                 link = atomAlternateLink(entry),
                 summaryHtml = summaryHtml,
                 extraImageHtml = listOfNotNull(atomTextAsHtml(summaryEl), atomTextAsHtml(contentEl)),
+                inlineImage = xhtmlImage(summaryEl) ?: xhtmlImage(contentEl),
                 author = entry.child(ATOM, "author")?.childText(ATOM, "name")?.takeIf { it.isNotBlank() }
                     ?: entry.child(ATOM, "source")?.child(ATOM, "author")?.childText(ATOM, "name")?.takeIf { it.isNotBlank() }
                     ?: feedAuthor,
@@ -153,12 +154,12 @@ object FeedParser {
         return preferred.firstNotNullOfOrNull { resolveUrl(it.base, it.attr("href")) }
     }
 
-    /** Atom text construct rendered as HTML-ish input for [HtmlText]. */
+    /** Atom text construct rendered as HTML-ish input for [HtmlText]. XHTML: its text in document order. */
     private fun atomTextAsHtml(el: XmlElement?): String? {
         el ?: return null
         return when (el.attr("type")?.trim()?.lowercase() ?: "text") {
             "html" -> el.text
-            "xhtml" -> el.deepText()
+            "xhtml" -> escapeForHtml(el.deepText())
             "text" -> escapeForHtml(el.text)
             else -> if (el.attr("src") != null) null else escapeForHtml(el.text)
         }
@@ -171,6 +172,17 @@ object FeedParser {
             "xhtml" -> el.deepText()
             else -> el.text
         }
+    }
+
+    /**
+     * First usable `img/@src` inside an XHTML text construct (images are lost when it is turned into text).
+     * Relative URLs resolve against the img element's own xml:base chain; tracking pixels and unsafe URLs are skipped.
+     */
+    private fun xhtmlImage(el: XmlElement?): String? {
+        if (el == null || el.attr("type")?.trim()?.lowercase() != "xhtml") return null
+        return el.descendants()
+            .filter { it.name.equals("img", ignoreCase = true) && (it.namespace == XHTML || it.namespace.isEmpty()) }
+            .firstNotNullOfOrNull { img -> imageUrl(img.base, img.attr("src"), img.attr("width"), img.attr("height")) }
     }
 
     private fun escapeForHtml(text: String): String =
@@ -188,6 +200,7 @@ object FeedParser {
         published: Long?,
         item: XmlElement,
         atomEnclosures: List<XmlElement> = emptyList(),
+        inlineImage: String? = null,
     ): NormalizedEntry {
         val base = item.base
         val title = TextNormalizer.normalize(rawTitle, Limits.TITLE_CODE_POINTS)
@@ -196,6 +209,7 @@ object FeedParser {
         val image = mediaImage(item)
             ?: enclosureImage(item, atomEnclosures)
             ?: summary.firstImage
+            ?: inlineImage
             ?: extraImageHtml.firstNotNullOfOrNull { HtmlText.extract(it, base, 0).firstImage }
         return NormalizedEntry(
             entryKey = EntryKeys.of(rawId, link, title, published, normalizedAuthor, summary.text),

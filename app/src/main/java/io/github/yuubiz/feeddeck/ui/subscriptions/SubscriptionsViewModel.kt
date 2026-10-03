@@ -9,7 +9,12 @@ import io.github.yuubiz.feeddeck.backend.RefreshScope
 import io.github.yuubiz.feeddeck.backend.local.opml.OpmlWriter
 import io.github.yuubiz.feeddeck.data.repository.AddFeedResult
 import io.github.yuubiz.feeddeck.data.repository.SubscriptionRepository
+import io.github.yuubiz.feeddeck.model.FeedDiagnostics
+import io.github.yuubiz.feeddeck.model.FeedFetchInfo
 import io.github.yuubiz.feeddeck.model.Structure
+import io.github.yuubiz.feeddeck.sync.HttpsUpgradeCoordinator
+import io.github.yuubiz.feeddeck.sync.HttpsUpgradeState
+import io.github.yuubiz.feeddeck.sync.RefreshState
 import io.github.yuubiz.feeddeck.sync.RefreshCoordinator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -36,12 +41,11 @@ sealed interface SubscriptionEvent {
     data object OperationFailed : SubscriptionEvent
 }
 
-/** Fetch details for the feed detail screen (times are epoch millis UTC). */
-data class FeedDetail(val lastAttemptAt: Long?, val lastSuccessAt: Long?, val fetchUrl: String?, val siteUrl: String?, val feedTitle: String?, val userTitle: String?)
 
 class SubscriptionsViewModel(
     private val subscriptions: SubscriptionRepository,
     private val coordinator: RefreshCoordinator,
+    private val httpsUpgrade: HttpsUpgradeCoordinator,
     private val documents: DocumentIo,
     private val allowHttp: suspend () -> Boolean,
     private val clock: Clock,
@@ -52,6 +56,34 @@ class SubscriptionsViewModel(
     val structure: StateFlow<Structure> = accountId.filterNotNull()
         .flatMapLatest { subscriptions.observeStructure(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, Structure())
+
+    /** Fetch diagnostics per feed id (DATA-01). */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val diagnostics: StateFlow<Map<String, FeedDiagnostics>> = accountId.filterNotNull()
+        .flatMapLatest { subscriptions.observeDiagnostics(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    val refreshState: StateFlow<RefreshState> = coordinator.state
+
+    val httpsState: StateFlow<HttpsUpgradeState> = httpsUpgrade.state
+
+    fun feedInfo(feedId: String): Flow<FeedFetchInfo?> = subscriptions.observeFetchInfo(feedId)
+
+    fun feedDiagnostics(feedId: String): Flow<FeedDiagnostics?> = subscriptions.observeFeedDiagnostics(feedId)
+
+    suspend fun httpCandidateCount(): Int = httpsUpgrade.candidateCount()
+
+    /** The user agreed: check all http:// feeds over HTTPS and switch the verified ones. */
+    fun startHttpsUpgrade() {
+        httpsUpgrade.start()
+    }
+
+    fun cancelHttpsUpgrade() = httpsUpgrade.cancel()
+
+    fun dismissHttpsUpgrade() = httpsUpgrade.dismiss()
+
+    /** Feeds whose last request did not finish or failed. A valid Retry-After is still respected. */
+    fun retryPending() = viewModelScope.launch { coordinator.refresh(RefreshScope.Pending, RefreshReason.MANUAL) }
 
     private val _search = MutableStateFlow("")
     val search: StateFlow<String> = _search.asStateFlow()
@@ -67,11 +99,6 @@ class SubscriptionsViewModel(
         _search.value = text
     }
 
-    suspend fun detail(feedId: String): FeedDetail {
-        val feed = subscriptions.feed(feedId)
-        val state = subscriptions.fetchState(feedId)
-        return FeedDetail(state?.lastAttemptAt, state?.lastSuccessAt, feed?.fetchUrl, feed?.siteUrl, feed?.feedTitle, feed?.userTitle)
-    }
 
     fun addFeed(url: String, onDone: (AddFeedResult) -> Unit = {}) = viewModelScope.launch {
         val account = subscriptions.ensureLocalAccount()
@@ -104,7 +131,12 @@ class SubscriptionsViewModel(
 
     fun setCategories(feedId: String, categoryIds: Set<String>) = guarded { subscriptions.setFeedCategories(feedId, categoryIds) }
 
-    fun refreshFeed(feedId: String) = viewModelScope.launch { coordinator.refresh(RefreshScope.Feeds(listOf(feedId)), RefreshReason.MANUAL) }
+    /**
+     * This feed only, whatever its articles' dates. [force]: revalidate without stored validators
+     * ("refetch bypassing the cache"); articles, read and saved state are kept.
+     */
+    fun refreshFeed(feedId: String, force: Boolean = false) =
+        viewModelScope.launch { coordinator.refresh(RefreshScope.Feeds(listOf(feedId)), RefreshReason.MANUAL, force) }
 
     fun createCategory(parentId: String?, name: String) = viewModelScope.launch {
         val account = subscriptions.ensureLocalAccount()

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -126,6 +128,10 @@ fun ArticleItem(
         }
     }
 
+    if (mode == ListMode.CARD) {
+        ArticleCard(row, showImages, imageLoader, nowMillis, rowModifier, buttons, modifier)
+        return
+    }
     Column(modifier) {
         if (mode == ListMode.MAGAZINE) {
             Row(
@@ -169,6 +175,61 @@ fun ArticleItem(
             }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+    }
+}
+
+/**
+ * Large card (UX-02): wide 16:9 image on top, headline (3 lines), summary (2 lines), source/time and actions.
+ * Without an image URL (or with images off) it is a text card with no empty frame; with a URL the 16:9 area is
+ * fixed while loading or after a failure, so the list does not jump. Images off: no image area, no request.
+ */
+@Composable
+private fun ArticleCard(
+    row: ArticleRow,
+    showImages: Boolean,
+    imageLoader: ImageLoader,
+    nowMillis: Long,
+    rowModifier: Modifier,
+    buttons: @Composable () -> Unit,
+    modifier: Modifier,
+) {
+    ElevatedCard(modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Column(rowModifier) {
+            if (showImages && row.imageUrl != null) {
+                val placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant)
+                Box(
+                    Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(MaterialTheme.colorScheme.surfaceVariant).testTag("card_image"),
+                ) {
+                    AsyncImage(
+                        model = row.imageUrl,
+                        contentDescription = null,
+                        imageLoader = imageLoader,
+                        placeholder = placeholder,
+                        error = placeholder,
+                        fallback = placeholder,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.matchParentSize(),
+                    )
+                }
+            }
+            Column(Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp)) {
+                ArticleTitle(row, fontSize = 18, lineHeight = 24, maxLines = 3)
+                if (row.summaryText.isNotBlank()) {
+                    Spacer(Modifier.padding(top = 4.dp))
+                    Text(
+                        text = row.summaryText,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 20.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            MetaText(row, nowMillis, Modifier.weight(1f))
+            buttons()
+        }
     }
 }
 

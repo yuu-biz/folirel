@@ -20,7 +20,10 @@ data class CategoryNode(
 data class FeedNode(
     val id: String,
     val name: String,
+    /** Registered URL (OPML identity). */
     val url: String,
+    /** Current fetch URL (may be https:// after a verified migration, or a permanent redirect target). */
+    val fetchUrl: String,
     val subscribed: Boolean,
     val paused: Boolean,
     val lastError: FetchError?,
@@ -59,6 +62,7 @@ data class Structure(
                     id = f.id,
                     name = displayName(f),
                     url = f.subscriptionUrl,
+                    fetchUrl = f.fetchUrl,
                     subscribed = f.isSubscribed,
                     paused = f.isPaused,
                     lastError = FetchError.fromStored(state?.lastErrorCode),

@@ -72,7 +72,8 @@ class LocalBackend(
     override val capabilities = BackendCapabilities(subscriptionEditing = true, remoteStateSync = false)
 
     private sealed interface FeedOutcome {
-        data class Updated(val newArticles: Int, val updatedArticles: Int, val insertedIds: List<String>) : FeedOutcome
+        /** [firstFetch]: the feed had never been fetched; its articles are the initial content, not "new arrivals". */
+        data class Updated(val newArticles: Int, val updatedArticles: Int, val insertedIds: List<String>, val firstFetch: Boolean) : FeedOutcome
         data object NotModified : FeedOutcome
         data class Failed(val error: FetchError) : FeedOutcome
         data object SkippedInactive : FeedOutcome
@@ -202,7 +203,7 @@ class LocalBackend(
                 is FeedOutcome.Updated -> {
                     updated++
                     newArticles += outcome.newArticles
-                    newIds += outcome.insertedIds
+                    if (!outcome.firstFetch) newIds += outcome.insertedIds
                     FeedRefreshResult(FeedResult.UPDATED, newArticles = outcome.newArticles, updatedArticles = outcome.updatedArticles)
                 }
                 FeedOutcome.NotModified -> FeedRefreshResult(FeedResult.NOT_MODIFIED).also { notModified++ }
@@ -365,7 +366,7 @@ class LocalBackend(
                 val meta = FetchMetadata(outcome.etag, outcome.lastModified, outcome.finalUrl, outcome.permanentRedirectUrl)
                 try {
                     when (val applied = store.applySuccess(feed.id, parsed, meta, BodyStats(outcome.body.size.toLong(), parsed.rawEntryCount), attempt)) {
-                        is ApplyResult.Applied -> FeedOutcome.Updated(applied.newArticles, applied.updatedArticles, applied.insertedIds)
+                        is ApplyResult.Applied -> FeedOutcome.Updated(applied.newArticles, applied.updatedArticles, applied.insertedIds, !state.initialized)
                         ApplyResult.SkippedInactive -> FeedOutcome.SkippedInactive.also { store.recordInactive(feed.id) }
                     }
                 } catch (e: CancellationException) {

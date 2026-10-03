@@ -121,7 +121,7 @@ data class RefreshReport(
     val force: Boolean = false,
     /** Per target feed. */
     val perFeed: Map<String, FeedRefreshResult> = emptyMap(),
-    /** Articles inserted for this request (for the new-articles banner; bounded by the feeds' own sizes). */
+    /** Articles inserted for this request in feeds fetched before (the new-arrivals banner; not a first import). */
     val newArticleIds: List<String> = emptyList(),
 ) {
     /** Everything this request wanted but did not get a result for. */

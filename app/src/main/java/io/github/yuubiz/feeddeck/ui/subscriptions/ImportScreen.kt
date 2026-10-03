@@ -35,7 +35,7 @@ import io.github.yuubiz.feeddeck.backend.local.opml.OpmlRejectedException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImportScreen(vm: ImportViewModel, onPickAgain: () -> Unit, onClose: () -> Unit) {
+fun ImportScreen(vm: ImportViewModel, onPickAgain: () -> Unit, onClose: () -> Unit, onHttpsCheck: (start: Boolean) -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     Scaffold(
         topBar = {
@@ -90,7 +90,21 @@ fun ImportScreen(vm: ImportViewModel, onPickAgain: () -> Unit, onClose: () -> Un
                     CountRow(stringResource(R.string.import_memberships), s.result.addedMemberships)
                     CountRow(stringResource(R.string.import_categories_created), s.result.createdCategories)
                     Text(stringResource(R.string.import_fetch_note), style = MaterialTheme.typography.bodyMedium)
+                    if (s.httpFeeds > 0) {
+                        Text(stringResource(R.string.summary_http, s.httpFeeds), style = MaterialTheme.typography.bodyMedium)
+                        OutlinedButton(onClick = { onHttpsCheck(false) }) { Text(stringResource(R.string.https_check_title)) }
+                    }
                     Button(onClick = onClose, modifier = Modifier.testTag("import_done")) { Text(stringResource(R.string.import_go_home)) }
+                    if (s.httpFeeds > 0 && !s.httpsAnswered) {
+                        HttpsConsentDialog(
+                            count = s.httpFeeds,
+                            onAccept = {
+                                vm.httpsAnswered()
+                                onHttpsCheck(true)
+                            },
+                            onDismiss = vm::httpsAnswered,
+                        )
+                    }
                 }
             }
         }

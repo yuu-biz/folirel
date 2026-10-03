@@ -17,6 +17,7 @@ import io.github.yuubiz.feeddeck.data.preferences.SettingsRepository
 import io.github.yuubiz.feeddeck.data.repository.ArticleRepository
 import io.github.yuubiz.feeddeck.data.repository.FeedStore
 import io.github.yuubiz.feeddeck.data.repository.IdGenerator
+import io.github.yuubiz.feeddeck.data.repository.RetentionManager
 import io.github.yuubiz.feeddeck.data.repository.SubscriptionRepository
 import io.github.yuubiz.feeddeck.model.Limits
 import io.github.yuubiz.feeddeck.network.AddressPolicy
@@ -33,6 +34,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import okio.Path.Companion.toOkioPath
 import java.time.Clock
 import java.util.concurrent.atomic.AtomicBoolean
@@ -66,6 +68,7 @@ class AppContainer(context: Context) {
     val subscriptions = SubscriptionRepository(database, clock, ids)
     val articles = ArticleRepository(database, clock)
     private val feedStore = FeedStore(database, clock, ids)
+    val retention = RetentionManager(database, clock)
 
     val backend: BackendSynchronizer = LocalBackend(
         store = feedStore,
@@ -78,10 +81,14 @@ class AppContainer(context: Context) {
     val refresh = RefreshCoordinator(
         backend = backend,
         accountId = { subscriptions.ensureLocalAccount() },
-        automaticAllowed = { AutoRefreshPolicy.networkAllowed(settings.current(), networkStatus.current()) },
+        automaticAllowed = { reason -> AutoRefreshPolicy.networkAllowed(settings.current(), networkStatus.current(), reason) },
         onAttempt = { settings.setLastRefreshAttempt(it) },
         scope = appScope,
         clock = clock,
+        afterRefresh = {
+            val limit = settings.current().retentionLimit
+            if (limit > 0) retention.apply(subscriptions.ensureLocalAccount(), limit)
+        },
     )
 
     /**
@@ -103,14 +110,20 @@ class AppContainer(context: Context) {
 
     fun databaseFileBytes(): Long = AppDatabase.fileBytes(appContext)
 
-    /** Thumbnails: same network policy, bounded disk cache, no service-loaded default fetchers. */
-    val imageLoader: ImageLoader = ImageLoader.Builder(appContext)
+    /**
+     * Thumbnails: same network policy, bounded disk cache, no service-loaded default fetchers. The cache size
+     * setting is read once when the loader is first used (preferences are already loaded by then), so a change
+     * applies at the next app start.
+     */
+    val imageLoader: ImageLoader by lazy { buildImageLoader(runBlocking { settings.current().imageCacheMb }) }
+
+    private fun buildImageLoader(cacheMb: Int): ImageLoader = ImageLoader.Builder(appContext)
         .serviceLoaderEnabled(false)
         .components { add(OkHttpNetworkFetcherFactory(callFactory = { imageHttpClient })) }
         .diskCache {
             DiskCache.Builder()
                 .directory(appContext.cacheDir.resolve("thumbnails").toOkioPath())
-                .maxSizeBytes(IMAGE_CACHE_BYTES)
+                .maxSizeBytes(cacheMb * 1024L * 1024L)
                 .build()
         }
         .build()
@@ -126,7 +139,6 @@ class AppContainer(context: Context) {
 
     companion object {
         private const val TAG = "FeedDeck"
-        const val IMAGE_CACHE_BYTES = 128L * 1024 * 1024
         const val DB_WARNING_BYTES = 100L * 1024 * 1024
     }
 }

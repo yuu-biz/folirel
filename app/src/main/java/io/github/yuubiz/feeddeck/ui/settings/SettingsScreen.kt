@@ -55,6 +55,8 @@ import io.github.yuubiz.feeddeck.data.preferences.BrowserMode
 import io.github.yuubiz.feeddeck.data.preferences.SettingsRepository
 import io.github.yuubiz.feeddeck.data.preferences.ThemeMode
 import io.github.yuubiz.feeddeck.data.repository.ArticleRepository
+import io.github.yuubiz.feeddeck.data.repository.RetentionManager
+import io.github.yuubiz.feeddeck.data.repository.RetentionPreview
 import io.github.yuubiz.feeddeck.model.ListMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
@@ -66,6 +68,7 @@ import kotlinx.coroutines.withContext
 class SettingsViewModel(
     private val repository: SettingsRepository,
     private val articles: ArticleRepository,
+    private val retention: RetentionManager,
     private val imageLoader: ImageLoader,
     private val accountId: suspend () -> String,
     private val databaseFileBytes: () -> Long,
@@ -77,6 +80,15 @@ class SettingsViewModel(
     }
 
     suspend fun articleCount(): Int = articles.countArticles(accountId())
+
+    /** What the limit would remove now (nothing is removed by this call). */
+    suspend fun retentionPreview(limit: Int): RetentionPreview = retention.preview(accountId(), limit)
+
+    /** The user confirmed the removal count: store the limit and apply it once now. */
+    suspend fun confirmRetention(limit: Int): Int {
+        repository.setRetentionLimit(limit)
+        return retention.apply(accountId(), limit)
+    }
 
     fun imageCacheBytes(): Long = imageLoader.diskCache?.size ?: 0
 
@@ -92,14 +104,20 @@ class SettingsViewModel(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Unit) {
+fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Unit, onHttpsCheck: () -> Unit) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     var httpWarning by remember { mutableStateOf(false) }
     var cacheVersion by remember { mutableIntStateOf(0) }
-    val articleCount by produceState(-1) { value = vm.articleCount() }
+    var retentionAsk by remember { mutableStateOf<RetentionPreview?>(null) }
+    var dataVersion by remember { mutableIntStateOf(0) }
+    val articleCount by produceState(-1, dataVersion) { value = vm.articleCount() }
+    val retentionPreview by produceState<RetentionPreview?>(null, dataVersion, s.retentionLimit) {
+        value = if (s.retentionLimit > 0) vm.retentionPreview(s.retentionLimit) else null
+    }
+    val removedText = stringResource(R.string.retention_removed)
     val dbBytes = remember(articleCount) { vm.databaseBytes() }
     val cacheBytes = remember(cacheVersion) { vm.imageCacheBytes() }
     val cacheCleared = stringResource(R.string.settings_cache_cleared)
@@ -130,7 +148,11 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Un
             item {
                 Choice(
                     stringResource(R.string.settings_list_mode),
-                    listOf(ListMode.MAGAZINE to stringResource(R.string.list_mode_magazine), ListMode.LIST to stringResource(R.string.list_mode_list)),
+                    listOf(
+                        ListMode.MAGAZINE to stringResource(R.string.list_mode_magazine),
+                        ListMode.LIST to stringResource(R.string.list_mode_list),
+                        ListMode.CARD to stringResource(R.string.list_mode_card),
+                    ),
                     s.listMode,
                 ) { vm.update { setListMode(it) } }
             }
@@ -157,11 +179,16 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Un
             item {
                 Choice(
                     stringResource(R.string.settings_interval),
-                    AppSettings.REFRESH_INTERVALS.map { it to if (it == 0) stringResource(R.string.interval_off) else pluralStringResource(R.plurals.interval_hours, it, it) },
-                    s.refreshIntervalHours,
-                ) { vm.update { setRefreshInterval(it) } }
+                    AppSettings.REFRESH_INTERVALS_MINUTES.map { it to intervalLabel(it) },
+                    s.refreshIntervalMinutes,
+                ) { vm.update { setRefreshIntervalMinutes(it) } }
             }
             item { Note(stringResource(R.string.settings_interval_note)) }
+            item {
+                Toggle(stringResource(R.string.settings_startup_refresh), stringResource(R.string.settings_startup_refresh_note), s.startupRefresh) { v ->
+                    vm.update { setStartupRefresh(v) }
+                }
+            }
             item { Toggle(stringResource(R.string.settings_unmetered), stringResource(R.string.settings_unmetered_note), s.unmeteredOnly) { v -> vm.update { setUnmeteredOnly(v) } } }
             item {
                 Toggle(stringResource(R.string.settings_allow_http), stringResource(R.string.settings_allow_http_note), s.allowHttp, Modifier.testTag("allow_http")) { v ->
@@ -169,7 +196,32 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Un
                 }
             }
 
+            item {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    Note(stringResource(R.string.settings_https_note))
+                    OutlinedButton(onClick = onHttpsCheck, modifier = Modifier.testTag("settings_https_check")) { Text(stringResource(R.string.https_check_title)) }
+                }
+            }
+
             item { Header(stringResource(R.string.settings_data)) }
+            item {
+                Choice(
+                    stringResource(R.string.settings_retention),
+                    AppSettings.RETENTION_LIMITS.map { it to if (it == 0) stringResource(R.string.retention_unlimited) else stringResource(R.string.retention_count, it) },
+                    s.retentionLimit,
+                ) { limit ->
+                    if (limit == 0 || (s.retentionLimit in 1..limit)) {
+                        // No limit, or a looser limit: nothing would be removed beyond what the current one keeps.
+                        vm.update { setRetentionLimit(limit) }
+                    } else {
+                        scope.launch { retentionAsk = vm.retentionPreview(limit) }
+                    }
+                }
+            }
+            item { Note(stringResource(R.string.settings_retention_note)) }
+            retentionPreview?.takeIf { it.overLimitBecauseProtected }?.let { p ->
+                item { Note(stringResource(R.string.retention_over_limit, p.total, p.protectedCount)) }
+            }
             item {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                     Text(stringResource(R.string.settings_article_count, if (articleCount < 0) 0 else articleCount))
@@ -177,9 +229,17 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Un
                     if (dbBytes > AppContainer.DB_WARNING_BYTES) {
                         Text(stringResource(R.string.settings_db_warning), color = MaterialTheme.colorScheme.error)
                     }
-                    Text(stringResource(R.string.settings_cache_size, Formatter.formatShortFileSize(context, cacheBytes)))
+                    Text(stringResource(R.string.settings_cache_size, Formatter.formatShortFileSize(context, cacheBytes), s.imageCacheMb))
                 }
             }
+            item {
+                Choice(
+                    stringResource(R.string.settings_image_cache),
+                    AppSettings.IMAGE_CACHE_MB.map { it to stringResource(R.string.cache_mb, it) },
+                    s.imageCacheMb,
+                ) { vm.update { setImageCacheMb(it) } }
+            }
+            item { Note(stringResource(R.string.settings_image_cache_note)) }
             item {
                 Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                     OutlinedButton(onClick = {
@@ -207,6 +267,29 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Un
                 }
             }
         }
+    }
+    retentionAsk?.let { p ->
+        AlertDialog(
+            onDismissRequest = { retentionAsk = null },
+            title = { Text(stringResource(R.string.retention_confirm_title)) },
+            text = {
+                Text(
+                    stringResource(R.string.retention_confirm_message, p.limit, p.total, p.toRemove, p.protectedCount) +
+                        if (p.overLimitBecauseProtected) "\n" + stringResource(R.string.retention_over_limit, p.total - p.toRemove, p.protectedCount) else "",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    retentionAsk = null
+                    scope.launch {
+                        val removed = vm.confirmRetention(p.limit)
+                        dataVersion++
+                        snackbar.showSnackbar(removedText.format(removed))
+                    }
+                }, modifier = Modifier.testTag("retention_confirm")) { Text(stringResource(R.string.retention_confirm)) }
+            },
+            dismissButton = { TextButton(onClick = { retentionAsk = null }) { Text(stringResource(R.string.cancel)) } },
+        )
     }
     if (httpWarning) {
         AlertDialog(
@@ -262,4 +345,11 @@ private fun <T> Choice(title: String, options: List<Pair<T, String>>, selected: 
             }
         }
     }
+}
+
+@Composable
+private fun intervalLabel(minutes: Int): String = when {
+    minutes == 0 -> stringResource(R.string.interval_off)
+    minutes < 60 -> pluralStringResource(R.plurals.interval_minutes, minutes, minutes)
+    else -> pluralStringResource(R.plurals.interval_hours, minutes / 60, minutes / 60)
 }

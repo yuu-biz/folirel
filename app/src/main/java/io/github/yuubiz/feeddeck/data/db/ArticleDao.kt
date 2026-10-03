@@ -45,6 +45,30 @@ interface ArticleDao {
     @Query("SELECT * FROM articles WHERE feedId = :feedId ORDER BY sortAt DESC, id DESC")
     suspend fun articlesOfFeed(feedId: String): List<ArticleEntity>
 
+    @Query(
+        """SELECT COUNT(*) AS total, COALESCE(SUM(s.isRead = 0), 0) AS unread, COALESCE(SUM(s.isSaved = 1), 0) AS saved
+           FROM articles a JOIN article_states s ON s.articleId = a.id WHERE a.feedId = :feedId""",
+    )
+    fun observeFeedCounts(feedId: String): Flow<FeedArticleCounts>
+
+    /** Unread or saved: protected from the retention cleanup. */
+    @Query(
+        """SELECT COUNT(*) FROM articles a JOIN article_states s ON s.articleId = a.id
+           WHERE a.accountId = :accountId AND (s.isRead = 0 OR s.isSaved = 1)""",
+    )
+    suspend fun countProtected(accountId: String): Int
+
+    /** Oldest read, unsaved articles first. */
+    @Query(
+        """SELECT a.id AS id, a.feedId AS feedId, a.entryKey AS entryKey FROM articles a JOIN article_states s ON s.articleId = a.id
+           WHERE a.accountId = :accountId AND s.isRead = 1 AND s.isSaved = 0 ORDER BY a.sortAt ASC, a.id ASC LIMIT :limit""",
+    )
+    suspend fun oldestRemovable(accountId: String, limit: Int): List<RemovableArticle>
+
+    /** article_states rows go with them (ON DELETE CASCADE). */
+    @Query("DELETE FROM articles WHERE id IN (:ids)")
+    suspend fun deleteArticles(ids: List<String>): Int
+
     @Query("SELECT entryKey FROM articles WHERE feedId = :feedId ORDER BY sortAt DESC, id DESC LIMIT :limit")
     suspend fun recentEntryKeys(feedId: String, limit: Int): List<String>
 
@@ -83,3 +107,7 @@ interface ArticleDao {
     @RawQuery(observedEntities = [ArticleEntity::class, ArticleStateEntity::class, FeedEntity::class, FeedCategoryEntity::class])
     fun observeCount(query: SupportSQLiteQuery): Flow<Int>
 }
+
+data class FeedArticleCounts(val total: Int, val unread: Int, val saved: Int)
+
+data class RemovableArticle(val id: String, val feedId: String, val entryKey: String)

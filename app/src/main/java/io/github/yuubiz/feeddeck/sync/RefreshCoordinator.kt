@@ -62,12 +62,14 @@ data class RefreshState(
 class RefreshCoordinator(
     private val backend: BackendSynchronizer,
     private val accountId: suspend () -> String,
-    /** For automatic reasons only: whether the current network satisfies the auto-update constraint. */
-    private val automaticAllowed: suspend () -> Boolean,
+    /** For automatic reasons only: whether settings and the current network allow this automatic refresh. */
+    private val automaticAllowed: suspend (RefreshReason) -> Boolean,
     /** Called when a refresh request is accepted (manual or automatic); the startup 30-minute rule uses it. */
     private val onAttempt: suspend (Long) -> Unit,
     private val scope: CoroutineScope,
     private val clock: Clock,
+    /** After every finished request (e.g. the retention cleanup). Failures there never fail the refresh. */
+    private val afterRefresh: suspend () -> Unit = {},
 ) {
     private val _state = MutableStateFlow(RefreshState())
     val state: StateFlow<RefreshState> = _state.asStateFlow()
@@ -79,7 +81,7 @@ class RefreshCoordinator(
     private val ids = AtomicLong()
 
     suspend fun refresh(target: RefreshScope, reason: RefreshReason, force: Boolean = false): RefreshReport {
-        if (reason.isAutomatic && !automaticAllowed()) {
+        if (reason.isAutomatic && !automaticAllowed(reason)) {
             _state.update { it.copy(lastAutoBlocked = true) }
             return RefreshReport(total = 0, deferredConstraint = 1)
         }
@@ -110,6 +112,7 @@ class RefreshCoordinator(
         var report: RefreshReport? = null
         try {
             report = backend.refresh(accountId(), target, reason, force) { p -> updateRequest(id) { r -> r.copy(progress = p) } }
+            runCatching { afterRefresh() }
             return report
         } finally {
             val finished = report
