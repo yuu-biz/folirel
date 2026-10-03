@@ -705,7 +705,8 @@ internal fun ArticleList(
         if (farDown) {
             SmallFloatingActionButton(
                 onClick = { scope.launch { currentScroll.animateToTop() } },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).testTag("scroll_to_top"),
+                // Bottom centre: the per-article buttons (save, menu) sit at the right edge and must stay reachable.
+                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp).testTag("scroll_to_top"),
                 containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.92f),
             ) {
                 Icon(painterResource(R.drawable.ic_arrow_upward), contentDescription = stringResource(R.string.scroll_to_top))
