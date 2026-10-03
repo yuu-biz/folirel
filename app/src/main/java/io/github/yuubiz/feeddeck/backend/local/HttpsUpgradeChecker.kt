@@ -24,6 +24,12 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
  */
 class HttpsUpgradeChecker(
     private val fetcher: FeedFetcher,
+    /**
+     * Normal feed fetcher, used only while the user allows HTTP: when HTTPS redirects elsewhere, the HTTP document
+     * is fetched to compare (same final URL, shared entries or same title). Never used to turn HTTP on.
+     */
+    private val httpFetcher: FeedFetcher? = null,
+    private val httpAllowed: () -> Boolean = { false },
     private val parseDispatcher: CoroutineDispatcher = Dispatchers.Default,
     /** http → https candidate. Default: same host/path/query, default port 80 becomes 443. */
     private val candidateFor: (HttpUrl) -> HttpUrl = { it.newBuilder().scheme("https").build() },
@@ -63,21 +69,40 @@ class HttpsUpgradeChecker(
             return Result(HttpsVerdict.UNCHANGED, reason, candidate, outcome.httpStatus)
         }
         val samePlace = sameHost(original, final) && samePath(original, final)
-        val titleMatches = known.feedTitle != null && parsed.title != null &&
-            TextNormalizer.normalize(known.feedTitle).equals(TextNormalizer.normalize(parsed.title), ignoreCase = true)
-        val knownKeys = known.entryKeys.mapTo(HashSet(), ::comparableKey)
-        val overlap = parsed.entries.any { comparableKey(it.entryKey) in knownKeys }
+        val titleMatches = sameTitle(known.feedTitle, parsed.title)
+        val parsedKeys = parsed.entries.mapTo(HashSet()) { comparableKey(it.entryKey) }
+        val overlap = known.entryKeys.any { comparableKey(it) in parsedKeys }
         val hasHistory = known.entryKeys.isNotEmpty()
-        val same = if (samePlace) {
+        val changed = Result(HttpsVerdict.CHANGED, HttpsReason.OK, candidate, outcome.httpStatus)
+        val different = Result(HttpsVerdict.UNCHANGED, HttpsReason.DIFFERENT_FEED, candidate, outcome.httpStatus)
+        if (samePlace) {
             // Same address: accept unless what we already have clearly disagrees with what HTTPS returned.
-            !(hasHistory && !overlap && known.feedTitle != null && !titleMatches)
-        } else {
-            // Redirected somewhere else: only with positive evidence that it is the same feed.
-            overlap || titleMatches
+            return if (hasHistory && !overlap && known.feedTitle != null && !titleMatches) different else changed
         }
-        return if (same) Result(HttpsVerdict.CHANGED, HttpsReason.OK, candidate, outcome.httpStatus)
-        else Result(HttpsVerdict.UNCHANGED, HttpsReason.DIFFERENT_FEED, candidate, outcome.httpStatus)
+        // Redirected somewhere else: only with positive evidence that it is the same feed.
+        if (overlap || titleMatches) return changed
+        val http = httpDocument(original) ?: return Result(HttpsVerdict.UNCHECKED, HttpsReason.REDIRECT_UNCONFIRMED, candidate, outcome.httpStatus)
+        val same = http.finalUrl == outcome.finalUrl || http.entryKeys.any { it in parsedKeys } || sameTitle(http.title, parsed.title)
+        return if (same) changed else different
     }
+
+    private class HttpDocument(val finalUrl: String, val title: String?, val entryKeys: Set<String>)
+
+    /** The feed as served over HTTP, only when the user allows HTTP; null otherwise or on any failure. */
+    private suspend fun httpDocument(original: HttpUrl): HttpDocument? {
+        val http = httpFetcher ?: return null
+        if (!httpAllowed()) return null
+        val outcome = http.fetch(original.toString(), null, initialized = false) as? FetchOutcome.Success ?: return null
+        val parsed = try {
+            withContext(parseDispatcher) { FeedParser.parse(XmlCharset.decode(outcome.body, outcome.charset).text, outcome.finalUrl) }
+        } catch (_: FeedParseException) {
+            return null
+        }
+        return HttpDocument(outcome.finalUrl, parsed.title, parsed.entries.mapTo(HashSet()) { comparableKey(it.entryKey) })
+    }
+
+    private fun sameTitle(a: String?, b: String?) =
+        a != null && b != null && TextNormalizer.normalize(a).equals(TextNormalizer.normalize(b), ignoreCase = true)
 
     private fun failure(outcome: FetchOutcome.Failure, candidate: String): Result {
         val (verdict, reason) = when (outcome.error) {

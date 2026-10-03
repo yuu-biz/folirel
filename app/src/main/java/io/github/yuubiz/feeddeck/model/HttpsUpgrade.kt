@@ -22,6 +22,11 @@ enum class HttpsReason {
     DOWNGRADE_TO_HTTP,
     /** HTTPS answered with a feed, but apparently not the same feed. */
     DIFFERENT_FEED,
+    /**
+     * HTTPS redirected to another address and nothing confirms it is the same feed. With HTTP allowed, the HTTP
+     * document is compared too; without it the URL stays and the feed counts as not checked.
+     */
+    REDIRECT_UNCONFIRMED,
     /** 4xx / unexpected status / redirect problems. */
     HTTP_STATUS,
     /** Address or content refused by the security policy. */

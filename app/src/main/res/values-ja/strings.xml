@@ -350,4 +350,5 @@
     <plurals name="interval_minutes">
         <item quantity="other">%d分ごと</item>
     </plurals>
+    <string name="https_reason_redirect_unconfirmed">別のサイトへ転送され、同じフィードか確認できない（HTTPを許可すると比較して判定）</string>
 </resources>

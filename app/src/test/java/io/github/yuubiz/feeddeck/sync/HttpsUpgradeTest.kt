@@ -65,14 +65,17 @@ class HttpsUpgradeTest {
             .build()
 
     /** Normal fetching after the switch: HTTP allowed (for the old URLs) and the test certificate trusted. */
+    private val trustingHttpClient = env.httpClient.newBuilder().sslSocketFactory(trust.sslSocketFactory(), trust.trustManager).build()
     private val backend = LocalBackend(
         env.store,
-        FeedFetcher(env.httpClient.newBuilder().sslSocketFactory(trust.sslSocketFactory(), trust.trustManager).build(), env.clock),
+        FeedFetcher(trustingHttpClient, env.clock),
         env.clock, env.network, { true },
     )
 
-    private fun checker(timeoutMillis: Long = 5_000) = HttpsUpgradeChecker(
+    private fun checker(timeoutMillis: Long = 5_000, httpAllowed: Boolean = false) = HttpsUpgradeChecker(
         FeedFetcher(strictClient(timeoutMillis), env.clock),
+        httpFetcher = FeedFetcher(trustingHttpClient, env.clock),
+        httpAllowed = { httpAllowed },
         candidateFor = { url ->
             val target = if (url.encodedPath.startsWith("/tls")) untrusted else https
             url.newBuilder().scheme("https").port(target.port).build()
@@ -207,7 +210,7 @@ class HttpsUpgradeTest {
         val before = env.db.subscriptionDao().feeds(account()).associate { it.id to it.fetchUrl }
         val downBefore = http.requestCount
 
-        val result = runUpgrade(checker())
+        val result = runUpgrade(checker(httpAllowed = true))
         val reasons = result.results.associate { it.httpUrl.substringAfterLast('/') to it.reason }
         assertEquals(HttpsReason.HTML_PAGE, reasons["html"])
         assertEquals(HttpsReason.TLS_ERROR, reasons["tls"])
@@ -216,7 +219,33 @@ class HttpsUpgradeTest {
         assertEquals(HttpsReason.HTTP_STATUS, reasons["gone"])
         assertTrue(result.results.all { it.verdict == HttpsVerdict.UNCHANGED })
         assertEquals("every URL kept", before, env.db.subscriptionDao().feeds(account()).associate { it.id to it.fetchUrl })
-        assertEquals("the check never contacted HTTP (no downgrade followed)", downBefore, http.requestCount)
+        // HTTP was contacted only to compare the redirected feed ("moved"), never by following a downgrade.
+        assertEquals(downBefore + 1, http.requestCount)
+    }
+
+    @Test
+    fun crossSiteRedirectIsUnconfirmedWithoutHttpAndConfirmedByTheHttpDocument() = runBlocking<Unit> {
+        // Never fetched before (HTTP was off): no history to compare with.
+        http.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest) = MockResponse.Builder().code(301).setHeader("Location", httpsUrl("/new/feed.xml")).build()
+        }
+        https.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = when (request.url.encodedPath) {
+                "/old/feed.xml" -> MockResponse.Builder().code(301).setHeader("Location", "/new/feed.xml").build()
+                else -> ok(rss("Renamed news", listOf("n1" to "https://example.com/n1")))
+            }
+        }
+        importOpml(opml(httpUrl("/old/feed.xml")))
+        val unconfirmed = runUpgrade(checker(httpAllowed = false)).results.single()
+        assertEquals(HttpsVerdict.UNCHECKED, unconfirmed.verdict)
+        assertEquals(HttpsReason.REDIRECT_UNCONFIRMED, unconfirmed.reason)
+        assertEquals(0, http.requestCount)
+        assertTrue(env.db.subscriptionDao().feeds(account()).single().fetchUrl.startsWith("http://"))
+
+        // With HTTP allowed, the HTTP URL itself redirects to the same HTTPS document: same feed.
+        val confirmed = runUpgrade(checker(httpAllowed = true)).results.single()
+        assertEquals(HttpsVerdict.CHANGED, confirmed.verdict)
+        assertTrue(env.db.subscriptionDao().feeds(account()).single().fetchUrl.startsWith("https://"))
     }
 
     @Test

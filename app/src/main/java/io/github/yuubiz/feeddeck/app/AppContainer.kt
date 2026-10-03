@@ -96,7 +96,11 @@ class AppContainer(context: Context) {
      * so a redirect back to http:// fails instead of being followed; certificates are verified as usual.
      */
     val httpsUpgrade = HttpsUpgradeCoordinator(
-        checker = HttpsUpgradeChecker(FeedFetcher(HttpClients.feedClient(NetworkGuard(AddressPolicy.PUBLIC_ONLY, { false }), userAgent), clock)),
+        checker = HttpsUpgradeChecker(
+            fetcher = FeedFetcher(HttpClients.feedClient(NetworkGuard(AddressPolicy.PUBLIC_ONLY, { false }), userAgent), clock),
+            httpFetcher = FeedFetcher(feedHttpClient, clock),
+            httpAllowed = { allowHttp.get() },
+        ),
         subscriptions = subscriptions,
         refresh = refresh,
         scope = appScope,

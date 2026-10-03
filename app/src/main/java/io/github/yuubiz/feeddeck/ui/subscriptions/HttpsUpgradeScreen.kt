@@ -170,6 +170,7 @@ fun httpsReasonLabel(reason: HttpsReason): String = stringResource(
         HttpsReason.TLS_ERROR -> R.string.https_reason_tls
         HttpsReason.DOWNGRADE_TO_HTTP -> R.string.https_reason_downgrade
         HttpsReason.DIFFERENT_FEED -> R.string.https_reason_different
+        HttpsReason.REDIRECT_UNCONFIRMED -> R.string.https_reason_redirect_unconfirmed
         HttpsReason.HTTP_STATUS -> R.string.https_reason_status
         HttpsReason.BLOCKED -> R.string.https_reason_blocked
         HttpsReason.TOO_LARGE -> R.string.https_reason_too_large

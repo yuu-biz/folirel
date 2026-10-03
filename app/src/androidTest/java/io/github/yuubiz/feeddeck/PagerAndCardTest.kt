@@ -2,6 +2,8 @@ package io.github.yuubiz.feeddeck
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -57,6 +59,14 @@ class PagerAndCardTest {
 
     private fun waitForScope(scope: ArticleScope) = compose.waitUntil(5_000) { lastScope() == scope }
 
+    /** A node inside the page of [scope] (the pager may also compose the neighbouring page). */
+    private fun inPage(scope: ArticleScope, tag: String) =
+        compose.onNode(hasTestTag(tag) and hasAnyAncestor(hasTestTag("page_${scope.encode()}")))
+
+    private fun waitInPage(scope: ArticleScope, tag: String) = compose.waitUntil(10_000) {
+        compose.onAllNodes(hasTestTag(tag) and hasAnyAncestor(hasTestTag("page_${scope.encode()}"))).fetchSemanticsNodes().isNotEmpty()
+    }
+
     private fun swipePager(left: Boolean) {
         compose.onNodeWithTag("category_pager").performTouchInput { if (left) swipeLeft() else swipeRight() }
         compose.waitForIdle()
@@ -82,7 +92,7 @@ class PagerAndCardTest {
         compose.onNodeWithTag("tab_all").performClick()
         waitForScope(ArticleScope.All)
         compose.waitForIdle()
-        compose.onNodeWithTag("article_${seeded.getValue(alpha).first()}").assertIsDisplayed()
+        inPage(ArticleScope.All, "article_${seeded.getValue(alpha).first()}").assertIsDisplayed()
         // First page: swiping right stays on All.
         swipePager(left = false)
         Thread.sleep(500)
@@ -97,26 +107,30 @@ class PagerAndCardTest {
         compose.onNodeWithTag("tab_category:$alpha").performClick()
         waitForScope(ArticleScope.Category(alpha))
         compose.waitForIdle()
-        compose.onNodeWithTag("article_list").performScrollToIndex(30)
+        val a = ArticleScope.Category(alpha)
+        val b = ArticleScope.Category(beta)
+        waitInPage(a, "article_list")
+        inPage(a, "article_list").performScrollToIndex(30)
         val alphaAnchor = seeded.getValue(alpha)[30]
-        compose.onNodeWithTag("article_$alphaAnchor").assertIsDisplayed()
+        inPage(a, "article_$alphaAnchor").assertIsDisplayed()
 
         compose.onNodeWithTag("tab_category:$beta").performClick()
         waitForScope(ArticleScope.Category(beta))
         compose.waitForIdle()
-        compose.onNodeWithTag("article_list").performScrollToIndex(10)
+        waitInPage(b, "article_list")
+        inPage(b, "article_list").performScrollToIndex(10)
         val betaAnchor = seeded.getValue(beta)[10]
-        compose.onNodeWithTag("article_$betaAnchor").assertIsDisplayed()
+        inPage(b, "article_$betaAnchor").assertIsDisplayed()
 
         swipePager(left = false) // back to Alpha by swipe
         waitForScope(ArticleScope.Category(alpha))
-        waitForTag("article_$alphaAnchor")
-        compose.onNodeWithTag("article_$alphaAnchor").assertIsDisplayed()
+        waitInPage(a, "article_$alphaAnchor")
+        inPage(a, "article_$alphaAnchor").assertIsDisplayed()
 
         compose.onNodeWithTag("tab_category:$beta").performClick() // and to Beta by tab
         waitForScope(ArticleScope.Category(beta))
-        waitForTag("article_$betaAnchor")
-        compose.onNodeWithTag("article_$betaAnchor").assertIsDisplayed()
+        waitInPage(b, "article_$betaAnchor")
+        inPage(b, "article_$betaAnchor").assertIsDisplayed()
 
         assertTrue(seeded.values.flatten().none { TestData.state(it).isRead })
     }
@@ -126,7 +140,8 @@ class PagerAndCardTest {
     fun cardModeIsSelectableAndPersisted() {
         launch()
         waitForTag("category_pager")
-        compose.onNodeWithTag("article_list").performScrollToIndex(5)
+        waitInPage(ArticleScope.All, "article_list")
+        inPage(ArticleScope.All, "article_list").performScrollToIndex(5)
         compose.onNodeWithTag("home_more").performClick()
         compose.onNodeWithTag("menu_mode_CARD").performClick()
         compose.waitUntil(5_000) { runBlocking { TestData.container.settings.current().listMode } == ListMode.CARD }

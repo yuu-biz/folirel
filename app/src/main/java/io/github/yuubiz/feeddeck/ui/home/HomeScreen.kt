@@ -432,19 +432,21 @@ private fun ScopePage(
 ) {
     val flow = remember(pageScope) { vm.pageList(pageScope) }
     val list by flow.collectAsStateWithLifecycle()
-    when {
-        !list.loaded -> Box(Modifier.fillMaxSize())
-        list.items.isEmpty() -> EmptyList(selection, refreshing, offline, onRefresh)
-        else -> ArticleList(
-            vm = vm,
-            state = list,
-            mode = settings.listMode,
-            showImages = settings.showImages,
-            imageLoader = imageLoader,
-            actions = actions,
-            newIds = newIds,
-            newestFirst = selection.sort == SortOrder.NEWEST,
-        )
+    Box(Modifier.fillMaxSize().testTag("page_${pageScope.encode()}")) {
+        when {
+            !list.loaded -> Unit
+            list.items.isEmpty() -> EmptyList(selection, refreshing, offline, onRefresh)
+            else -> ArticleList(
+                vm = vm,
+                state = list,
+                mode = settings.listMode,
+                showImages = settings.showImages,
+                imageLoader = imageLoader,
+                actions = actions,
+                newIds = newIds,
+                newestFirst = selection.sort == SortOrder.NEWEST,
+            )
+        }
     }
 }
 
