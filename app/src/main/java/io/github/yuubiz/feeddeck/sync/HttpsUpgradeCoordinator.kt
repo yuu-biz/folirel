@@ -120,7 +120,9 @@ class HttpsUpgradeCoordinator(
             HttpsUpgradeChecker.Result(HttpsVerdict.UNCHECKED, HttpsReason.NETWORK, null)
         }
         if (result.verdict == HttpsVerdict.CHANGED && result.httpsUrl != null) {
-            val applied = withContext(NonCancellable) { subscriptions.applyHttpsUpgrade(feed.id, feed.fetchUrl, result.httpsUrl) }
+            val applied = withContext(NonCancellable) {
+                subscriptions.applyHttpsUpgrade(feed.id, feed.fetchUrl, result.httpsUrl).also { if (it) refresh.feedAddressChanged() }
+            }
             if (!applied) return HttpsCheck(feed.id, name, feed.fetchUrl, result.httpsUrl, HttpsVerdict.UNCHANGED, HttpsReason.SKIPPED)
         }
         return HttpsCheck(feed.id, name, feed.fetchUrl, result.httpsUrl, result.verdict, result.reason, result.httpStatus)

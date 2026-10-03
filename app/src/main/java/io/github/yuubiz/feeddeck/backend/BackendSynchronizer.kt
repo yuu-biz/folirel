@@ -78,6 +78,8 @@ enum class FeedResult {
     CANCELLED,
     /** This request stopped waiting, but the fetch continues for another request that also asked for it. */
     CONTINUING,
+    /** The fetch address changed while this request was fetching the old one; the old answer was dropped and the new address is fetched by the request that followed the change. */
+    REPLACED,
     /** Unsubscribed or paused while the fetch was running; nothing written. */
     INACTIVE,
     ;
@@ -113,6 +115,8 @@ data class RefreshReport(
     /** Still being fetched for another request when this one stopped waiting. */
     val continuing: Int = 0,
     val skippedInactive: Int = 0,
+    /** Feeds whose address changed during this request: not fetched here, fetched by the request after the change (history, not unfinished work). */
+    val replaced: Int = 0,
     /** http:// feeds not fetched because HTTP is disabled in settings (registered, waiting for opt-in). */
     val httpPending: Int = 0,
     val newArticles: Int = 0,

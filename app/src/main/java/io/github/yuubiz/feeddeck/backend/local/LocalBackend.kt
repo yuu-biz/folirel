@@ -206,6 +206,7 @@ class LocalBackend(
         var updated = 0
         var notModified = 0
         var inactive = 0
+        var replaced = 0
         var newArticles = 0
         val newIds = ArrayList<String>()
         for (feedId in jobs.keys) {
@@ -221,8 +222,8 @@ class LocalBackend(
                 FeedOutcome.SkippedInactive -> FeedRefreshResult(FeedResult.INACTIVE).also { inactive++ }
                 FeedOutcome.NotStarted -> FeedRefreshResult(FeedResult.NOT_STARTED)
                 FeedOutcome.Cancelled -> FeedRefreshResult(FeedResult.CANCELLED)
-                // The fetch of the old address was replaced by one of the new address that continues.
-                FeedOutcome.Superseded -> FeedRefreshResult(FeedResult.CONTINUING)
+                // The address changed: this request did not fetch the feed; the request that follows the change fetches the new address.
+                FeedOutcome.Superseded -> FeedRefreshResult(FeedResult.REPLACED).also { replaced++ }
                 null -> FeedRefreshResult(unfinished[feedId] ?: FeedResult.NOT_STARTED)
             }
         }
@@ -232,6 +233,7 @@ class LocalBackend(
             notModified = notModified,
             failed = failed,
             skippedInactive = inactive,
+            replaced = replaced,
             notStarted = results.count { it.result == FeedResult.NOT_STARTED },
             cancelled = results.count { it.result == FeedResult.CANCELLED },
             continuing = results.count { it.result == FeedResult.CONTINUING },

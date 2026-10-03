@@ -316,6 +316,7 @@
     <string name="result_backoff">再試行待ち</string>
     <string name="result_cancelled">取得途中で中止</string>
     <string name="result_continuing">別の更新で継続中</string>
+    <string name="result_replaced">取得先の変更により別に取得</string>
     <string name="result_failed">失敗</string>
     <string name="result_inactive">停止（購読解除/一時停止）</string>
     <string name="result_not_modified">変更なし（304）</string>

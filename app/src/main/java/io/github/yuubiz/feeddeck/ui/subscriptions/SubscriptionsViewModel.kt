@@ -15,6 +15,7 @@ import io.github.yuubiz.feeddeck.model.FeedListFilter
 import io.github.yuubiz.feeddeck.model.FeedProblem
 import io.github.yuubiz.feeddeck.model.FeedFetchInfo
 import io.github.yuubiz.feeddeck.model.Structure
+import io.github.yuubiz.feeddeck.sync.FeedAddressChange
 import io.github.yuubiz.feeddeck.sync.FeedDiscoveryService
 import io.github.yuubiz.feeddeck.sync.HttpsUpgradeCoordinator
 import io.github.yuubiz.feeddeck.sync.HttpsUpgradeState
@@ -281,6 +282,7 @@ class SubscriptionsViewModel(
 
     // Finding where a feed moved (SUB-DISCOVERY)
 
+    private val addressChange = FeedAddressChange(subscriptions, coordinator)
     private val discoveryRuns = DiscoveryController(viewModelScope) { feedId, entered -> discovery.run(feedId, entered) }
     val discoveryState: StateFlow<DiscoveryState> = discoveryRuns.state
 
@@ -293,7 +295,7 @@ class SubscriptionsViewModel(
 
     /** The user approved this candidate for [feedId]. The refresh that follows fetches the new address. */
     fun applyMove(feedId: String, fromUrl: String, toUrl: String) = viewModelScope.launch {
-        when (val result = runCatching { subscriptions.applyUrlMove(feedId, fromUrl, toUrl) }.getOrNull()) {
+        when (val result = runCatching { addressChange.adopt(feedId, fromUrl, toUrl) }.getOrNull()) {
             SubscriptionRepository.MoveResult.Applied -> {
                 clearDiscovery()
                 events.send(SubscriptionEvent.MoveApplied)

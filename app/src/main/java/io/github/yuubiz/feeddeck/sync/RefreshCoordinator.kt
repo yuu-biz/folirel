@@ -54,7 +54,8 @@ data class RefreshState(
  * Single entry point for every refresh (manual, import, startup, periodic).
  * - Each request acts on its own target: a running "All" no longer absorbs a narrower request. Overlap is
  *   resolved per feed in the backend (a feed queued/running for one request is shared, never fetched twice).
- * - Only an identical request (same target, same manual/automatic kind, same force) joins a running one.
+ * - Only an identical request (same target, same manual/automatic kind, same force, made with the same feed addresses:
+ *   [feedAddressChanged] separates requests made before and after an address change) joins a running one.
  * - Manual, import and startup requests run in the application [scope], so leaving a screen does not cancel them.
  *   Periodic requests run in the calling worker's coroutine: stopping the worker releases its feeds, and fetches
  *   that only it wanted are cancelled (finished feeds stay applied).
@@ -74,11 +75,13 @@ class RefreshCoordinator(
     private val _state = MutableStateFlow(RefreshState())
     val state: StateFlow<RefreshState> = _state.asStateFlow()
 
-    private data class Key(val scope: RefreshScope, val automatic: Boolean, val force: Boolean)
+    /** [addresses]: the count of address changes seen when the request was made; requests of different counts never share. */
+    private data class Key(val scope: RefreshScope, val automatic: Boolean, val force: Boolean, val addresses: Long)
 
     private val mutex = Mutex()
     private val joinable = HashMap<Key, Deferred<RefreshReport>>()
     private val ids = AtomicLong()
+    private val addressChanges = AtomicLong()
 
     suspend fun refresh(target: RefreshScope, reason: RefreshReason, force: Boolean = false): RefreshReport {
         if (reason.isAutomatic && !automaticAllowed(reason)) {
@@ -87,7 +90,7 @@ class RefreshCoordinator(
         }
         onAttempt(clock.millis())
         if (reason == RefreshReason.PERIODIC) return run(target, reason, force)
-        val key = Key(target, reason.isAutomatic, force)
+        val key = Key(target, reason.isAutomatic, force, addressChanges.get())
         val job = mutex.withLock {
             joinable[key] ?: scope.async(start = CoroutineStart.LAZY) {
                 try {
@@ -99,6 +102,11 @@ class RefreshCoordinator(
         }
         job.start() // outside the lock; no-op when joining an already running job
         return job.await()
+    }
+
+    /** An address of a feed changed: requests made from now on are not merged into requests made before. */
+    fun feedAddressChanged() {
+        addressChanges.incrementAndGet()
     }
 
     private suspend fun run(target: RefreshScope, reason: RefreshReason, force: Boolean): RefreshReport {

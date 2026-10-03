@@ -324,6 +324,7 @@
     <string name="result_backoff">Waiting to retry</string>
     <string name="result_cancelled">Stopped while fetching</string>
     <string name="result_continuing">Continuing elsewhere</string>
+    <string name="result_replaced">Address changed; fetched separately</string>
     <string name="result_failed">Failed</string>
     <string name="result_inactive">Stopped (unsubscribed/paused)</string>
     <string name="result_not_modified">Not modified (304)</string>

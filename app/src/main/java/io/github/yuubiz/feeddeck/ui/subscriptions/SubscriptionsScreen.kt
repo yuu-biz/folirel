@@ -515,6 +515,7 @@ fun resultLabel(result: FeedResult): String = stringResource(
         FeedResult.NOT_STARTED -> R.string.result_not_started
         FeedResult.CANCELLED -> R.string.result_cancelled
         FeedResult.CONTINUING -> R.string.result_continuing
+        FeedResult.REPLACED -> R.string.result_replaced
         FeedResult.INACTIVE -> R.string.result_inactive
     },
 )
