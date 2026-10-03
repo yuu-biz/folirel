@@ -81,6 +81,9 @@ interface SubscriptionDao {
     @Query("SELECT * FROM categories WHERE accountId = :accountId")
     fun observeCategories(accountId: String): Flow<List<CategoryEntity>>
 
+    @Query("SELECT accountId FROM categories WHERE id = :id")
+    suspend fun categoryAccount(id: String): String?
+
     @Query("DELETE FROM categories WHERE id IN (:ids)")
     suspend fun deleteCategories(ids: List<String>): Int
 

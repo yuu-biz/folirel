@@ -1,0 +1,306 @@
+package io.github.yuubiz.feeddeck.data.repository
+
+import androidx.room.withTransaction
+import io.github.yuubiz.feeddeck.backend.local.opml.OpmlDocument
+import io.github.yuubiz.feeddeck.data.db.AccountEntity
+import io.github.yuubiz.feeddeck.data.db.AppDatabase
+import io.github.yuubiz.feeddeck.data.db.CategoryEntity
+import io.github.yuubiz.feeddeck.data.db.FeedCategoryEntity
+import io.github.yuubiz.feeddeck.data.db.FeedEntity
+import io.github.yuubiz.feeddeck.data.db.FeedFetchStateEntity
+import io.github.yuubiz.feeddeck.model.Structure
+import io.github.yuubiz.feeddeck.network.UrlNormalizer
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import java.time.Clock
+
+/** Diff of an OPML document against the current DB, shown before anything is written (docs/02 S30). */
+data class ImportPreview(
+    val document: OpmlDocument,
+    val totalUniqueFeeds: Int,
+    val newFeeds: Int,
+    val existingFeeds: Int,
+    val resubscribeFeeds: Int,
+    val addedMemberships: Int,
+    val multiCategoryFeeds: Int,
+    /** Valid http:// feeds; registered, but not fetched while HTTP is disabled. */
+    val httpFeeds: Int,
+    val httpPending: Int,
+    val invalidUrls: Int,
+    val unsupportedItems: Int,
+    val newCategories: Int,
+    val emptyCategories: Int,
+    val warnings: Int,
+)
+
+data class ImportResult(
+    val createdFeeds: Int,
+    val resubscribedFeeds: Int,
+    val addedMemberships: Int,
+    val createdCategories: Int,
+    /** Feeds to fetch after the import (new and resubscribed), by local id. */
+    val feedIdsToFetch: List<String>,
+)
+
+sealed interface AddFeedResult {
+    data class Added(val feedId: String) : AddFeedResult
+    data class Resubscribed(val feedId: String) : AddFeedResult
+    data class AlreadySubscribed(val feedId: String) : AddFeedResult
+    data class Invalid(val reason: UrlNormalizer.Reason) : AddFeedResult
+}
+
+class SubscriptionRepository(
+    private val db: AppDatabase,
+    private val clock: Clock,
+    private val ids: IdGenerator,
+) {
+    private val dao = db.subscriptionDao()
+
+    /** Feeds, categories, memberships and fetch states as one derived tree for drawer/tabs/management. */
+    fun observeStructure(accountId: String): Flow<Structure> = combine(
+        dao.observeFeeds(accountId),
+        dao.observeCategories(accountId),
+        dao.observeMemberships(accountId),
+        dao.observeFetchStates(accountId),
+    ) { feeds, categories, memberships, states -> Structure.build(feeds, categories, memberships, states) }
+
+    suspend fun fetchState(feedId: String): FeedFetchStateEntity? = dao.fetchState(feedId)
+
+    suspend fun feed(feedId: String): FeedEntity? = dao.feed(feedId)
+
+    /** V1 has exactly one LOCAL account, created on first use. */
+    suspend fun ensureLocalAccount(): String = db.withTransaction {
+        dao.firstAccountOfType(LOCAL)?.id ?: ids.newId().also { id ->
+            dao.insertAccount(AccountEntity(id, LOCAL, "Local", clock.millis()))
+        }
+    }
+
+    suspend fun previewImport(accountId: String, document: OpmlDocument, allowHttp: Boolean): ImportPreview {
+        val feedsByUrl = dao.feeds(accountId).associateBy { it.subscriptionUrl }
+        val categoryIdByPath = dao.categories(accountId).associate { CategoryPaths.decode(it.pathSegmentsJson) to it.id }
+        val existingMemberships = dao.memberships(accountId).map { it.feedId to it.categoryId }.toSet()
+
+        val valid = document.occurrences.filter { it.url != null }
+        val uniqueUrls = valid.map { it.url!! }.distinct()
+        val newUrls = uniqueUrls.filter { it !in feedsByUrl }
+        val existing = uniqueUrls.mapNotNull { feedsByUrl[it] }
+        val wantedMemberships = valid.filter { it.categoryPath.isNotEmpty() }.map { it.url!! to it.categoryPath }.toSet()
+        val added = wantedMemberships.count { (url, path) ->
+            val feedId = feedsByUrl[url]?.id
+            val categoryId = categoryIdByPath[path]
+            feedId == null || categoryId == null || (feedId to categoryId) !in existingMemberships
+        }
+        val httpUrls = uniqueUrls.filter { it.startsWith("http://") }
+        val pathsWithFeeds = wantedMemberships.map { it.second }
+        return ImportPreview(
+            document = document,
+            totalUniqueFeeds = uniqueUrls.size,
+            newFeeds = newUrls.size,
+            existingFeeds = existing.count { it.isSubscribed },
+            resubscribeFeeds = existing.count { !it.isSubscribed },
+            addedMemberships = added,
+            multiCategoryFeeds = wantedMemberships.groupBy { it.first }.count { it.value.size > 1 },
+            httpFeeds = httpUrls.size,
+            httpPending = if (allowHttp) 0 else httpUrls.size,
+            invalidUrls = document.occurrences.count { it.url == null },
+            unsupportedItems = document.unsupported.size,
+            newCategories = document.categoryPaths.count { it !in categoryIdByPath },
+            emptyCategories = document.categoryPaths.count { p -> pathsWithFeeds.none { CategoryPaths.isSameOrDescendant(it, p) } },
+            warnings = document.warnings.size,
+        )
+    }
+
+    /**
+     * Applies the import in one transaction: add/merge only. Existing user titles, memberships and reading
+     * state are never changed or removed; unsubscribed feeds with the same URL are re-enabled (same id).
+     */
+    suspend fun commitImport(accountId: String, document: OpmlDocument): ImportResult = db.withTransaction {
+        val now = clock.millis()
+        val categoryIdByPath = dao.categories(accountId)
+            .associate { CategoryPaths.decode(it.pathSegmentsJson) to it.id }
+            .toMutableMap()
+        var createdCategories = 0
+        val allPaths = LinkedHashSet<List<String>>()
+        document.categoryPaths.forEach { path -> for (i in 1..path.size) allPaths += path.subList(0, i) }
+        document.occurrences.forEach { o -> for (i in 1..o.categoryPath.size) allPaths += o.categoryPath.subList(0, i) }
+        for (path in allPaths) {
+            if (path !in categoryIdByPath) {
+                val id = ids.newId()
+                dao.insertCategory(CategoryEntity(id, accountId, path.last(), CategoryPaths.encode(path)))
+                categoryIdByPath[path] = id
+                createdCategories++
+            }
+        }
+
+        var created = 0
+        var resubscribed = 0
+        var memberships = 0
+        val toFetch = LinkedHashSet<String>()
+        val feedIdByUrl = HashMap<String, String>()
+        for (occurrence in document.occurrences) {
+            val url = occurrence.url ?: continue
+            val feedId = feedIdByUrl.getOrPut(url) {
+                val existing = dao.feedByUrl(accountId, url)
+                when {
+                    existing == null -> {
+                        val id = ids.newId()
+                        dao.insertFeed(
+                            FeedEntity(
+                                id = id, accountId = accountId, subscriptionUrl = url, fetchUrl = url,
+                                siteUrl = occurrence.siteUrl, feedTitle = null,
+                                // First valid label in the file becomes the initial name.
+                                userTitle = occurrence.label, isSubscribed = true, isPaused = false, createdAt = now,
+                            ),
+                        )
+                        dao.insertFetchState(FeedFetchStateEntity(feedId = id))
+                        created++
+                        toFetch += id
+                        id
+                    }
+                    !existing.isSubscribed -> {
+                        dao.setSubscribed(existing.id, true)
+                        resubscribed++
+                        toFetch += existing.id
+                        existing.id
+                    }
+                    else -> existing.id
+                }
+            }
+            if (occurrence.categoryPath.isNotEmpty()) {
+                val categoryId = categoryIdByPath.getValue(occurrence.categoryPath)
+                if (dao.insertMembership(FeedCategoryEntity(feedId, categoryId)) != -1L) memberships++
+            }
+        }
+        ImportResult(created, resubscribed, memberships, createdCategories, toFetch.toList())
+    }
+
+    /** Adds one feed URL. A known URL is merged (re-subscribed when needed); HTTP URLs are allowed to be registered. */
+    suspend fun addFeed(accountId: String, rawUrl: String, categoryIds: List<String> = emptyList()): AddFeedResult {
+        val url = when (val result = UrlNormalizer.normalize(rawUrl)) {
+            is UrlNormalizer.Result.Valid -> result.url
+            is UrlNormalizer.Result.Invalid -> return AddFeedResult.Invalid(result.reason)
+        }
+        return db.withTransaction {
+            val existing = dao.feedByUrl(accountId, url)
+            val result = when {
+                existing == null -> {
+                    val id = ids.newId()
+                    dao.insertFeed(FeedEntity(id, accountId, url, url, null, null, null, true, false, clock.millis()))
+                    dao.insertFetchState(FeedFetchStateEntity(feedId = id))
+                    AddFeedResult.Added(id)
+                }
+                !existing.isSubscribed -> {
+                    dao.setSubscribed(existing.id, true)
+                    AddFeedResult.Resubscribed(existing.id)
+                }
+                else -> AddFeedResult.AlreadySubscribed(existing.id)
+            }
+            val feedId = when (result) {
+                is AddFeedResult.Added -> result.feedId
+                is AddFeedResult.Resubscribed -> result.feedId
+                is AddFeedResult.AlreadySubscribed -> result.feedId
+                is AddFeedResult.Invalid -> null
+            }
+            if (feedId != null) categoryIds.forEach { dao.insertMembership(FeedCategoryEntity(feedId, it)) }
+            result
+        }
+    }
+
+    /** Soft unsubscribe: stops updates and hides the feed from normal lists; articles and saved state remain. */
+    suspend fun unsubscribe(feedId: String) {
+        dao.setSubscribed(feedId, false)
+    }
+
+    suspend fun resubscribe(feedId: String) {
+        dao.setSubscribed(feedId, true)
+    }
+
+    suspend fun setPaused(feedId: String, paused: Boolean) {
+        dao.setPaused(feedId, paused)
+    }
+
+    suspend fun renameFeed(feedId: String, userTitle: String?) {
+        dao.setUserTitle(feedId, userTitle?.trim()?.ifEmpty { null })
+    }
+
+    /** Replaces the feed's direct memberships with [categoryIds] (same account only). */
+    suspend fun setFeedCategories(feedId: String, categoryIds: Set<String>) = db.withTransaction {
+        val feed = dao.feed(feedId) ?: return@withTransaction
+        val valid = dao.categories(feed.accountId).map { it.id }.toSet()
+        require(valid.containsAll(categoryIds)) { "Category of another account" }
+        val current = dao.memberships(feed.accountId).filter { it.feedId == feedId }.map { it.categoryId }.toSet()
+        (current - categoryIds).forEach { dao.deleteMembership(feedId, it) }
+        (categoryIds - current).forEach { dao.insertMembership(FeedCategoryEntity(feedId, it)) }
+    }
+
+    sealed interface CategoryResult {
+        data class Ok(val categoryId: String) : CategoryResult
+        data object Conflict : CategoryResult
+        data object InvalidName : CategoryResult
+    }
+
+    /** Creates a category under [parentId] (or at top level). An existing identical path is a conflict. */
+    suspend fun createCategory(accountId: String, parentId: String?, name: String): CategoryResult = db.withTransaction {
+        val segment = io.github.yuubiz.feeddeck.backend.local.parser.TextNormalizer.nfcTrim(name)
+        if (segment.isEmpty()) return@withTransaction CategoryResult.InvalidName
+        val all = dao.categories(accountId)
+        val parentPath = parentId?.let { id -> all.firstOrNull { it.id == id }?.let { CategoryPaths.decode(it.pathSegmentsJson) } }.orEmpty()
+        val path = parentPath + segment
+        val json = CategoryPaths.encode(path)
+        if (all.any { it.pathSegmentsJson == json }) return@withTransaction CategoryResult.Conflict
+        val id = ids.newId()
+        dao.insertCategory(CategoryEntity(id, accountId, segment, json))
+        CategoryResult.Ok(id)
+    }
+
+    /**
+     * Renames the last segment of [categoryId] and rewrites all descendant paths in one transaction, keeping
+     * ids and memberships. If any resulting path collides with another category, nothing changes.
+     */
+    suspend fun renameCategory(categoryId: String, newName: String): CategoryResult = db.withTransaction {
+        val segment = io.github.yuubiz.feeddeck.backend.local.parser.TextNormalizer.nfcTrim(newName)
+        if (segment.isEmpty()) return@withTransaction CategoryResult.InvalidName
+        val target = db.subscriptionDao().categories(accountOf(categoryId) ?: return@withTransaction CategoryResult.InvalidName)
+        val byId = target.associateBy { it.id }
+        val oldPath = CategoryPaths.decode(byId.getValue(categoryId).pathSegmentsJson)
+        val newPath = oldPath.dropLast(1) + segment
+        val affected = target.filter { CategoryPaths.isSameOrDescendant(CategoryPaths.decode(it.pathSegmentsJson), oldPath) }
+        val renamed = affected.associate { c ->
+            val path = CategoryPaths.decode(c.pathSegmentsJson)
+            c.id to (newPath + path.drop(oldPath.size))
+        }
+        val untouchedPaths = target.filter { it.id !in renamed }.map { it.pathSegmentsJson }.toSet()
+        if (renamed.values.any { CategoryPaths.encode(it) in untouchedPaths }) return@withTransaction CategoryResult.Conflict
+        // Two-phase update avoids transient UNIQUE collisions between renamed rows.
+        for (c in affected) dao.updateCategory(c.copy(pathSegmentsJson = "[\"\\u0000tmp\",\"${c.id}\"]"))
+        for (c in affected) {
+            val path = renamed.getValue(c.id)
+            dao.updateCategory(c.copy(name = path.last(), pathSegmentsJson = CategoryPaths.encode(path)))
+        }
+        CategoryResult.Ok(categoryId)
+    }
+
+    /** Deletes the category and its descendants and their memberships. Feeds and articles are never deleted. */
+    suspend fun deleteCategory(categoryId: String): Int = db.withTransaction {
+        val account = accountOf(categoryId) ?: return@withTransaction 0
+        val all = dao.categories(account)
+        val root = CategoryPaths.decode(all.first { it.id == categoryId }.pathSegmentsJson)
+        val ids = all.filter { CategoryPaths.isSameOrDescendant(CategoryPaths.decode(it.pathSegmentsJson), root) }.map { it.id }
+        dao.deleteCategories(ids) // memberships cascade
+    }
+
+    /** Subscribed feeds with their direct category paths, for OPML export. */
+    suspend fun exportData(accountId: String): Pair<List<FeedEntity>, Map<String, List<List<String>>>> {
+        val feeds = dao.feeds(accountId).filter { it.isSubscribed }
+        val paths = dao.categories(accountId).associate { it.id to CategoryPaths.decode(it.pathSegmentsJson) }
+        val byFeed = dao.memberships(accountId).groupBy({ it.feedId }, { paths.getValue(it.categoryId) })
+        return feeds to byFeed
+    }
+
+    private suspend fun accountOf(categoryId: String): String? =
+        db.subscriptionDao().categoryAccount(categoryId)
+
+    companion object {
+        const val LOCAL = "LOCAL"
+    }
+}

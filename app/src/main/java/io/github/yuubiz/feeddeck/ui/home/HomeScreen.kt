@@ -1,0 +1,591 @@
+package io.github.yuubiz.feeddeck.ui.home
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.PrimaryScrollableTabRow
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.ImageLoader
+import io.github.yuubiz.feeddeck.R
+import io.github.yuubiz.feeddeck.browser.BrowserLauncher
+import io.github.yuubiz.feeddeck.data.preferences.BrowserMode
+import io.github.yuubiz.feeddeck.model.ArticleRow
+import io.github.yuubiz.feeddeck.model.ArticleScope
+import io.github.yuubiz.feeddeck.model.FetchError
+import io.github.yuubiz.feeddeck.model.ListMode
+import io.github.yuubiz.feeddeck.model.ReadFilter
+import io.github.yuubiz.feeddeck.model.SortOrder
+import io.github.yuubiz.feeddeck.model.Structure
+import kotlinx.coroutines.launch
+
+class HomeNavigation(
+    val importOpml: () -> Unit,
+    val addFeed: () -> Unit,
+    val subscriptions: () -> Unit,
+    val settings: () -> Unit,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeScreen(
+    vm: HomeViewModel,
+    imageLoader: ImageLoader,
+    browser: BrowserLauncher,
+    nav: HomeNavigation,
+) {
+    val settings by vm.settings.collectAsStateWithLifecycle()
+    val selection by vm.selection.collectAsStateWithLifecycle()
+    val structure by vm.structure.collectAsStateWithLifecycle()
+    val list by vm.articleList.collectAsStateWithLifecycle()
+    val refresh by vm.refreshState.collectAsStateWithLifecycle()
+    val network by vm.network.collectAsStateWithLifecycle()
+    val searchActive by vm.searchActive.collectAsStateWithLifecycle()
+    val searchText by vm.searchText.collectAsStateWithLifecycle()
+    val banner by vm.newArticlesBanner.collectAsStateWithLifecycle()
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val snackbar = remember { SnackbarHostState() }
+
+    var markAllRequest by remember { mutableStateOf<MarkAllReadRequest?>(null) }
+    var meteredConfirm by remember { mutableStateOf(false) }
+    var httpConfirmUrl by rememberSaveable { mutableStateOf<String?>(null) }
+    var httpConfirmMode by rememberSaveable { mutableStateOf(BrowserMode.CUSTOM_TABS) }
+    var summaryFor by remember { mutableStateOf<ArticleRow?>(null) }
+    var overflowOpen by remember { mutableStateOf(false) }
+
+    val messages = HomeMessages.load()
+    LaunchedEffect(vm) {
+        vm.eventFlow.collect { event ->
+            val text = when (event) {
+                is HomeEvent.BulkMarked -> messages.bulkMarked(event.count)
+                is HomeEvent.Message -> messages.of(event.kind)
+            }
+            snackbar.showSnackbar(text)
+        }
+    }
+
+    fun openUrl(row: ArticleRow, mode: BrowserMode) {
+        when (val check = browser.check(row.linkUrl)) {
+            BrowserLauncher.LinkCheck.Missing -> scope.launch { snackbar.showSnackbar(messages.noUrl) }
+            BrowserLauncher.LinkCheck.Unsafe -> scope.launch { snackbar.showSnackbar(messages.unsafeUrl) }
+            is BrowserLauncher.LinkCheck.Ok -> if (!check.isHttps) {
+                httpConfirmUrl = check.url
+                httpConfirmMode = mode
+            } else if (browser.open(context, check.url, mode) == BrowserLauncher.OpenResult.NO_BROWSER) {
+                scope.launch { snackbar.showSnackbar(messages.noBrowser) }
+            }
+        }
+    }
+
+    val actions = ArticleActions(
+        open = { openUrl(it, settings.browserMode) },
+        openExternal = { openUrl(it, BrowserMode.EXTERNAL) },
+        toggleSaved = { vm.toggleSaved(it) },
+        setRead = { row, read -> vm.setRead(row, read) },
+        share = { row -> context.startActivity(browser.shareIntent(row.title, row.linkUrl)) },
+        showSummary = { summaryFor = it },
+    )
+
+    fun requestRefresh() {
+        if (network.metered && settings.unmeteredOnly && network.connected) meteredConfirm = true else vm.refreshCurrentScope()
+    }
+
+    val scopeTitle = scopeTitle(selection.scope, structure)
+    val unreadInList = list.items.count { !it.isRead }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            HomeDrawer(
+                structure = structure,
+                selection = selection,
+                onSelect = { s ->
+                    vm.selectScope(s)
+                    scope.launch { drawerState.close() }
+                },
+                onSaved = {
+                    vm.showSaved()
+                    scope.launch { drawerState.close() }
+                },
+                onSubscriptions = {
+                    scope.launch { drawerState.close() }
+                    nav.subscriptions()
+                },
+                onSettings = {
+                    scope.launch { drawerState.close() }
+                    nav.settings()
+                },
+            )
+        },
+    ) {
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbar) },
+            topBar = {
+                TopAppBar(
+                    expandedHeight = 56.dp,
+                    navigationIcon = {
+                        if (searchActive) {
+                            IconButton(onClick = { vm.setSearchActive(false) }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_close_search))
+                            }
+                        } else {
+                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                Icon(Icons.Filled.Menu, stringResource(R.string.action_open_drawer))
+                            }
+                        }
+                    },
+                    title = {
+                        if (searchActive) {
+                            TextField(
+                                value = searchText,
+                                onValueChange = vm::setSearchText,
+                                placeholder = { Text(stringResource(R.string.search_hint, scopeTitle), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                ),
+                                trailingIcon = {
+                                    if (searchText.isNotEmpty()) {
+                                        IconButton(onClick = { vm.setSearchText("") }) {
+                                            Icon(Icons.Filled.Close, stringResource(R.string.action_clear_search))
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().testTag("search_field"),
+                            )
+                        } else {
+                            Text(scopeTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    },
+                    actions = {
+                        if (!searchActive) {
+                            IconButton(onClick = { vm.setSearchActive(true) }) {
+                                Icon(Icons.Filled.Search, stringResource(R.string.action_search))
+                            }
+                        }
+                        Box {
+                            IconButton(onClick = { overflowOpen = true }) {
+                                Icon(Icons.Filled.MoreVert, stringResource(R.string.action_more))
+                            }
+                            DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
+                                val nextMode = if (settings.listMode == ListMode.MAGAZINE) ListMode.LIST else ListMode.MAGAZINE
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(if (nextMode == ListMode.LIST) R.string.menu_list_mode_compact else R.string.menu_list_mode_magazine)) },
+                                    onClick = { overflowOpen = false; vm.setListMode(nextMode) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(if (selection.sort == SortOrder.NEWEST) R.string.sort_oldest else R.string.sort_newest)) },
+                                    onClick = { overflowOpen = false; vm.toggleSort() },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.menu_mark_all_read)) },
+                                    enabled = unreadInList > 0,
+                                    onClick = {
+                                        overflowOpen = false
+                                        scope.launch { markAllRequest = vm.prepareMarkAllRead(scopeTitle) }
+                                    },
+                                )
+                                DropdownMenuItem(text = { Text(stringResource(R.string.menu_refresh)) }, onClick = { overflowOpen = false; requestRefresh() })
+                                HorizontalDivider()
+                                DropdownMenuItem(text = { Text(stringResource(R.string.action_import_opml)) }, onClick = { overflowOpen = false; nav.importOpml() })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.action_add_feed)) }, onClick = { overflowOpen = false; nav.addFeed() })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.nav_subscriptions)) }, onClick = { overflowOpen = false; nav.subscriptions() })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.nav_settings)) }, onClick = { overflowOpen = false; nav.settings() })
+                            }
+                        }
+                    },
+                )
+            },
+        ) { padding ->
+            Column(Modifier.padding(padding).fillMaxSize()) {
+                if (selection.scope !is ArticleScope.Feed && structure.subscribedFeeds.isNotEmpty()) {
+                    ScopeTabs(structure, selection.scope, vm::selectScope)
+                }
+                FilterBar(selection, vm::selectFilter, vm::toggleSort)
+                StatusBar(refresh = refresh, offline = !network.connected, structure = structure, onOpenSubscriptions = nav.subscriptions)
+                PullToRefreshBox(
+                    isRefreshing = refresh.running,
+                    onRefresh = { requestRefresh() },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    when {
+                        !structure.loaded || !list.loaded -> Unit
+                        structure.feeds.isEmpty() -> NoSubscriptions(nav.importOpml, nav.addFeed)
+                        list.items.isEmpty() -> EmptyList(selection, refresh.running, !network.connected) { requestRefresh() }
+                        else -> ArticleList(
+                            vm = vm,
+                            state = list,
+                            mode = settings.listMode,
+                            showImages = settings.showImages,
+                            imageLoader = imageLoader,
+                            actions = actions,
+                            newArticles = banner,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    markAllRequest?.let { request ->
+        MarkAllReadDialog(request, onConfirm = { vm.confirmMarkAllRead(request); markAllRequest = null }, onDismiss = { markAllRequest = null })
+    }
+    if (meteredConfirm) {
+        AlertDialog(
+            onDismissRequest = { meteredConfirm = false },
+            title = { Text(stringResource(R.string.metered_title)) },
+            text = { Text(stringResource(R.string.metered_message)) },
+            confirmButton = { TextButton(onClick = { meteredConfirm = false; vm.refreshCurrentScope() }) { Text(stringResource(R.string.metered_confirm)) } },
+            dismissButton = { TextButton(onClick = { meteredConfirm = false }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+    httpConfirmUrl?.let { url ->
+        AlertDialog(
+            onDismissRequest = { httpConfirmUrl = null },
+            title = { Text(stringResource(R.string.http_open_title)) },
+            text = { Text(stringResource(R.string.http_open_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    httpConfirmUrl = null
+                    if (browser.open(context, url, httpConfirmMode) == BrowserLauncher.OpenResult.NO_BROWSER) {
+                        scope.launch { snackbar.showSnackbar(messages.noBrowser) }
+                    }
+                }) { Text(stringResource(R.string.http_open_confirm)) }
+            },
+            dismissButton = { TextButton(onClick = { httpConfirmUrl = null }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+    summaryFor?.let { row ->
+        ModalBottomSheet(onDismissRequest = { summaryFor = null }) {
+            Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp).verticalScroll(rememberScrollState())) {
+                Text(row.title.ifBlank { stringResource(R.string.untitled) }, style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+                Text(row.summaryText.ifBlank { stringResource(R.string.summary_empty) }, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(8.dp))
+                Text(stringResource(R.string.summary_no_url_note), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArticleList(
+    vm: HomeViewModel,
+    state: ArticlesState,
+    mode: ListMode,
+    showImages: Boolean,
+    imageLoader: ImageLoader,
+    actions: ArticleActions,
+    newArticles: Int,
+) {
+    val items = state.items
+    // Restore from the saved anchor (article id + offset); if it is gone, use the nearest remaining article.
+    val listState = remember(state.key) {
+        val anchor = vm.anchorFor(state.key)
+        val index = anchor?.let { a ->
+            items.indexOfFirst { it.id == a.articleId }.takeIf { it >= 0 }
+                ?: items.indexOfFirst { if (state.key.contains("|NEWEST|")) it.sortAt <= a.sortAt else it.sortAt >= a.sortAt }.takeIf { it >= 0 }
+                ?: (items.size - 1)
+        } ?: 0
+        LazyListState(index.coerceAtLeast(0), if (anchor != null && items.getOrNull(index)?.id == anchor.articleId) anchor.offset else 0)
+    }
+    val currentItems by rememberUpdatedState(items)
+    LaunchedEffect(listState, state.key) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }.collect { (index, offset) ->
+            currentItems.getOrNull(index)?.let { vm.saveAnchor(ListAnchor(state.key, it.id, it.sortAt, offset)) }
+            if (index == 0 && offset == 0) vm.dismissNewArticlesBanner()
+        }
+    }
+    val atTop by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 } }
+    val scope = rememberCoroutineScope()
+    val now = remember(items) { System.currentTimeMillis() }
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize().testTag("article_list"), contentPadding = PaddingValues(bottom = 24.dp)) {
+            items(items, key = { it.id }, contentType = { mode }) { row ->
+                ArticleItem(row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"))
+            }
+        }
+        if (newArticles > 0 && !atTop) {
+            // New arrivals never move the list on their own; the user jumps explicitly.
+            FilledTonalButton(
+                onClick = {
+                    vm.dismissNewArticlesBanner()
+                    scope.launch { listState.scrollToItem(0) }
+                },
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp).testTag("new_articles_banner"),
+            ) { Text(pluralStringResource(R.plurals.new_articles_banner, newArticles, newArticles)) }
+        }
+    }
+}
+
+@Composable
+private fun ScopeTabs(structure: Structure, current: ArticleScope, onSelect: (ArticleScope) -> Unit) {
+    val tabs = buildList {
+        add(ArticleScope.All to stringResource(R.string.tab_all))
+        if (structure.hasUncategorized) add(ArticleScope.Uncategorized to stringResource(R.string.scope_uncategorized))
+        structure.tabCategories.forEach { add(ArticleScope.Category(it.id) to it.display) }
+    }
+    val selected = tabs.indexOfFirst { it.first == current }
+    PrimaryScrollableTabRow(selectedTabIndex = selected.coerceAtLeast(0), edgePadding = 8.dp, minTabWidth = 48.dp) {
+        tabs.forEachIndexed { index, (scope, label) ->
+            Tab(
+                selected = index == selected,
+                onClick = { onSelect(scope) },
+                text = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                modifier = Modifier.heightIn(min = 48.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun FilterBar(selection: Selection, onFilter: (ReadFilter) -> Unit, onToggleSort: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        listOf(
+            ReadFilter.ALL to R.string.filter_all,
+            ReadFilter.UNREAD to R.string.filter_unread,
+            ReadFilter.SAVED to R.string.filter_saved,
+        ).forEach { (filter, label) ->
+            FilterChip(selected = selection.filter == filter, onClick = { onFilter(filter) }, label = { Text(stringResource(label), maxLines = 1) })
+        }
+        Spacer(Modifier.weight(1f))
+        TextButton(onClick = onToggleSort, modifier = Modifier.testTag("sort_toggle")) {
+            Icon(painterResource(R.drawable.ic_swap_vert), contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(stringResource(if (selection.sort == SortOrder.NEWEST) R.string.sort_newest else R.string.sort_oldest), maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun StatusBar(refresh: io.github.yuubiz.feeddeck.sync.RefreshState, offline: Boolean, structure: Structure, onOpenSubscriptions: () -> Unit) {
+    val report = refresh.lastReport
+    val lines = buildList {
+        if (refresh.running) {
+            val p = refresh.progress
+            val firstFetch = structure.subscribedFeeds.isNotEmpty() && structure.subscribedFeeds.none { it.initialized }
+            add(
+                when {
+                    firstFetch -> stringResource(R.string.status_first_fetch)
+                    p != null && p.total > 0 -> stringResource(R.string.status_refreshing_progress, p.completed, p.total)
+                    else -> stringResource(R.string.status_refreshing)
+                },
+            )
+        }
+        if (offline) add(stringResource(R.string.status_offline))
+        if (!refresh.running && report != null) {
+            if (report.failed.isNotEmpty()) {
+                val storage = report.failed.values.count { it == FetchError.STORAGE }
+                if (storage > 0) add(pluralStringResource(R.plurals.status_storage_failed, storage, storage))
+                add(pluralStringResource(R.plurals.status_partial_failure, report.failed.size, report.failed.size))
+            }
+            if (report.notAttempted > 0) add(pluralStringResource(R.plurals.status_not_attempted, report.notAttempted, report.notAttempted))
+            if (report.deferredConstraint > 0 && report.offline && !offline) add(stringResource(R.string.status_deferred_offline))
+            if (report.httpPending > 0) add(pluralStringResource(R.plurals.status_http_pending, report.httpPending, report.httpPending))
+        }
+    }
+    if (lines.isEmpty() && !refresh.running) return
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, onClick = onOpenSubscriptions, modifier = Modifier.fillMaxWidth().testTag("status_bar")) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+            if (refresh.running) {
+                val p = refresh.progress
+                if (p != null && p.total > 0) {
+                    LinearProgressIndicator(progress = { p.completed.toFloat() / p.total }, modifier = Modifier.fillMaxWidth())
+                } else {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
+            }
+            Text(lines.joinToString(" · "), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun NoSubscriptions(onImport: () -> Unit, onAdd: () -> Unit) {
+    CenteredMessage(stringResource(R.string.empty_no_subscriptions)) {
+        Button(onClick = onImport) { Text(stringResource(R.string.action_import_opml)) }
+        OutlinedButton(onClick = onAdd) { Text(stringResource(R.string.action_add_feed)) }
+    }
+}
+
+@Composable
+private fun EmptyList(selection: Selection, refreshing: Boolean, offline: Boolean, onRefresh: () -> Unit) {
+    val message = when {
+        selection.search.isNotEmpty() -> stringResource(R.string.empty_search, selection.search)
+        selection.filter == ReadFilter.UNREAD -> stringResource(R.string.empty_unread)
+        selection.filter == ReadFilter.SAVED -> stringResource(R.string.empty_saved)
+        refreshing -> stringResource(R.string.empty_fetching)
+        offline -> stringResource(R.string.empty_offline)
+        else -> stringResource(R.string.empty_articles)
+    }
+    CenteredMessage(message) {
+        if (selection.search.isEmpty() && selection.filter == ReadFilter.ALL && !refreshing) {
+            OutlinedButton(onClick = onRefresh) { Text(stringResource(R.string.menu_refresh)) }
+        }
+    }
+}
+
+@Composable
+private fun CenteredMessage(message: String, actions: @Composable () -> Unit) {
+    // Scrollable so pull-to-refresh also works on empty states and nothing is clipped at 200% text.
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(message, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, modifier = Modifier.testTag("empty_message"))
+        actions()
+    }
+}
+
+@Composable
+private fun MarkAllReadDialog(request: MarkAllReadRequest, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val filterLabel = stringResource(
+        when (request.filter) {
+            ReadFilter.ALL -> R.string.filter_all
+            ReadFilter.UNREAD -> R.string.filter_unread
+            ReadFilter.SAVED -> R.string.filter_saved
+        },
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.mark_all_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.mark_all_scope, request.scopeTitle))
+                Text(stringResource(R.string.mark_all_filter, filterLabel))
+                if (request.search.isNotEmpty()) Text(stringResource(R.string.mark_all_search, request.search))
+                Text(
+                    if (request.ids.isEmpty()) stringResource(R.string.mark_all_none)
+                    else pluralStringResource(R.plurals.mark_all_count, request.ids.size, request.ids.size),
+                    modifier = Modifier.testTag("mark_all_count"),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = request.ids.isNotEmpty()) { Text(stringResource(R.string.mark_all_confirm)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+@Composable
+fun scopeTitle(scope: ArticleScope, structure: Structure): String = when (scope) {
+    ArticleScope.All -> stringResource(R.string.scope_all)
+    ArticleScope.Uncategorized -> stringResource(R.string.scope_uncategorized)
+    is ArticleScope.Category -> structure.categories.firstOrNull { it.id == scope.categoryId }?.display ?: stringResource(R.string.scope_all)
+    is ArticleScope.Feed -> structure.feeds[scope.feedId]?.name ?: stringResource(R.string.scope_all)
+}
+
+/** Snackbar texts resolved in composition. */
+private class HomeMessages(
+    private val texts: Map<HomeEvent.Message.Kind, String>,
+    private val bulk: (Int) -> String,
+    val noUrl: String,
+    val unsafeUrl: String,
+    val noBrowser: String,
+) {
+    fun of(kind: HomeEvent.Message.Kind) = texts.getValue(kind)
+    fun bulkMarked(count: Int) = bulk(count)
+
+    companion object {
+        @Composable
+        fun load(): HomeMessages {
+            val resources = LocalResources.current
+            return HomeMessages(
+                texts = mapOf(
+                    HomeEvent.Message.Kind.SAVED to stringResource(R.string.msg_saved),
+                    HomeEvent.Message.Kind.UNSAVED to stringResource(R.string.msg_unsaved),
+                    HomeEvent.Message.Kind.MARKED_READ to stringResource(R.string.msg_marked_read),
+                    HomeEvent.Message.Kind.MARKED_UNREAD to stringResource(R.string.msg_marked_unread),
+                    HomeEvent.Message.Kind.BULK_MARKED to stringResource(R.string.msg_marked_read),
+                    HomeEvent.Message.Kind.UPDATE_FAILED to stringResource(R.string.msg_update_failed),
+                ),
+                bulk = { n -> resources.getQuantityString(R.plurals.msg_bulk_marked, n, n) },
+                noUrl = stringResource(R.string.msg_no_url),
+                unsafeUrl = stringResource(R.string.msg_unsafe_url),
+                noBrowser = stringResource(R.string.msg_no_browser),
+            )
+        }
+    }
+}

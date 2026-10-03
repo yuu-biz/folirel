@@ -6,25 +6,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RawQuery
 import androidx.sqlite.db.SupportSQLiteQuery
+import io.github.yuubiz.feeddeck.model.ArticleRow
 import kotlinx.coroutines.flow.Flow
-
-/** One list row. Built by [io.github.yuubiz.feeddeck.data.repository.ArticleQuery]. */
-data class ArticleRow(
-    val id: String,
-    val feedId: String,
-    val title: String,
-    val summaryText: String,
-    val linkUrl: String?,
-    val imageUrl: String?,
-    val author: String?,
-    val publishedAt: Long?,
-    val sortAt: Long,
-    val isRead: Boolean,
-    val isSaved: Boolean,
-    val feedName: String?,
-    val feedUrl: String,
-    val feedSubscribed: Boolean,
-)
 
 @Dao
 interface ArticleDao {
