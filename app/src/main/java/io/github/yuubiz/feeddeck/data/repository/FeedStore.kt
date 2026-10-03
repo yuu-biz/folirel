@@ -108,6 +108,8 @@ class FeedStore(
         // Only the icon URL the feed declares is recorded here; looking it up is the icon coordinator's job.
         icons.insertIgnore(FeedIconEntity(feedId = feedId, declaredUrl = feed.iconUrl, status = IconStatus.PENDING.name))
         icons.changeDeclared(feedId, feed.iconUrl)
+        // A feed that now names its site, or has its first articles, may reveal an icon an earlier lookup could not find.
+        if ((current.siteUrl == null && feed.siteUrl != null) || !subscriptions.fetchState(feedId)?.initialized.orFalse()) icons.retryIfNoIcon(feedId)
         var updated = 0
         var skippedPruned = 0
         val insertedIds = ArrayList<String>()
@@ -284,6 +286,8 @@ class FeedStore(
         private const val CHUNK = 500
     }
 }
+
+private fun Boolean?.orFalse() = this ?: false
 
 object RetryPolicy {
     const val MIN_DELAY_MS = 15L * 60 * 1000

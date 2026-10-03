@@ -2,7 +2,9 @@ package io.github.yuubiz.feeddeck
 
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -104,7 +106,10 @@ class UxNextTest {
         waitForTag("http_open_dont_ask")
         compose.onNodeWithTag("http_open_dont_ask").performClick()
         compose.onNodeWithTag("http_open_confirm").performClick()
-        compose.waitUntil(5_000) { !runBlocking { TestData.container.settings.current().confirmHttpOpen } }
+        // The browser is coming to the front: the app has no compose hierarchy for a moment, so poll the setting directly.
+        val deadline = System.currentTimeMillis() + 5_000
+        while (runBlocking { TestData.container.settings.current().confirmHttpOpen } && System.currentTimeMillis() < deadline) Thread.sleep(50)
+        assertFalse(runBlocking { TestData.container.settings.current().confirmHttpOpen })
         assertFalse("silencing the question does not allow HTTP feeds or images", runBlocking { TestData.container.settings.current().allowHttp })
         device.wait(Until.hasObject(By.pkg("com.android.chrome")), 10_000)
         device.pressBack()
@@ -114,7 +119,7 @@ class UxNextTest {
         compose.waitForIdle()
         waitForTag("article_${ids[1]}")
         compose.onNodeWithTag("article_${ids[1]}").performClick()
-        assertTrue(compose.onAllNodesWithTag("http_open_confirm").fetchSemanticsNodes().isEmpty())
+        // The browser comes up without anyone pressing "open": there was no dialog in between.
         assertTrue(device.wait(Until.hasObject(By.pkg("com.android.chrome")), 10_000) == true)
         assertTrue(ids.none { TestData.state(it).isRead })
     }
@@ -138,7 +143,8 @@ class UxNextTest {
 
     private fun openSubscriptions() {
         compose.onNodeWithTag("home_more").performClick()
-        compose.onNodeWithText(text(R.string.nav_subscriptions)).performClick()
+        // The drawer also has this entry (off screen); the menu item is the one inside the popup.
+        compose.onNode(hasText(text(R.string.nav_subscriptions)) and hasAnyAncestor(isPopup())).performClick()
         waitForTag("fetch_summary")
     }
 
@@ -165,7 +171,7 @@ class UxNextTest {
         waitForTag("bulk_confirm")
         compose.onNodeWithTag("bulk_item_$gone").assertIsDisplayed()
         assertTrue(compose.onAllNodesWithTag("bulk_item_$busy").fetchSemanticsNodes().isEmpty())
-        compose.onNodeWithText(text(R.string.problem_missing), substring = true).assertIsDisplayed()
+        compose.onNode(hasText(text(R.string.problem_missing), substring = true) and hasAnyAncestor(hasTestTag("bulk_item_$gone"))).assertIsDisplayed()
 
         // Cancel changes nothing.
         compose.onNodeWithTag("bulk_cancel").performClick()

@@ -287,6 +287,23 @@ class FeedIconTest {
         assertFalse(paths.isEmpty())
     }
 
+    /** A feed without a known site gets nothing at first; once it has fetched (site and articles known) it is tried again. */
+    @Test
+    fun aFeedThatLearnsItsSiteIsLookedUpAgainAtOnce() = runBlocking<Unit> {
+        serve("/" to html("<html><head><link rel=icon href=/fav.png></head></html>"), "/fav.png" to image(32, 32))
+        val account = env.subscriptions.ensureLocalAccount()
+        val feedId = (env.subscriptions.addFeed(account, "https://feeds.example.org/late.xml") as AddFeedResult.Added).feedId
+        val c = coordinator()
+        assertEquals(1, c.runPasses())
+        assertEquals(IconStatus.NONE.name, env.db.iconDao().icon(feedId)!!.status)
+        assertEquals(0, c.runPasses())
+        assertTrue(paths.isEmpty())
+        // First successful fetch: it now names its site.
+        env.store.applySuccess(feedId, NormalizedFeed("f", url("/"), emptyList()), FetchMetadata(null, null, "https://x/", null), BodyStats(0, 0), AttemptInfo(200, false))
+        assertEquals(1, c.runPasses())
+        assertEquals(IconStatus.OK.name, env.db.iconDao().icon(feedId)!!.status)
+    }
+
     @Test
     fun aChangedDeclaredIconUrlStartsANewLookup() = runBlocking<Unit> {
         serve("/one.png" to image(32, 32), "/two.png" to image(40, 40))

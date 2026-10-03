@@ -37,6 +37,13 @@ interface FeedIconDao {
     suspend fun changeDeclared(feedId: String, url: String?): Int
 
     /**
+     * The feed now tells more than before (its site, or its first articles): a lookup that found nothing, or failed,
+     * is worth another try at once. A stored icon is left alone.
+     */
+    @Query("UPDATE feed_icons SET status = 'PENDING', nextAttemptAt = 0 WHERE feedId = :feedId AND png IS NULL AND status IN ('NONE', 'FAILED')")
+    suspend fun retryIfNoIcon(feedId: String): Int
+
+    /**
      * Subscribed, active feeds without a row, or whose next lookup time has come. A feed with a stored icon is
      * looked at again after a long while only to notice a changed site icon.
      */
