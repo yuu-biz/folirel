@@ -17,7 +17,7 @@ android {
         versionName = "0.3.2"
         // Shown in Settings > About so a build can be traced to its source ("-dirty" = uncommitted changes).
         val gitCommit = try {
-            providers.exec { commandLine("git", "describe", "--always", "--dirty", "--abbrev=7") }.standardOutput.asText.get().trim()
+            providers.exec { commandLine("git", "describe", "--always", "--dirty", "--abbrev=7", "--match=no-such-tag") }.standardOutput.asText.get().trim()
         } catch (e: Exception) {
             "unknown"
         }
