@@ -57,7 +57,7 @@ class HomeViewModel(
     private val coordinator: RefreshCoordinator,
     network: Flow<NetworkState>,
     private val savedState: SavedStateHandle,
-) : ViewModel() {
+) : ViewModel(), ListHost {
 
     private val accountId = MutableStateFlow<String?>(null)
 
@@ -286,7 +286,7 @@ class HomeViewModel(
     }
 
     /** New articles that were shown (or jumped to) are no longer announced. */
-    fun markNewSeen(ids: Collection<String>) {
+    override fun markNewSeen(ids: Collection<String>) {
         if (ids.isEmpty()) return
         _newArticleIds.update { current -> if (ids.none { it in current }) current else current - ids.toSet() }
     }
@@ -304,7 +304,7 @@ class HomeViewModel(
         }
     }
 
-    fun saveAnchor(anchor: ListAnchor) {
+    override fun saveAnchor(anchor: ListAnchor) {
         if (anchors[anchor.listKey] == anchor) return
         anchors.remove(anchor.listKey)
         anchors[anchor.listKey] = anchor
@@ -314,7 +314,7 @@ class HomeViewModel(
             .toTypedArray()
     }
 
-    fun anchorFor(listKey: String): ListAnchor? = anchors[listKey]
+    override fun anchorFor(listKey: String): ListAnchor? = anchors[listKey]
 
     companion object {
         const val SEARCH_DEBOUNCE_MS = 250L

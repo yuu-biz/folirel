@@ -517,7 +517,7 @@ private fun ScopePage(
             !list.loaded -> Unit
             list.items.isEmpty() -> EmptyList(selection, refreshing, offline, onRefresh)
             else -> ArticleList(
-                vm = vm,
+                host = vm,
                 state = list,
                 mode = settings.listMode,
                 showImages = settings.showImages,
@@ -569,8 +569,8 @@ private class GridScroll(private val s: LazyGridState) : ScrollHandle {
 }
 
 @Composable
-private fun ArticleList(
-    vm: HomeViewModel,
+internal fun ArticleList(
+    host: ListHost,
     state: ArticlesState,
     mode: ListMode,
     showImages: Boolean,
@@ -588,7 +588,7 @@ private fun ArticleList(
     // Restore from this list's own anchor (article id + offset); if it is gone, use the nearest remaining article.
     // Switching list style, rotating or resizing the window keeps the same article near the top.
     val start = remember(state.key, useGrid) {
-        val anchor = vm.anchorFor(state.key)
+        val anchor = host.anchorFor(state.key)
         val index = anchor?.let { a ->
             items.indexOfFirst { it.id == a.articleId }.takeIf { it >= 0 }
                 ?: items.indexOfFirst { if (newestFirst) it.sortAt <= a.sortAt else it.sortAt >= a.sortAt }.takeIf { it >= 0 }
@@ -613,14 +613,14 @@ private fun ArticleList(
     val currentScroll by rememberUpdatedState(scroll)
     LaunchedEffect(scroll.owner, state.key) {
         snapshotFlow { currentScroll.firstIndex to currentScroll.firstOffset }.collect { (index, offset) ->
-            currentItems.getOrNull(index)?.let { vm.saveAnchor(ListAnchor(state.key, it.id, it.sortAt, offset)) }
+            currentItems.getOrNull(index)?.let { host.saveAnchor(ListAnchor(state.key, it.id, it.sortAt, offset)) }
         }
     }
     // New articles count as seen once they are on screen, judged on this list's own state (REV-02 / N06).
     LaunchedEffect(scroll.owner, isCurrent) {
         if (!isCurrent) return@LaunchedEffect
         // Both sides are observed: a marker added later for an article that is already shown is consumed too (V3-R03).
-        NewArticleSeen.visibleNew({ currentScroll.visibleKeys }, { currentNew }).collect { vm.markNewSeen(it) }
+        NewArticleSeen.visibleNew({ currentScroll.visibleKeys }, { currentNew }).collect { host.markNewSeen(it) }
     }
     // "Back to top": the selected tab was tapped again (only the list on screen follows, and only a tap made after this list appeared).
     val firstTick = remember { scrollToTopTick }
