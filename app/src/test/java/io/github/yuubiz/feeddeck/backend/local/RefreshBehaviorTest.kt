@@ -248,7 +248,8 @@ class RefreshBehaviorTest {
         assertEquals(RetryPolicy.MIN_DELAY_MS, next("/bad"))
         assertEquals(RetryPolicy.MIN_DELAY_MS, next("/none"))
         assertEquals(RetryPolicy.MIN_DELAY_MS, next("/past"))
-        assertEquals(RetryPolicy.MAX_DELAY_MS, next("/huge"))
+        // A server wait is bounded only by the 30 day sanity cap, not by the app's own 24 h backoff cap (review F03).
+        assertEquals(RetryPolicy.MAX_SERVER_WAIT_MS, next("/huge"))
         assertEquals(RetryPolicy.MIN_DELAY_MS, next("/500"))
 
         // Automatic refresh respects every wait; manual refresh may retry 5xx but never before Retry-After.

@@ -160,7 +160,8 @@ class FeedFetcher(
     }
 
     private companion object {
-        const val MAX_RETRY_AFTER_SECONDS = 7L * 24 * 60 * 60
+        // Only an overflow guard; the store applies the real upper bound (RetryPolicy.MAX_SERVER_WAIT_MS).
+        const val MAX_RETRY_AFTER_SECONDS = 10L * 365 * 24 * 60 * 60
     }
 }
 

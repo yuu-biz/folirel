@@ -117,21 +117,30 @@ class SubscriptionRepository(
     }
 
     suspend fun previewImport(accountId: String, document: OpmlDocument, allowHttp: Boolean): ImportPreview {
-        val feedsByUrl = dao.feeds(accountId).associateBy { it.subscriptionUrl }
+        // The same identity rule as commitImport (FeedLookup): registered URL, current fetch URL, or the https URL
+        // a feed was migrated to. Counts therefore equal what the import will do.
+        val lookup = feedLookup(accountId)
         val categoryIdByPath = dao.categories(accountId).associate { CategoryPaths.decode(it.pathSegmentsJson) to it.id }
         val existingMemberships = dao.memberships(accountId).map { it.feedId to it.categoryId }.toSet()
 
         val valid = document.occurrences.filter { it.url != null }
         val uniqueUrls = valid.map { it.url!! }.distinct()
-        val newUrls = uniqueUrls.filter { it !in feedsByUrl }
-        val existing = uniqueUrls.mapNotNull { feedsByUrl[it] }
+        val matches = uniqueUrls.associateWith { lookup.find(it) }
+        val newUrls = uniqueUrls.filter { matches.getValue(it) == null }
+        // Several OPML URLs can resolve to one feed (http and https spelling): count that feed once.
+        val existing = matches.values.filterNotNull().distinctBy { it.id }
         val wantedMemberships = valid.filter { it.categoryPath.isNotEmpty() }.map { it.url!! to it.categoryPath }.toSet()
         val added = wantedMemberships.count { (url, path) ->
-            val feedId = feedsByUrl[url]?.id
+            val feedId = matches[url]?.id
             val categoryId = categoryIdByPath[path]
             feedId == null || categoryId == null || (feedId to categoryId) !in existingMemberships
         }
         val httpUrls = uniqueUrls.filter { it.startsWith("http://") }
+        // Held back only when the feed would really be fetched over http://: an existing feed that already moved to
+        // https:// is not pending whatever scheme the OPML spells.
+        val httpPending = if (allowHttp) 0 else uniqueUrls.count { url ->
+            (matches.getValue(url)?.fetchUrl ?: url).startsWith("http://", ignoreCase = true)
+        }
         val pathsWithFeeds = wantedMemberships.map { it.second }
         return ImportPreview(
             document = document,
@@ -142,7 +151,7 @@ class SubscriptionRepository(
             addedMemberships = added,
             multiCategoryFeeds = wantedMemberships.groupBy { it.first }.count { it.value.size > 1 },
             httpFeeds = httpUrls.size,
-            httpPending = if (allowHttp) 0 else httpUrls.size,
+            httpPending = httpPending,
             invalidUrls = document.occurrences.count { it.url == null },
             unsupportedItems = document.unsupported.size,
             newCategories = document.categoryPaths.count { it !in categoryIdByPath },
@@ -150,6 +159,33 @@ class SubscriptionRepository(
             warnings = document.warnings.size,
         )
     }
+
+    /**
+     * Finds the existing feed of an OPML/add-feed URL: the registered URL first, then a feed already fetched from
+     * that URL (moved to HTTPS or permanently redirected there). One implementation for preview and commit.
+     */
+    private class FeedLookup(feeds: List<FeedEntity>, migrations: List<FeedHttpsMigrationEntity>) {
+        private val byUrl = feeds.associateByTo(HashMap()) { it.subscriptionUrl }
+        private val byFetchUrl = HashMap<String, FeedEntity>()
+
+        init {
+            val byId = feeds.associateBy { it.id }
+            val order = compareBy<FeedEntity>({ it.createdAt }, { it.id })
+            val candidates = feeds.map { it.fetchUrl to it } +
+                migrations.mapNotNull { m -> byId[m.feedId]?.let { m.httpsUrl to it } }
+            // Earliest feed wins, like the SQL lookup (ORDER BY createdAt, id LIMIT 1).
+            candidates.sortedWith { a, b -> order.compare(a.second, b.second) }.forEach { (url, feed) -> byFetchUrl.putIfAbsent(url, feed) }
+        }
+
+        fun find(url: String): FeedEntity? = byUrl[url] ?: byFetchUrl[url]
+
+        fun add(feed: FeedEntity) {
+            byUrl.putIfAbsent(feed.subscriptionUrl, feed)
+            byFetchUrl.putIfAbsent(feed.fetchUrl, feed)
+        }
+    }
+
+    private suspend fun feedLookup(accountId: String) = FeedLookup(dao.feeds(accountId), dao.httpsMigrations(accountId))
 
     /**
      * Applies the import in one transaction: add/merge only. Existing user titles, memberships and reading
@@ -178,22 +214,24 @@ class SubscriptionRepository(
         var memberships = 0
         val toFetch = LinkedHashSet<String>()
         val feedIdByUrl = HashMap<String, String>()
+        val lookup = feedLookup(accountId)
         for (occurrence in document.occurrences) {
             val url = occurrence.url ?: continue
             val feedId = feedIdByUrl.getOrPut(url) {
                 // The registered URL, or a feed already fetched from this URL (moved to HTTPS / redirected).
-                val existing = dao.feedByUrl(accountId, url) ?: dao.feedByFetchUrl(accountId, url)
+                // Current subscribed state is read again: an earlier URL of this file may have re-enabled the feed.
+                val existing = lookup.find(url)?.let { dao.feed(it.id) }
                 when {
                     existing == null -> {
                         val id = ids.newId()
-                        dao.insertFeed(
-                            FeedEntity(
-                                id = id, accountId = accountId, subscriptionUrl = url, fetchUrl = url,
-                                siteUrl = occurrence.siteUrl, feedTitle = null,
-                                // First valid label in the file becomes the initial name.
-                                userTitle = occurrence.label, isSubscribed = true, isPaused = false, createdAt = now,
-                            ),
+                        val entity = FeedEntity(
+                            id = id, accountId = accountId, subscriptionUrl = url, fetchUrl = url,
+                            siteUrl = occurrence.siteUrl, feedTitle = null,
+                            // First valid label in the file becomes the initial name.
+                            userTitle = occurrence.label, isSubscribed = true, isPaused = false, createdAt = now,
                         )
+                        dao.insertFeed(entity)
+                        lookup.add(entity)
                         dao.insertFetchState(FeedFetchStateEntity(feedId = id))
                         created++
                         toFetch += id

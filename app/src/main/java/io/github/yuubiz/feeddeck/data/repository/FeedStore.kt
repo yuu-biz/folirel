@@ -123,7 +123,7 @@ class FeedStore(
                     lastSeenAt = now,
                 )
                 updated++
-            } else if (diagnostics.touchPruned(feedId, entry.entryKey, now) > 0) {
+            } else if (touchPruned(feedId, entry.entryKey, now)) {
                 // Removed earlier by the retention cleanup (read, not saved): not resurrected as a new unread article.
                 skippedPruned++
             } else {
@@ -222,6 +222,11 @@ class FeedStore(
         diagnostics.attemptFinished(feedId, clock.millis(), null, false, null, null, FeedResult.INACTIVE.name)
     }
 
+    /** The pruned record of [entryKey], or of its http/https twin (same rule as for stored articles), seen again now. */
+    private suspend fun touchPruned(feedId: String, entryKey: String, now: Long): Boolean =
+        diagnostics.touchPruned(feedId, entryKey, now) > 0 ||
+            (schemeVariant(entryKey)?.let { diagnostics.touchPruned(feedId, it, now) > 0 } ?: false)
+
     // Request bookkeeping: diagnostics only. lastAttemptAt / lastSuccessAt are never moved by these.
 
     private suspend fun ensureDiagnostics(feedIds: List<String>) {
@@ -277,19 +282,22 @@ class FeedStore(
 object RetryPolicy {
     const val MIN_DELAY_MS = 15L * 60 * 1000
     const val MAX_DELAY_MS = 24L * 60 * 60 * 1000
+    /** Upper bound of a server-specified wait (Retry-After); longer values count as this long. */
+    const val MAX_SERVER_WAIT_MS = 30L * 24 * 60 * 60 * 1000
     private const val MIN_RETRY_AFTER_MS = 60L * 1000
 
     /**
-     * 429: a valid Retry-After (already converted to a delay) clamped to [1 min, 24 h]; missing/invalid/past → 15 min.
-     * 5xx with a valid Retry-After: the same clamp. Others: 15 min × 2^(failures-1), capped at 24 h.
+     * 429: a valid Retry-After (already converted to a delay) is kept, within [1 min, 30 days]; missing/invalid/past → 15 min.
+     * 5xx with a valid Retry-After: the same. The server's time is never shortened to the app's own 24 h backoff cap.
+     * Others: 15 min × 2^(failures-1), capped at 24 h.
      */
     fun delayMillis(error: FetchError, failureCount: Int, retryAfterMillis: Long?): Long {
         if (error == FetchError.RATE_LIMITED) {
             return if (retryAfterMillis == null || retryAfterMillis <= 0) MIN_DELAY_MS
-            else retryAfterMillis.coerceIn(MIN_RETRY_AFTER_MS, MAX_DELAY_MS)
+            else retryAfterMillis.coerceIn(MIN_RETRY_AFTER_MS, MAX_SERVER_WAIT_MS)
         }
         if (error == FetchError.SERVER && retryAfterMillis != null && retryAfterMillis > 0) {
-            return retryAfterMillis.coerceIn(MIN_RETRY_AFTER_MS, MAX_DELAY_MS)
+            return retryAfterMillis.coerceIn(MIN_RETRY_AFTER_MS, MAX_SERVER_WAIT_MS)
         }
         val exponent = (failureCount - 1).coerceIn(0, 10)
         return (MIN_DELAY_MS shl exponent).coerceAtMost(MAX_DELAY_MS)
