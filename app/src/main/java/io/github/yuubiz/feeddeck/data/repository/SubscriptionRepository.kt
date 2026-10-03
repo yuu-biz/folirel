@@ -333,10 +333,11 @@ class SubscriptionRepository(
 
     /** Subscribed feeds with their direct category paths, for OPML export. */
     suspend fun exportData(accountId: String): Pair<List<FeedEntity>, Map<String, List<List<String>>>> {
-        // Feeds moved to HTTPS are exported with their verified https:// URL.
-        val https = dao.httpsMigrations(accountId).associate { it.feedId to it.httpsUrl }
+        // Feeds moved to HTTPS are exported with their current https:// fetch URL (it may have followed a later
+        // permanent redirect); importing that file again finds the same feed by its fetch URL.
+        val migrated = dao.httpsMigrations(accountId).map { it.feedId }.toSet()
         val feeds = dao.feeds(accountId).filter { it.isSubscribed }
-            .map { f -> https[f.id]?.takeIf { f.fetchUrl == it }?.let { f.copy(subscriptionUrl = it) } ?: f }
+            .map { f -> if (f.id in migrated && f.fetchUrl.startsWith("https://")) f.copy(subscriptionUrl = f.fetchUrl) else f }
         val paths = dao.categories(accountId).associate { it.id to CategoryPaths.decode(it.pathSegmentsJson) }
         val byFeed = dao.memberships(accountId).groupBy({ it.feedId }, { paths.getValue(it.categoryId) })
         return feeds to byFeed
