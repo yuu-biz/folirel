@@ -3,6 +3,8 @@ package io.github.yuubiz.feeddeck.ui.home
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -415,12 +417,14 @@ private fun ScopeTabs(structure: Structure, current: ArticleScope, onSelect: (Ar
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FilterBar(selection: Selection, onFilter: (ReadFilter) -> Unit, onToggleSort: () -> Unit) {
-    Row(
+    // Wraps instead of clipping when the text is large (200% system font).
+    FlowRow(
         Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         listOf(
             ReadFilter.ALL to R.string.filter_all,

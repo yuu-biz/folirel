@@ -55,6 +55,8 @@ android {
         // Synthetic fixtures are read from the repository root; never copied or re-encoded.
         getByName("test").resources.directories.add(rootProject.file("fixtures").path)
         getByName("androidTest").assets.directories.add(rootProject.file("fixtures").path)
+        // Exported Room schemas for MigrationTestHelper.
+        getByName("androidTest").assets.directories.add("$projectDir/schemas")
     }
 
     lint {
@@ -117,6 +119,8 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.test.uiautomator)
+    // Compose UI test pulls espresso-core 3.5.0, which fails on API 37 (InputManager.getInstance removed).
+    androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.room.testing)
     androidTestImplementation(libs.kotlinx.coroutines.test)
 }

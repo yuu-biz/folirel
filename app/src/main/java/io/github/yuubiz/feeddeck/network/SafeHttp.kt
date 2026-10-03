@@ -151,6 +151,7 @@ private class ResponseSizeLimitInterceptor(private val maxBytes: Long) : Interce
 
 object HttpClients {
     const val CONNECT_TIMEOUT_SECONDS = 10L
+    const val IO_TIMEOUT_SECONDS = 10L
     const val CALL_TIMEOUT_SECONDS = 25L
 
     /** Base client for feeds: no cookies, no HTTP cache, no proxy, no automatic redirects. */
@@ -162,7 +163,10 @@ object HttpClients {
         .cookieJar(CookieJar.NO_COOKIES)
         .cache(null)
         .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .readTimeout(CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        // Inactivity timeouts shorter than the call budget: a stalled TLS handshake fails after 10 s and OkHttp
+        // can still retry (e.g. with its compatible TLS spec; certificates are verified either way) within 25 s.
+        .readTimeout(IO_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .writeTimeout(IO_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .callTimeout(CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .addInterceptor(UserAgentInterceptor(userAgent))
         .addInterceptor(SafeRedirectInterceptor(guard))
