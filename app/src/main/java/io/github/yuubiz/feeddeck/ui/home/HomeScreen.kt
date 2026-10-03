@@ -598,6 +598,21 @@ private fun ArticleList(
                         CardMetrics(size, CardGridLayout.cardWidthDp(widthDp, size), wide = size == 1 && columns.count > 1 && !even)
                     }
                 }
+                val metricsNoImage = remember(metricsBySize) {
+                    metricsBySize.mapValues { (_, m) -> CardMetrics(m.columns, m.widthDp, m.wide, rowHasImage = false) }
+                }
+                // Per article: does any card of its row have an image? (Rows without one do not reserve a picture area.)
+                val rowHasImage = remember(items, rowSizes, showImages) {
+                    BooleanArray(items.size).also { flags ->
+                        var i = 0
+                        while (i < items.size) {
+                            val end = minOf(items.size, i + rowSizes[i].coerceAtLeast(1))
+                            val any = showImages && (i until end).any { items[it].imageUrl != null }
+                            for (j in i until end) flags[j] = any
+                            i = end
+                        }
+                    }
+                }
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(MagazinePlan.GRID_SPANS),
                     state = gridState,
@@ -614,7 +629,7 @@ private fun ArticleList(
                     ) { index, row ->
                         ArticleItem(
                             row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"),
-                            metricsBySize.getValue(rowSizes.getOrElse(index) { 1 }),
+                            (if (rowHasImage.getOrElse(index) { true }) metricsBySize else metricsNoImage).getValue(rowSizes.getOrElse(index) { 1 }),
                         )
                     }
                 }

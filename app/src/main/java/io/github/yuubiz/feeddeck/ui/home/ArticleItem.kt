@@ -73,7 +73,7 @@ class ArticleActions(
  * the full-width card of a mixed (magazine) page, drawn with the image beside the text.
  */
 @Immutable
-class CardMetrics(val columns: Int, val widthDp: Float, val wide: Boolean = false) {
+class CardMetrics(val columns: Int, val widthDp: Float, val wide: Boolean = false, val rowHasImage: Boolean = true) {
     val multiColumn: Boolean get() = columns > 1
     val horizontal: Boolean get() = wide || CardGridLayout.isHorizontal(columns, widthDp)
 
@@ -242,7 +242,13 @@ private fun ArticleCard(
     // for an article that has no image (so all cards of a row are equally tall).
     val fixedTextHeight: Dp? = if (multi) {
         val base = with(density) { (titleLine * 3 + 4 + summaryLine * baseSummaryLines).sp.toDp() }
-        if (showImages && !hasImage) base + metrics.imageHeight else base
+        when {
+            // An article without an image in a row where its neighbours have one uses that area for more text.
+            showImages && !hasImage && metrics.rowHasImage -> base + metrics.imageHeight
+            // A row with no image at all stays compact instead of leaving a blank picture area.
+            !metrics.rowHasImage -> base + with(density) { (summaryLine * 2).sp.toDp() }
+            else -> base
+        }
     } else null
     val summaryLines = if (multi) {
         val area = fixedTextHeight ?: 0.dp
