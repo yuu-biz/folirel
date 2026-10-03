@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -61,7 +62,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -96,7 +96,19 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -702,6 +714,10 @@ private fun ArticleList(
     }
 }
 
+/** Narrowest tab underline: a one-letter title still gets a visible bar. */
+private val TAB_INDICATOR_MIN_WIDTH = 24.dp
+private val TAB_INDICATOR_HEIGHT = 3.dp
+
 @Composable
 private fun ScopeTabs(
     structure: Structure,
@@ -721,53 +737,74 @@ private fun ScopeTabs(
             is ArticleScope.Feed -> ""
         }
     }
-    // The highlighted tab and the indicator follow the pager while it is dragged or animated; the selection (which
+    // The highlighted tab and the underline follow the pager while it is dragged or animated; the selection (which
     // is saved) only follows once the page has settled, so it is not what the tabs wait for.
     val selected = pagerState.currentPage.coerceIn(0, (tabs.size - 1).coerceAtLeast(0))
     val scope = rememberCoroutineScope()
-    PrimaryScrollableTabRow(
-        selectedTabIndex = selected,
-        edgePadding = 8.dp,
-        minTabWidth = 48.dp,
-        indicator = {
-            TabRowDefaults.PrimaryIndicator(
-                Modifier.tabIndicatorLayout { measurable, constraints, tabPositions ->
-                    val position = (pagerState.currentPage + pagerState.currentPageOffsetFraction).coerceIn(0f, tabPositions.lastIndex.toFloat())
-                    val from = position.toInt().coerceIn(0, tabPositions.lastIndex)
-                    val to = (from + 1).coerceAtMost(tabPositions.lastIndex)
-                    val fraction = (position - from).coerceIn(0f, 1f)
-                    val a = tabPositions[from]
-                    val b = tabPositions[to]
-                    fun mix(x: Float, y: Float) = x + (y - x) * fraction
-                    val width = mix(a.contentWidth.toPx(), b.contentWidth.toPx()).roundToInt()
-                    val center = mix((a.left + a.width / 2).toPx(), (b.left + b.width / 2).toPx())
-                    val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
-                    layout(constraints.maxWidth, placeable.height) {
-                        placeable.placeRelative((center - width / 2f).roundToInt(), 0)
-                    }
-                },
-                width = Dp.Unspecified,
-            )
-        },
-    ) {
-        tabs.forEachIndexed { index, (tabScope, label) ->
-            Tab(
-                selected = index == selected,
-                onClick = {
-                    if (index == selected) {
-                        onReselect()
-                    } else {
-                        // Start moving the page at once; the selection catches up when the page has settled.
-                        scope.launch { pagerState.animateScrollToPage(index) }
-                        onSelect(tabScope)
-                    }
-                },
-                text = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                modifier = Modifier.heightIn(min = 48.dp).testTag("tab_${tabScope.encode()}"),
-            )
+    // Where each title really is (screen coordinates), and where this row is. The underline is placed from these:
+    // centred on the title, as wide as it with a minimum, and sliding between two titles with the pager's position.
+    val titleBounds = remember { mutableStateMapOf<Int, Rect>() }
+    var rowOrigin by remember { mutableStateOf(Offset.Zero) }
+    val barColor = MaterialTheme.colorScheme.primary
+    Box(Modifier.fillMaxWidth().clipToBounds().onGloballyPositioned { rowOrigin = it.positionInRoot() }) {
+        PrimaryScrollableTabRow(
+            selectedTabIndex = selected,
+            edgePadding = 8.dp,
+            minTabWidth = 48.dp,
+            indicator = {},
+        ) {
+            tabs.forEachIndexed { index, (tabScope, label) ->
+                Tab(
+                    selected = index == selected,
+                    onClick = {
+                        if (index == selected) {
+                            onReselect()
+                        } else {
+                            // Start moving the page at once; the selection catches up when the page has settled.
+                            scope.launch { pagerState.animateScrollToPage(index) }
+                            onSelect(tabScope)
+                        }
+                    },
+                    text = {
+                        Text(
+                            label,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.onGloballyPositioned { titleBounds[index] = it.boundsInRoot() },
+                        )
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("tab_${tabScope.encode()}"),
+                )
+            }
         }
+        // Left edge and width (px) of the underline relative to this row, or null until the titles are measured.
+        fun Density.bar(): Pair<Int, Int>? {
+            val position = pagerState.currentPage + pagerState.currentPageOffsetFraction
+            val from = position.toInt().coerceIn(0, tabs.lastIndex.coerceAtLeast(0))
+            val to = (from + 1).coerceAtMost(tabs.lastIndex.coerceAtLeast(0))
+            val a = titleBounds[from] ?: return null
+            val b = titleBounds[to] ?: a
+            val f = (position - from).coerceIn(0f, 1f)
+            val centre = a.center.x + (b.center.x - a.center.x) * f
+            val width = maxOf(a.width + (b.width - a.width) * f, TAB_INDICATOR_MIN_WIDTH.toPx())
+            return (centre - width / 2f - rowOrigin.x).roundToInt() to width.roundToInt()
+        }
+        Box(
+            Modifier
+                .align(Alignment.BottomStart)
+                .layout { measurable, constraints ->
+                    val bar = bar()
+                    val p = measurable.measure(constraints.copy(minWidth = bar?.second ?: 0, maxWidth = bar?.second ?: 0))
+                    layout(p.width, p.height) { p.place(0, 0) }
+                }
+                .offset { IntOffset(bar()?.first ?: 0, 0) }
+                .height(TAB_INDICATOR_HEIGHT)
+                .background(barColor, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+                .testTag("tab_indicator"),
+        )
     }
 }
+
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

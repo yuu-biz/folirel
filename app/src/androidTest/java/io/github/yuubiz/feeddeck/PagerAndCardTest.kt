@@ -3,6 +3,7 @@ package io.github.yuubiz.feeddeck
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -145,6 +146,31 @@ class PagerAndCardTest {
         inPage(a, "article_$first").assertIsDisplayed()
         assertEquals(ArticleScope.Category(alpha), lastScope())
         assertTrue(seeded.values.flatten().none { TestData.state(it).isRead })
+    }
+
+
+    /** The indicator sits under its own tab: same centre, and wide enough to see, for short and long titles alike. */
+    @Test
+    fun indicatorIsCentredUnderEachTab() {
+        TestData.reset()
+        val names = listOf("IT", "ss", "Matome2chNews", "MatomeGeha")
+        val ids = TestData.seedCategories(names, perCategory = 3)
+        launch()
+        waitForTag("category_pager")
+        val density = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+        for (id in ids.keys) {
+            val scope = ArticleScope.Category(id)
+            compose.onNodeWithTag("tab_category:$id").performClick()
+            waitForScope(scope)
+            compose.waitForIdle()
+            val tab = compose.onNodeWithTag("tab_category:$id").getUnclippedBoundsInRoot()
+            val bar = compose.onNodeWithTag("tab_indicator").getUnclippedBoundsInRoot()
+            val tabCentre = (tab.left + tab.right).value / 2
+            val barCentre = (bar.left + bar.right).value / 2
+            assertTrue("centre of $id: tab $tabCentre vs indicator $barCentre (dp, density $density)", kotlin.math.abs(tabCentre - barCentre) <= 1.5f)
+            assertTrue("indicator of $id is at least 20dp wide, was ${(bar.right - bar.left).value}", (bar.right - bar.left).value >= 20f)
+            assertTrue("indicator of $id is no wider than its tab", (bar.right - bar.left).value <= (tab.right - tab.left).value + 0.5f)
+        }
     }
 
     /** N01 + N24: each category keeps its own position across swipes and tab switches; nothing is marked read. */
