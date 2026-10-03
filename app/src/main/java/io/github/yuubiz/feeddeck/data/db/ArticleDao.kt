@@ -45,6 +45,9 @@ interface ArticleDao {
     @Query("SELECT * FROM articles WHERE feedId = :feedId ORDER BY sortAt DESC, id DESC")
     suspend fun articlesOfFeed(feedId: String): List<ArticleEntity>
 
+    @Query("SELECT entryKey FROM articles WHERE feedId = :feedId ORDER BY sortAt DESC, id DESC LIMIT :limit")
+    suspend fun recentEntryKeys(feedId: String, limit: Int): List<String>
+
     @Query("SELECT * FROM article_states WHERE articleId = :articleId")
     suspend fun state(articleId: String): ArticleStateEntity?
 

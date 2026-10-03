@@ -9,6 +9,7 @@ import coil3.serviceLoaderEnabled
 import io.github.yuubiz.feeddeck.BuildConfig
 import io.github.yuubiz.feeddeck.backend.BackendSynchronizer
 import io.github.yuubiz.feeddeck.backend.local.FeedFetcher
+import io.github.yuubiz.feeddeck.backend.local.HttpsUpgradeChecker
 import io.github.yuubiz.feeddeck.backend.local.LocalBackend
 import io.github.yuubiz.feeddeck.browser.BrowserLauncher
 import io.github.yuubiz.feeddeck.data.db.AppDatabase
@@ -23,6 +24,7 @@ import io.github.yuubiz.feeddeck.network.AndroidNetworkStatus
 import io.github.yuubiz.feeddeck.network.HttpClients
 import io.github.yuubiz.feeddeck.network.NetworkGuard
 import io.github.yuubiz.feeddeck.sync.AutoRefreshPolicy
+import io.github.yuubiz.feeddeck.sync.HttpsUpgradeCoordinator
 import io.github.yuubiz.feeddeck.sync.RefreshCoordinator
 import io.github.yuubiz.feeddeck.sync.RefreshScheduler
 import android.util.Log
@@ -80,6 +82,17 @@ class AppContainer(context: Context) {
         onAttempt = { settings.setLastRefreshAttempt(it) },
         scope = appScope,
         clock = clock,
+    )
+
+    /**
+     * Consented HTTP → HTTPS check. Its own client never allows cleartext HTTP, whatever the user's HTTP setting,
+     * so a redirect back to http:// fails instead of being followed; certificates are verified as usual.
+     */
+    val httpsUpgrade = HttpsUpgradeCoordinator(
+        checker = HttpsUpgradeChecker(FeedFetcher(HttpClients.feedClient(NetworkGuard(AddressPolicy.PUBLIC_ONLY, { false }), userAgent), clock)),
+        subscriptions = subscriptions,
+        refresh = refresh,
+        scope = appScope,
     )
 
     val scheduler = RefreshScheduler(appContext)

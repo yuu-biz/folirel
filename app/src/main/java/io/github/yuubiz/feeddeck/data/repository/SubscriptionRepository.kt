@@ -8,6 +8,7 @@ import io.github.yuubiz.feeddeck.data.db.CategoryEntity
 import io.github.yuubiz.feeddeck.data.db.FeedCategoryEntity
 import io.github.yuubiz.feeddeck.data.db.FeedEntity
 import io.github.yuubiz.feeddeck.data.db.FeedFetchStateEntity
+import io.github.yuubiz.feeddeck.data.db.FeedHttpsMigrationEntity
 import io.github.yuubiz.feeddeck.model.Structure
 import io.github.yuubiz.feeddeck.network.UrlNormalizer
 import kotlinx.coroutines.flow.Flow
@@ -140,7 +141,8 @@ class SubscriptionRepository(
         for (occurrence in document.occurrences) {
             val url = occurrence.url ?: continue
             val feedId = feedIdByUrl.getOrPut(url) {
-                val existing = dao.feedByUrl(accountId, url)
+                // The registered URL, or a feed already fetched from this URL (moved to HTTPS / redirected).
+                val existing = dao.feedByUrl(accountId, url) ?: dao.feedByFetchUrl(accountId, url)
                 when {
                     existing == null -> {
                         val id = ids.newId()
@@ -181,7 +183,7 @@ class SubscriptionRepository(
             is UrlNormalizer.Result.Invalid -> return AddFeedResult.Invalid(result.reason)
         }
         return db.withTransaction {
-            val existing = dao.feedByUrl(accountId, url)
+            val existing = dao.feedByUrl(accountId, url) ?: dao.feedByFetchUrl(accountId, url)
             val result = when {
                 existing == null -> {
                     val id = ids.newId()
@@ -291,10 +293,36 @@ class SubscriptionRepository(
 
     /** Subscribed feeds with their direct category paths, for OPML export. */
     suspend fun exportData(accountId: String): Pair<List<FeedEntity>, Map<String, List<List<String>>>> {
+        // Feeds moved to HTTPS are exported with their verified https:// URL.
+        val https = dao.httpsMigrations(accountId).associate { it.feedId to it.httpsUrl }
         val feeds = dao.feeds(accountId).filter { it.isSubscribed }
+            .map { f -> https[f.id]?.takeIf { f.fetchUrl == it }?.let { f.copy(subscriptionUrl = it) } ?: f }
         val paths = dao.categories(accountId).associate { it.id to CategoryPaths.decode(it.pathSegmentsJson) }
         val byFeed = dao.memberships(accountId).groupBy({ it.feedId }, { paths.getValue(it.categoryId) })
         return feeds to byFeed
+    }
+
+    // HTTP → HTTPS migration (after the user's consent and a successful HTTPS verification)
+
+    /** Subscribed feeds still fetched over http://. */
+    suspend fun httpFeeds(accountId: String): List<FeedEntity> =
+        dao.feeds(accountId).filter { it.isSubscribed && it.fetchUrl.startsWith("http://", ignoreCase = true) }
+
+    /** Title and recent entry keys of a feed, to recognize the same feed over HTTPS. */
+    suspend fun knownContent(feedId: String): Pair<String?, List<String>> =
+        dao.feed(feedId)?.feedTitle to db.articleDao().recentEntryKeys(feedId, 200)
+
+    /**
+     * Moves the fetch URL of [feedId] from [httpUrl] to [httpsUrl]. The feed row (id, categories, articles,
+     * reading state) is kept; the registered URL stays as the re-import identity and the pair is recorded.
+     * Returns false when the feed changed meanwhile (unsubscribed, or no longer fetched from [httpUrl]).
+     */
+    suspend fun applyHttpsUpgrade(feedId: String, httpUrl: String, httpsUrl: String): Boolean = db.withTransaction {
+        val feed = dao.feed(feedId)
+        if (feed == null || !feed.isSubscribed || feed.fetchUrl != httpUrl) return@withTransaction false
+        dao.setFetchUrl(feedId, httpsUrl)
+        dao.insertHttpsMigration(FeedHttpsMigrationEntity(feedId, httpUrl, httpsUrl, clock.millis()))
+        true
     }
 
     private suspend fun accountOf(categoryId: String): String? =

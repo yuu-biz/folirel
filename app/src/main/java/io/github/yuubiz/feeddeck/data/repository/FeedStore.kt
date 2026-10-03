@@ -106,7 +106,10 @@ class FeedStore(
         var skippedPruned = 0
         val insertedIds = ArrayList<String>()
         for (entry in feed.entries) {
+            // Same article whose URL-like id/link only changed between http:// and https:// (e.g. after the feed
+            // moved to HTTPS) is the same article, not a new unread one.
             val existingId = articles.findId(current.accountId, feedId, entry.entryKey)
+                ?: schemeVariant(entry.entryKey)?.let { articles.findId(current.accountId, feedId, it) }
             if (existingId != null) {
                 articles.updateMetadata(
                     id = existingId,
@@ -260,6 +263,13 @@ class FeedStore(
 
     companion object {
         const val FUTURE_TOLERANCE_MS = 24L * 60 * 60 * 1000
+
+        /** `url:`/`id:` key with http:// and https:// swapped, or null for other keys. */
+        fun schemeVariant(key: String): String? = when {
+            key.startsWith("url:https://") || key.startsWith("id:https://") -> key.replaceFirst("https://", "http://")
+            key.startsWith("url:http://") || key.startsWith("id:http://") -> key.replaceFirst("http://", "https://")
+            else -> null
+        }
         private const val CHUNK = 500
     }
 }
