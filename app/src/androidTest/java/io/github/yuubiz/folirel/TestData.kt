@@ -39,12 +39,33 @@ object TestData {
         c.settings.setCardStyle(io.github.yuubiz.folirel.model.CardLayoutStyle.MIXED)
     }
 
+    private var seededFeedId: String? = null
+    private var seededCount = 0
+    private var arrivedCount = 0
+
+    /** Title of the newest article that [arriveAtTheHead] delivered. */
+    val newestArrivedTitle: String get() = "新着 ${arrivedCount - 1}"
+
+    /** What a refresh does: [count] articles newer than everything stored arrive at the head of the seeded feed. */
+    fun arriveAtTheHead(count: Int) = runBlocking {
+        val c = container
+        val now = System.currentTimeMillis()
+        val entries = (0 until count).map { _ ->
+            val k = arrivedCount++
+            NormalizedEntry("id:new-$k", "新着 $k", "https://www.example.com/", "新着の概要 $k", null, now + k * 1_000L + 1_000_000L, null)
+        }
+        FeedStore(c.database, Clock.systemUTC(), IdGenerator.Random)
+            .applySuccess(seededFeedId!!, NormalizedFeed("架空フィード", null, entries), FetchMetadata(null, null, "https://feed.example.com/rss.xml", null))
+    }
+
     /** One subscribed feed with [count] articles; index 0 is the newest. Returns article ids newest first. */
     fun seedArticles(count: Int, withLinks: Boolean = true, link: String = "https://www.example.com/"): List<String> = runBlocking {
         val c = container
         val account = c.subscriptions.ensureLocalAccount()
         val opml = """<opml version="2.0"><body><outline text="テスト"><outline text="架空フィード" xmlUrl="https://feed.example.com/rss.xml"/></outline></body></opml>"""
         val feedId = c.subscriptions.commitImport(account, OpmlParser.parse(opml.toByteArray())).feedIdsToFetch.single()
+        seededFeedId = feedId
+        arrivedCount = 0
         val now = System.currentTimeMillis()
         val entries = (0 until count).map { i ->
             NormalizedEntry(

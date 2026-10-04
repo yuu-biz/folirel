@@ -69,6 +69,7 @@ class NewArticleBannerTest {
     private var newIds by mutableStateOf<Set<String>>(emptySet())
     private var newestFirst by mutableStateOf(true)
     private var isCurrent by mutableStateOf(true)
+    private var topTick by mutableStateOf(0)
     private var readCalls = 0
 
     private fun row(n: Int) = ArticleRow(
@@ -103,7 +104,7 @@ class NewArticleBannerTest {
                     newIds = newIds,
                     newestFirst = newestFirst,
                     isCurrent = isCurrent,
-                    scrollToTopTick = 0,
+                    scrollToTopTick = topTick,
                 )
             }
             }
@@ -207,4 +208,107 @@ class NewArticleBannerTest {
 
     @Test
     fun articlesArrivingAtTheHeadKeepTheReadingPlaceInTheCompactListLayout() = headArrival(ListMode.COMPACT_LIST)
+
+    /** Where the first article sits relative to the list: 0 when the list is really at its top (not a few articles short of it). */
+    /** Like real feeds: titles of one to three lines, summaries of none to five. */
+    private fun variedRow(n: Int) = row(n).copy(
+        title = "記事 $n " + "見出しの文章が長くなると行数が増える ".repeat(Math.floorMod(n, 3)),
+        summaryText = if (Math.floorMod(n, 6) == 5) "" else "概要 $n " + "本文の冒頭が続きます ".repeat(Math.floorMod(n, 6) * 3),
+    )
+
+    private fun firstArticleGap(firstId: String): Float {
+        val list = compose.onNodeWithTag("article_list").fetchSemanticsNode().boundsInRoot.top
+        return compose.onNodeWithTag("article_$firstId").fetchSemanticsNode().boundsInRoot.top - list
+    }
+
+    private fun assertAtTop(label: String, firstId: String) {
+        compose.waitUntil(5_000) { displayed(firstId) }
+        val gap = firstArticleGap(firstId)
+        assertTrue("$label: $firstId is the first article but sits ${gap}px from the top of the list", gap in 0f..24f * 4)
+    }
+
+    private fun farDownThenArrivals(mode: ListMode): String {
+        show(mode, (0 until BIG).map(::variedRow))
+        compose.onNodeWithTag("article_list").performScrollToIndex(BIG - 400)
+        compose.waitForIdle()
+        val arrived = (-5..-1).map { variedRow(it) }
+        items = arrived + items
+        newIds = arrived.map { it.id }.toSet()
+        compose.waitForIdle()
+        return arrived.first().id
+    }
+
+    private fun backToTopButtonAfterArrivals(mode: ListMode) {
+        val first = farDownThenArrivals(mode)
+        compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("scroll_to_top")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("scroll_to_top").performClick()
+        compose.waitForIdle()
+        assertAtTop("$mode button", first)
+    }
+
+    private fun backToTopTabTapAfterArrivals(mode: ListMode) {
+        val first = farDownThenArrivals(mode)
+        topTick++
+        compose.waitForIdle()
+        assertAtTop("$mode tab", first)
+    }
+
+    /** More articles arrive while the animation back to the top is running. */
+    private fun backToTopWhileArticlesArrive(mode: ListMode) {
+        show(mode, (0 until BIG).map(::variedRow))
+        compose.onNodeWithTag("article_list").performScrollToIndex(BIG - 400)
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        try {
+            topTick++
+            compose.mainClock.advanceTimeBy(150)
+            val arrived = (-5..-1).map { variedRow(it) }
+            items = arrived + items
+            newIds = arrived.map { it.id }.toSet()
+            compose.mainClock.advanceTimeBy(100)
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+        assertAtTop("$mode during arrivals", "a-5")
+    }
+
+    /** A refresh delivers feed after feed: the list is replaced again and again while the way back to the top is animated. */
+    private fun backToTopWhileManyBatchesArrive(mode: ListMode) {
+        show(mode, (0 until BIG).map(::variedRow))
+        compose.onNodeWithTag("article_list").performScrollToIndex(BIG - 400)
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        var next = -1
+        try {
+            topTick++
+            repeat(12) {
+                compose.mainClock.advanceTimeBy(48)
+                val arrived = (next - 3 until next + 1).map { variedRow(it) }
+                next -= 4
+                items = arrived + items
+                newIds = newIds + arrived.map { it.id }
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+        assertAtTop("$mode many batches", items.first().id)
+    }
+
+    @Test fun backToTopWhileManyBatchesArriveInTheListLayout() = backToTopWhileManyBatchesArrive(ListMode.LIST)
+    @Test fun backToTopWhileManyBatchesArriveInTheCompactListLayout() = backToTopWhileManyBatchesArrive(ListMode.COMPACT_LIST)
+    @Test fun backToTopWhileManyBatchesArriveInTheMagazineLayout() = backToTopWhileManyBatchesArrive(ListMode.MAGAZINE)
+
+    @Test fun backToTopButtonAfterArrivalsInTheListLayout() = backToTopButtonAfterArrivals(ListMode.LIST)
+    @Test fun backToTopButtonAfterArrivalsInTheCompactListLayout() = backToTopButtonAfterArrivals(ListMode.COMPACT_LIST)
+    @Test fun backToTopButtonAfterArrivalsInTheMagazineLayout() = backToTopButtonAfterArrivals(ListMode.MAGAZINE)
+    @Test fun backToTopTabTapAfterArrivalsInTheListLayout() = backToTopTabTapAfterArrivals(ListMode.LIST)
+    @Test fun backToTopTabTapAfterArrivalsInTheCompactListLayout() = backToTopTabTapAfterArrivals(ListMode.COMPACT_LIST)
+    @Test fun backToTopTabTapAfterArrivalsInTheMagazineLayout() = backToTopTabTapAfterArrivals(ListMode.MAGAZINE)
+    @Test fun backToTopWhileArticlesArriveInTheListLayout() = backToTopWhileArticlesArrive(ListMode.LIST)
+    @Test fun backToTopWhileArticlesArriveInTheCompactListLayout() = backToTopWhileArticlesArrive(ListMode.COMPACT_LIST)
+    @Test fun backToTopWhileArticlesArriveInTheMagazineLayout() = backToTopWhileArticlesArrive(ListMode.MAGAZINE)
+
+    private companion object { const val BIG = 3000 }
 }

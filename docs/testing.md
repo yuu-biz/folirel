@@ -86,7 +86,8 @@ Rules that apply to every layer:
 | `HomeFlowTest` | First launch without data (`T01`), opening/scrolling/returning never marks read (`T29`), Custom Tabs path and URL-less article (`T32`), position after rotation and recreation (`T34`), layouts and images off (`T31`, `T37`) |
 | `PagerAndMagazineTest` | Category pager and tabs (`N01`, `N03`, `N24`), layouts List / Compact list / Magazine persisted (`N09`), tabs following the drag, underline position, back to top (arrow and tab re-tap) in every layout, quick successive taps, distant tabs at large text (`V31-T03`) |
 | `UxNextTest` | Position kept across layout changes (`U03`), category round trip in Magazine (`U04`), HTTP confirmation and "do not ask again" (`U06`), bulk unsubscribe and undo (`U10`, `U11`) |
-| `NewArticleBannerTest` | The new-articles banner on the real list composable in all three layouts, both sort orders, neighbour pages, arrivals at the head (`V31-T02`, `V3-R03`) |
+| `NewArticleBannerTest` | The new-articles banner on the real list composable in all three layouts, both sort orders, neighbour pages, arrivals at the head (`V31-T02`, `V3-R03`); back to the top from far down a long list of uneven rows while articles arrive (`V4-R01`) |
+| `BackToTopTest` | Back to the top (arrow and tab re-tap) through the whole app with Room: articles arriving at the head during and right after the way up end on the newest article in all three layouts, and stop following once the user touches the list (`V4-R01`) |
 | `MigrationTest` | Room v1 to v2 and v2 to v3 migrations validated against exported schemas, data kept, chained 1 to 3, an unknown newer version fails instead of wiping data (`T38`, `N25`) |
 | `IconDecoderTest` | Source-icon decoding on a real Android runtime: PNG, ICO with PNG entry, ICO with BMP entry, wide logo, 512 px image, non-images (`U08`) |
 | `PerformanceTest` | Synthetic 300 feeds / 5,000 articles: warm start to a visible list and local search timings (`T47`) |
@@ -251,6 +252,7 @@ These `S` IDs are refresh scenarios. They are not the screen IDs `S00`-`S40` of 
 | V31-C02 | A replaced feed is not counted as unfinished work, nor offered for retry. | `ReplacedFeedStatusTest` |
 | V31-T01 | Upgrading by overwrite install (without uninstalling) keeps rows, reading state and settings unchanged, and a following ordinary refresh creates no duplicates. | `tools/compare_app_state.py` (manual device procedure) |
 | V31-T02 | The new-articles banner behaves correctly on the real list composable in all layouts and both orders. | `NewArticleBannerTest` |
+| V4-R01 | "Back to the top" ends on the first article even when articles arrive at the head meanwhile or right after (a refresh), and the list does not follow arrivals once the user has touched it. | `BackToTopTest`, `NewArticleBannerTest` |
 | V31-T03 | Tabs, underline, pages and the saved selection agree after drags, quick taps and distant tabs at large text; back to top works in every layout and does not change other categories' positions or any state. | `PagerAndMagazineTest` |
 
 ### 4.6 Design topics cited in source comments

@@ -69,12 +69,16 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberDrawerState
+import android.os.SystemClock
+import androidx.compose.foundation.interaction.Interaction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -130,6 +134,7 @@ import io.github.yuubiz.folirel.model.Structure
 import io.github.yuubiz.folirel.sync.HttpsUpgradeState
 import io.github.yuubiz.folirel.sync.RefreshState
 import io.github.yuubiz.folirel.sync.RequestStatus
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
@@ -538,6 +543,12 @@ private fun ScopePage(
 /** Items scrolled past before the "back to top" button appears. */
 private const val SCROLL_TOP_BUTTON_AFTER = 6
 
+/**
+ * After "back to top" the list keeps following articles that arrive at its head for this long (a refresh delivers feed
+ * after feed), so the newest article is not left a few rows above the screen. Touching the list ends it at once.
+ */
+private const val FOLLOW_HEAD_AFTER_BACK_TO_TOP_MS = 4_000L
+
 private interface ScrollHandle {
     /** The underlying Compose state object; effects restart when it changes. */
     val owner: Any
@@ -546,9 +557,15 @@ private interface ScrollHandle {
     val visibleKeys: List<Any>
     suspend fun scrollTo(index: Int)
 
-    /** Back to the first article, animated. */
+    /** Back to the first article, animated; it ends on the first article even if articles arrive at the head meanwhile. */
     suspend fun animateToTop()
+
+    /** Drag interactions of the user (a program-driven scroll is not one). */
+    val interactions: Flow<Interaction>
 }
+
+/** Articles that arrive above while the animation runs leave it a few rows short; go on until the real top is reached. */
+private const val BACK_TO_TOP_ATTEMPTS = 4
 
 private class ListScroll(private val s: LazyListState) : ScrollHandle {
     override val owner: Any get() = s
@@ -556,7 +573,11 @@ private class ListScroll(private val s: LazyListState) : ScrollHandle {
     override val firstOffset: Int get() = s.firstVisibleItemScrollOffset
     override val visibleKeys: List<Any> get() = s.layoutInfo.visibleItemsInfo.map { it.key }
     override suspend fun scrollTo(index: Int) = s.scrollToItem(index)
-    override suspend fun animateToTop() = s.animateScrollToItem(0)
+    override suspend fun animateToTop() {
+        var attempts = 0
+        do s.animateScrollToItem(0) while ((s.firstVisibleItemIndex != 0 || s.firstVisibleItemScrollOffset != 0) && ++attempts < BACK_TO_TOP_ATTEMPTS)
+    }
+    override val interactions: Flow<Interaction> get() = s.interactionSource.interactions
 }
 
 private class GridScroll(private val s: LazyGridState) : ScrollHandle {
@@ -565,7 +586,11 @@ private class GridScroll(private val s: LazyGridState) : ScrollHandle {
     override val firstOffset: Int get() = s.firstVisibleItemScrollOffset
     override val visibleKeys: List<Any> get() = s.layoutInfo.visibleItemsInfo.map { it.key }
     override suspend fun scrollTo(index: Int) = s.scrollToItem(index)
-    override suspend fun animateToTop() = s.animateScrollToItem(0)
+    override suspend fun animateToTop() {
+        var attempts = 0
+        do s.animateScrollToItem(0) while ((s.firstVisibleItemIndex != 0 || s.firstVisibleItemScrollOffset != 0) && ++attempts < BACK_TO_TOP_ATTEMPTS)
+    }
+    override val interactions: Flow<Interaction> get() = s.interactionSource.interactions
 }
 
 @Composable
@@ -624,8 +649,20 @@ internal fun ArticleList(
     }
     // "Back to top": the selected tab was tapped again (only the list on screen follows, and only a tap made after this list appeared).
     val firstTick = remember { scrollToTopTick }
+    var followHeadUntil by remember(scroll.owner) { mutableLongStateOf(0L) }
+    suspend fun backToTop() {
+        currentScroll.animateToTop()
+        followHeadUntil = SystemClock.uptimeMillis() + FOLLOW_HEAD_AFTER_BACK_TO_TOP_MS
+    }
     LaunchedEffect(scrollToTopTick) {
-        if (isCurrent && scrollToTopTick != firstTick) currentScroll.animateToTop()
+        if (isCurrent && scrollToTopTick != firstTick) backToTop()
+    }
+    // Shortly after "back to top" an article that arrives at the head is followed (otherwise the list stays on the article it
+    // ended on and the newest ones sit above the screen); the user touching the list ends this.
+    LaunchedEffect(scroll.owner) { scroll.interactions.collect { if (it is DragInteraction.Start) followHeadUntil = 0L } }
+    val headId = items.firstOrNull()?.id
+    LaunchedEffect(headId) {
+        if (SystemClock.uptimeMillis() < followHeadUntil) currentScroll.scrollTo(0)
     }
     // Far enough down that the way back is long; the button is for that case only.
     val farDown by remember(scroll.owner) { derivedStateOf { currentScroll.firstIndex > SCROLL_TOP_BUTTON_AFTER } }
@@ -704,7 +741,7 @@ internal fun ArticleList(
         }
         if (farDown) {
             SmallFloatingActionButton(
-                onClick = { scope.launch { currentScroll.animateToTop() } },
+                onClick = { scope.launch { backToTop() } },
                 // Bottom centre: the per-article buttons (save, menu) sit at the right edge and must stay reachable.
                 modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp).testTag("scroll_to_top"),
                 containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.92f),
