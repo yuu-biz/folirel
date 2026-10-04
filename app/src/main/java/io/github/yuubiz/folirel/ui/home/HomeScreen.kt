@@ -70,13 +70,14 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberDrawerState
 import android.os.SystemClock
-import androidx.compose.foundation.interaction.Interaction
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -134,7 +135,6 @@ import io.github.yuubiz.folirel.model.Structure
 import io.github.yuubiz.folirel.sync.HttpsUpgradeState
 import io.github.yuubiz.folirel.sync.RefreshState
 import io.github.yuubiz.folirel.sync.RequestStatus
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
@@ -545,7 +545,8 @@ private const val SCROLL_TOP_BUTTON_AFTER = 6
 
 /**
  * After "back to top" the list keeps following articles that arrive at its head for this long (a refresh delivers feed
- * after feed), so the newest article is not left a few rows above the screen. Touching the list ends it at once.
+ * after feed), so the newest article is not left a few rows above the screen. Any touch of the list (a finger put down,
+ * a drag, a long press, a tap on a card or its menu) or a wheel scroll ends it at once.
  */
 private const val FOLLOW_HEAD_AFTER_BACK_TO_TOP_MS = 4_000L
 
@@ -559,9 +560,6 @@ private interface ScrollHandle {
 
     /** Back to the first article, animated; it ends on the first article even if articles arrive at the head meanwhile. */
     suspend fun animateToTop()
-
-    /** Drag interactions of the user (a program-driven scroll is not one). */
-    val interactions: Flow<Interaction>
 }
 
 /** Articles that arrive above while the animation runs leave it a few rows short; go on until the real top is reached. */
@@ -577,7 +575,6 @@ private class ListScroll(private val s: LazyListState) : ScrollHandle {
         var attempts = 0
         do s.animateScrollToItem(0) while ((s.firstVisibleItemIndex != 0 || s.firstVisibleItemScrollOffset != 0) && ++attempts < BACK_TO_TOP_ATTEMPTS)
     }
-    override val interactions: Flow<Interaction> get() = s.interactionSource.interactions
 }
 
 private class GridScroll(private val s: LazyGridState) : ScrollHandle {
@@ -590,7 +587,6 @@ private class GridScroll(private val s: LazyGridState) : ScrollHandle {
         var attempts = 0
         do s.animateScrollToItem(0) while ((s.firstVisibleItemIndex != 0 || s.firstVisibleItemScrollOffset != 0) && ++attempts < BACK_TO_TOP_ATTEMPTS)
     }
-    override val interactions: Flow<Interaction> get() = s.interactionSource.interactions
 }
 
 @Composable
@@ -658,8 +654,7 @@ internal fun ArticleList(
         if (isCurrent && scrollToTopTick != firstTick) backToTop()
     }
     // Shortly after "back to top" an article that arrives at the head is followed (otherwise the list stays on the article it
-    // ended on and the newest ones sit above the screen); the user touching the list ends this.
-    LaunchedEffect(scroll.owner) { scroll.interactions.collect { if (it is DragInteraction.Start) followHeadUntil = 0L } }
+    // ended on and the newest ones sit above the screen); the user touching the list ends this (see the pointerInput below).
     val headId = items.firstOrNull()?.id
     LaunchedEffect(headId) {
         if (SystemClock.uptimeMillis() < followHeadUntil) currentScroll.scrollTo(0)
@@ -671,7 +666,19 @@ internal fun ArticleList(
     val newCount = remember(items, newIds) { items.count { it.id in newIds } }
     val scope = rememberCoroutineScope()
     val now = remember(items) { System.currentTimeMillis() }
-    Box(Modifier.fillMaxSize()) {
+    Box(
+        Modifier.fillMaxSize().pointerInput(scroll.owner) {
+            // Watches only: the Initial pass sees every press and wheel scroll first and consumes nothing, so taps, swipes and
+            // long presses reach the cards as before. The "back to top" button starts the follow only after its own animation,
+            // so its press cannot cancel the follow it is about to start.
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    if (event.type == PointerEventType.Press || event.type == PointerEventType.Scroll) followHeadUntil = 0L
+                }
+            }
+        },
+    ) {
         if (gridState != null) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val widthDp = maxWidth.value

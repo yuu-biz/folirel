@@ -2,7 +2,9 @@ package io.github.yuubiz.folirel
 
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -96,5 +98,58 @@ class BackToTopTest {
         val title = TestData.newestArrivedTitle
         val shown = compose.onAllNodes(hasText(title) and hasAnyAncestor(hasTestTag("page_${all.encode()}"))).fetchSemanticsNodes()
         assertTrue("the newest article stays above the screen after the user scrolled", shown.isEmpty())
+    }
+
+    private fun newestArrivedIsOnScreen(): Boolean =
+        compose.onAllNodes(hasText(TestData.newestArrivedTitle) and hasAnyAncestor(hasTestTag("page_${all.encode()}"))).fetchSemanticsNodes().isNotEmpty()
+
+    private fun backToTopAndSettle() {
+        TestData.arriveAtTheHead(2)
+        inAllPage("scroll_to_top").performClick()
+        compose.waitForIdle()
+        Thread.sleep(300)
+    }
+
+    /** Arrivals right after the button are followed; after [touch] they must not move the list. */
+    private fun arrivalsAfter(label: String, touch: () -> Unit) {
+        prepare(ListMode.LIST, 1500)
+        backToTopAndSettle()
+        touch()
+        compose.waitForIdle()
+        Thread.sleep(200)
+        TestData.arriveAtTheHead(3)
+        compose.waitForIdle()
+        Thread.sleep(600)
+        assertTrue("$label: the list did not follow the arrivals", !newestArrivedIsOnScreen())
+    }
+
+    /** A finger put down on the list without any drag (then lifted without a tap) ends the following. */
+    @Test
+    fun aFingerPutDownWithoutDraggingEndsTheFollowing() = arrivalsAfter("press") {
+        inAllPage("article_list").performTouchInput { down(center); cancel() }
+    }
+
+    @Test
+    fun aLongPressOnTheListEndsTheFollowing() = arrivalsAfter("long press") {
+        inAllPage("article_list").performTouchInput { down(center); advanceEventTime(800); up() }
+    }
+
+    /** Using an article's menu ends the following, and the tap itself still reaches the menu button (nothing is swallowed). */
+    @Test
+    fun operatingAnArticleMenuEndsTheFollowingAndStillOpensTheMenu() = arrivalsAfter("menu") {
+        compose.onAllNodes(hasContentDescription("More options") and hasAnyAncestor(hasTestTag("article_list")))[0].performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Mark as read").assertExists()
+    }
+
+    /** Pressing the "back to top" button must not cancel the following it starts. */
+    @Test
+    fun theButtonItselfStartsTheFollowing() {
+        prepare(ListMode.LIST, 1500)
+        inAllPage("scroll_to_top").performClick()
+        TestData.arriveAtTheHead(3)
+        compose.waitForIdle()
+        Thread.sleep(600)
+        assertOnTheNewestArticle("button start")
     }
 }
