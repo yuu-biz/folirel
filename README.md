@@ -9,7 +9,9 @@ analytics, no ads.
 Move your subscriptions in from Feedly (or any reader) with an OPML file, scan a dense list of the latest articles, and
 open the original page in your browser.
 
-> **Status:** early release (0.3.x). The app is feature-complete for its first scope and is tested on emulators.
+**Folirel** is a coined name inspired by *folio* and *reader*. The word *folio* ultimately traces back to Latin *folium*, "leaf" or "sheet," reflecting the idea of turning the feeds you choose into pages you can browse.
+
+> **Status:** early release (0.4.x). The app is feature-complete for its first scope and is tested on emulators.
 > Debug-signed APKs are published on the Releases page; there is no Google Play listing yet.
 
 ## Features

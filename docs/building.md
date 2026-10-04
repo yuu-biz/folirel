@@ -92,7 +92,7 @@ Notes:
 - The helper scripts in `tools/` have their own tests, which need Python 3:
 
   ```bash
-  python3 -m unittest tools.test_compare_app_state tools.test_layout_upgrade_check
+  python3 -m unittest tools.test_compare_app_state
   ```
 
 ## Install the debug APK with adb

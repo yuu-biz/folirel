@@ -58,8 +58,6 @@ data class AppSettings(
     companion object {
         val TEXT_SCALES = listOf(0.9f, 1.0f, 1.15f, 1.3f)
         val REFRESH_INTERVALS_MINUTES = listOf(0, 15, 30, 60, 120, 360, 720, 1440)
-        /** Values of the v0.1 "refresh_interval_hours" key, migrated x60. */
-        val LEGACY_INTERVAL_HOURS = listOf(0, 1, 2, 6, 12, 24)
         val RETENTION_LIMITS = listOf(0, 1_000, 3_000, 5_000, 10_000, 30_000)
         val IMAGE_CACHE_MB = listOf(64, 128, 256, 512)
         val CARD_COLUMNS = listOf(0, 1, 2, 3)
@@ -69,15 +67,12 @@ data class AppSettings(
 class SettingsRepository(private val store: DataStore<Preferences>) {
     private object Keys {
         val theme = stringPreferencesKey("theme")
-        /** `list_layout`; the pre-0.3.2 `list_mode` is translated by [ListModeMigration] and never read here. */
-        val listMode = ListModeMigration.KEY
+        val listMode = stringPreferencesKey("list_layout")
         val textScale = floatPreferencesKey("text_scale")
         val cardColumns = intPreferencesKey("card_columns")
         val cardStyle = stringPreferencesKey("card_style")
         val showImages = booleanPreferencesKey("show_images")
         val browserMode = stringPreferencesKey("browser_mode")
-        /** v0.1 key (hours). Read only for migration; never written. */
-        val legacyRefreshHours = intPreferencesKey("refresh_interval_hours")
         val refreshMinutes = intPreferencesKey("refresh_interval_minutes")
         val startupRefresh = booleanPreferencesKey("startup_refresh")
         val retentionLimit = intPreferencesKey("retention_limit")
@@ -103,7 +98,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             showImages = p[Keys.showImages] ?: defaults.showImages,
             browserMode = enumOr(p[Keys.browserMode], defaults.browserMode),
             refreshIntervalMinutes = intervalMinutes(p),
-            // Existing users: startup refresh used to follow the automatic-update switch.
+            // Until the user chooses, startup refresh follows the automatic-update switch.
             startupRefresh = p[Keys.startupRefresh] ?: (intervalMinutes(p) > 0),
             unmeteredOnly = p[Keys.unmeteredOnly] ?: defaults.unmeteredOnly,
             allowHttp = p[Keys.allowHttp] ?: defaults.allowHttp,
@@ -118,11 +113,8 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         )
     }
 
-    /** Minutes key first; otherwise the v0.1 hours value x60 (2 hours stays 2 hours, never 2 minutes). */
     private fun intervalMinutes(p: Preferences): Int =
-        p[Keys.refreshMinutes]?.takeIf { it in AppSettings.REFRESH_INTERVALS_MINUTES }
-            ?: p[Keys.legacyRefreshHours]?.takeIf { it in AppSettings.LEGACY_INTERVAL_HOURS }?.let { it * 60 }
-            ?: AppSettings().refreshIntervalMinutes
+        p[Keys.refreshMinutes]?.takeIf { it in AppSettings.REFRESH_INTERVALS_MINUTES } ?: AppSettings().refreshIntervalMinutes
 
     suspend fun current(): AppSettings = settings.first()
 

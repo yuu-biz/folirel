@@ -3,7 +3,6 @@ package io.github.yuubiz.folirel.data
 import android.database.sqlite.SQLiteDatabase
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.yuubiz.folirel.backend.RefreshReason
@@ -35,25 +34,17 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * N18 settings migration, N20/N21 retention (protection, no resurrection as unread), N25 DB v1→v2 migration
+ * N18 refresh interval settings, N20/N21 retention (protection, no resurrection as unread), N25 DB v1→v2 migration
  * keeping data, and S02's display-condition rule for refresh targets.
  */
 @RunWith(AndroidJUnit4::class)
 class DataKeepingTest {
 
-    /** N18: the old hours value becomes the same duration in minutes; 15/30 minutes can be stored. */
+    /** N18: the refresh interval is stored in minutes (15/30 can be stored); the defaults are what a new install gets. */
     @Test
-    fun legacyHourIntervalIsMigratedToMinutes() = runBlocking<Unit> {
+    fun refreshIntervalIsStoredInMinutes() = runBlocking<Unit> {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val dir = File(TestEnv.context().cacheDir, "prefs-${System.nanoTime()}").apply { mkdirs() }
-        for ((hours, minutes) in listOf(2 to 120, 6 to 360, 1 to 60, 24 to 1440, 0 to 0)) {
-            val store = PreferenceDataStoreFactory.create(scope = scope) { File(dir, "h$hours.preferences_pb") }
-            store.edit { it[intPreferencesKey("refresh_interval_hours")] = hours }
-            val settings = SettingsRepository(store).current()
-            assertEquals("$hours h", minutes, settings.refreshIntervalMinutes)
-            // Startup refresh followed the automatic switch in v0.1.
-            assertEquals(hours > 0, settings.startupRefresh)
-        }
         val fresh = SettingsRepository(PreferenceDataStoreFactory.create(scope = scope) { File(dir, "new.preferences_pb") })
         assertEquals(120, fresh.current().refreshIntervalMinutes)
         assertTrue(fresh.current().startupRefresh)

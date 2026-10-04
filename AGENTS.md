@@ -10,7 +10,7 @@ Machine-specific notes, work status and personal preferences do **not** belong h
 ```sh
 ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug   # JVM tests, lint, debug APK
 ./gradlew :app:connectedDebugAndroidTest                             # emulator or device
-python3 -m unittest tools.test_compare_app_state tools.test_layout_upgrade_check   # helper script tests
+python3 -m unittest tools.test_compare_app_state   # helper script tests
 ```
 
 On Windows use `.\gradlew.bat`. Prerequisites and pinned versions: [docs/building.md](docs/building.md). CI runs the

@@ -37,8 +37,6 @@ enum class SortOrder { NEWEST, OLDEST }
  * - COMPACT_LIST: one dense row per article.
  * - MAGAZINE: cards of different sizes packed into gap-free rows (see MagazinePlan, CardGridLayout).
  *
- * Before 0.3.2 the same three layouts were stored as MAGAZINE (= LIST), LIST (= COMPACT_LIST) and CARD (= MAGAZINE)
- * under the key `list_mode`; see ListModeMigration. Never read an old value as one of these names.
  */
 enum class ListMode { LIST, COMPACT_LIST, MAGAZINE }
 

@@ -289,11 +289,4 @@ failure never changes the feed's fetch state. The lookup procedure and schedule 
 | `last_scope`, `last_filter`, `sort_order` | Last selection | all / all / newest |
 | `last_refresh_attempt` | Start time of the last refresh of any kind | 0 |
 
-Migrations of the preferences file:
-
-- `list_mode` (older builds) held `MAGAZINE`, `LIST` or `CARD`, which meant one-column-with-thumbnails,
-  compact rows and the card grid. Because the old and new names overlap, a `DataMigration` translates the value
-  explicitly once (`MAGAZINE` to `LIST`, `LIST` to `COMPACT_LIST`, `CARD` to `MAGAZINE`) into `list_layout` and leaves
-  the old key untouched. Once `list_layout` exists it alone decides. An unknown old value writes nothing.
-- `refresh_interval_hours` (older builds) is read only when `refresh_interval_minutes` is absent and is multiplied by
-  60. A missing `startup_refresh` follows whether the interval is non-zero.
+A missing `startup_refresh` follows whether the interval is non-zero.

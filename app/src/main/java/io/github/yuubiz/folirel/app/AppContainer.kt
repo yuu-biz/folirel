@@ -17,7 +17,6 @@ import io.github.yuubiz.folirel.backend.local.discovery.FeedDiscovery
 import io.github.yuubiz.folirel.backend.local.icon.FeedIconResolver
 import io.github.yuubiz.folirel.browser.BrowserLauncher
 import io.github.yuubiz.folirel.data.db.AppDatabase
-import io.github.yuubiz.folirel.data.preferences.SettingsMigrations
 import io.github.yuubiz.folirel.data.preferences.SettingsRepository
 import io.github.yuubiz.folirel.data.repository.ArticleRepository
 import io.github.yuubiz.folirel.data.repository.FeedIconRepository
@@ -47,7 +46,7 @@ import okio.Path.Companion.toOkioPath
 import java.time.Clock
 import java.util.concurrent.atomic.AtomicBoolean
 
-private val Context.settingsDataStore by preferencesDataStore(name = "settings", produceMigrations = { SettingsMigrations.all })
+private val Context.settingsDataStore by preferencesDataStore(name = "settings")
 
 /** Manual dependency container (docs/architecture.md: no DI framework). One instance per process. */
 class AppContainer(context: Context) {

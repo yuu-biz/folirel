@@ -43,7 +43,7 @@ These tests need an emulator or a device running Android 9 (API 28) or later. Th
 ### Helper-script tests
 
 ```sh
-python3 -m unittest tools.test_compare_app_state tools.test_layout_upgrade_check
+python3 -m unittest tools.test_compare_app_state
 ```
 
 On Windows use `python -X utf8 -m unittest ...`. Run from the repository root. These tests need no device (a fake adb stands in for the real one).
@@ -57,7 +57,6 @@ The scripts in `tools/` are development aids; they are not used by the app. The 
 | `tools/verify.sh`, `tools/verify.ps1` | Run the Gradle verification command (and optionally the device tests). |
 | `tools/adb_ui.py` | A tiny adb and uiautomator driver for manual emulator checks: `dump`, `texts`, `tap TEXT`, `tapxy X Y`, `type TEXT` (ASCII only), `key KEYCODE`, `shot PATH`, `wait TEXT [SECONDS]`, `swipe X1 Y1 X2 Y2 [MS]`, with an optional `-s SERIAL`. |
 | `tools/compare_app_state.py` | Upgrade check. Compares two pulled copies of the app's Room database and DataStore and exits with code 1 when something that must not change did. `--mode install` (right after an overwrite install, before any fetch): nothing may differ in subscriptions, categories, articles, reading state or settings. `--mode after-refresh` (after one ordinary refresh): new articles are allowed and existing articles may change only the columns a refresh rewrites; their ID, key, feed and read/saved state may not change. Usage: `python -X utf8 tools/compare_app_state.py --mode install BEFORE_PREFIX AFTER_PREFIX`. |
-| `tools/layout_upgrade_check.py` | For each list-layout value that version 0.3.1 could store, installs an old APK, writes the old settings file, records the screen, installs the new APK over it without uninstalling, records again, and fails unless the new setting holds the expected new name, the old key is untouched and the two screens show the same articles in the same places. Usage: `python -X utf8 tools/layout_upgrade_check.py [-s SERIAL] OLD_APK NEW_APK [OUT_DIR]`. Test devices only; it replaces the app and rewrites its settings file. Any adb failure stops it with exit code 2. |
 | `tools/make_icon_fixtures.py` | Regenerates the synthetic images in `fixtures/icons/`. |
 | `tools/fixtures/datastore-settings-0.3.0.preferences_pb` | A DataStore settings file as an older version wrote it, for upgrade checks. |
 
@@ -89,7 +88,6 @@ Rules that apply to every layer:
 | `UxNextTest` | Position kept across layout changes (`U03`), category round trip in Magazine (`U04`), HTTP confirmation and "do not ask again" (`U06`), bulk unsubscribe and undo (`U10`, `U11`) |
 | `NewArticleBannerTest` | The new-articles banner on the real list composable in all three layouts, both sort orders, neighbour pages, arrivals at the head (`V31-T02`, `V3-R03`) |
 | `MigrationTest` | Room v1 to v2 and v2 to v3 migrations validated against exported schemas, data kept, chained 1 to 3, an unknown newer version fails instead of wiping data (`T38`, `N25`) |
-| `ListLayoutUpgradeTest` | A real DataStore file in the pre-0.3.2 format is migrated and the layout that is then drawn is the one the user had |
 | `IconDecoderTest` | Source-icon decoding on a real Android runtime: PNG, ICO with PNG entry, ICO with BMP entry, wide logo, 512 px image, non-images (`U08`) |
 | `PerformanceTest` | Synthetic 300 feeds / 5,000 articles: warm start to a visible list and local search timings (`T47`) |
 
@@ -185,7 +183,7 @@ Column "Test classes" lists the classes whose comments cite that ID. A dash mean
 | N15 | A 304 keeps the previous document's entry counts and does not confuse "0 new" with the feed's count. | `FetchCoverageTest` |
 | N16 | 2,001 entries, oversized body, deep XML and broken XML are told apart, and old articles and state stay. | `FetchCoverageTest` |
 | N17 | Time budget exhaustion, HTTP not allowed, network constraint and backoff are visible. | `FetchCoverageTest` |
-| N18 | The old hours-based setting migrates to the same duration in minutes (2 hours never becomes 2 minutes); 15 and 30 minutes and Off can be scheduled and cancelled. | `DataKeepingTest`, `UpdateConstraintsTest` |
+| N18 | The refresh interval is stored in minutes; 15 and 30 minutes and Off can be scheduled and cancelled. | `DataKeepingTest`, `UpdateConstraintsTest` |
 | N19 | Real periodic worker execution and cancellation on a dedicated emulator (registration alone is not execution). | - |
 | N20 | Lowering the retention limit protects unread and saved articles and explains why the count stays above the limit. | `DataKeepingTest` |
 | N21 | Read articles removed by cleanup are not added back as new unread articles when the feed redelivers them. | `DataKeepingTest` |
@@ -250,7 +248,6 @@ These `S` IDs are refresh scenarios. They are not the screen IDs `S00`-`S40` of 
 | V3-R05 | What a page is follows from its root element, not from a leading `<?xml` (XHTML pages are pages; feeds with a BOM or comments before the root are feeds). | `HtmlRootElementTest`, `FeedDiscoveryTest` |
 | V31-R01 | After an address change, the refresh coordinator does not coalesce a new request into an older in-flight request for the old address (normal, forced and All refreshes); repeated taps with an unchanged address still fetch once. | `RefreshAfterAddressChangeTest` |
 | V31-R02 | A request that did not fetch a feed because its address changed reports it as replaced (history), not as an unfinished or "not fetched" feed. | `RefreshAfterAddressChangeTest` |
-| V31-C01 | The upgrade checker scripts really fail on the differences they exist to catch (self-tests of `tools/compare_app_state.py` and `tools/layout_upgrade_check.py`). | `tools/test_compare_app_state.py`, `tools/test_layout_upgrade_check.py` |
 | V31-C02 | A replaced feed is not counted as unfinished work, nor offered for retry. | `ReplacedFeedStatusTest` |
 | V31-T01 | Upgrading by overwrite install (without uninstalling) keeps rows, reading state and settings unchanged, and a following ordinary refresh creates no duplicates. | `tools/compare_app_state.py` (manual device procedure) |
 | V31-T02 | The new-articles banner behaves correctly on the real list composable in all layouts and both orders. | `NewArticleBannerTest` |

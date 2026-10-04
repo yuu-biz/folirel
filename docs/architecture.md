@@ -18,7 +18,7 @@ minimum SDK is 28 and the code targets the current SDK; all dependency versions 
 | UI | Jetpack Compose, Material 3 | Density-tuned lists, drawer, category tabs in a pager, accessibility text scaling |
 | State | ViewModel, `StateFlow`, coroutines | UI does no I/O; state follows the lifecycle |
 | Database | Room 2.8 with KSP | Exported schemas, explicit additive migrations, transactions |
-| Preferences | DataStore (Preferences) with `DataMigration` | Kept separate from reading state in Room |
+| Preferences | DataStore (Preferences) | Kept separate from reading state in Room |
 | HTTP | OkHttp 5 | One client factory and network guard for everything (see fetch-and-security.md section 6); conditional GET |
 | Images | Coil 3 with the OkHttp fetcher | Uses the same guarded client family and size limits |
 | XML | Platform `XmlPullParser` (`android.util.Xml`) behind `SafeXmlReader` | RSS 2.0, Atom 1.0, RSS 1.0, OPML; namespace aware; hardened (section 6 of fetch-and-security.md) |
@@ -36,7 +36,7 @@ app/src/main/java/io/github/yuubiz/folirel/
   app/                    Application, AppContainer, MainActivity (navigation), DocumentIo (SAF)
   model/                  Backend-independent models: scopes, list models, normalized feed, errors, subscription tree
   data/db/                Room entities, DAOs, migrations
-  data/preferences/       DataStore settings and settings migrations
+  data/preferences/       DataStore settings
   data/repository/        FeedStore, SubscriptionRepository, ArticleRepository, FeedIconRepository, RetentionManager
   backend/                BackendSynchronizer contract, refresh scopes, results
   backend/local/          LocalBackend, FeedFetcher, SmallResourceFetcher, HtmlLinks, HttpsUpgradeChecker
