@@ -1,10 +1,10 @@
-# Contributing to FeedDeck
+# Contributing to Folirel
 
 Thanks for your interest. Bug reports, feature ideas and pull requests are welcome.
 
 ## Before you start
 
-FeedDeck is intentionally small. Please open an issue before starting a large change, especially anything touching the
+Folirel is intentionally small. Please open an issue before starting a large change, especially anything touching the
 following, which are **out of scope** by design:
 
 - Accounts, a sync service or any server component, and provider integrations that need sign-in.

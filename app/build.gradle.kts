@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "io.github.yuubiz.feeddeck"
+    namespace = "io.github.yuubiz.folirel"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "io.github.yuubiz.feeddeck"
+        applicationId = "io.github.yuubiz.folirel"
         minSdk = 28
         targetSdk = 37
         versionCode = 5

@@ -1,4 +1,4 @@
-# FeedDeck
+# Folirel
 
 @AGENTS.md
 

@@ -1,6 +1,6 @@
 # Architecture
 
-Technology choices, package layout, data flow and the one extension boundary of FeedDeck. Data and import rules are in
+Technology choices, package layout, data flow and the one extension boundary of Folirel. Data and import rules are in
 [data-and-import.md](data-and-import.md); fetching, refresh scheduling and security are in
 [fetch-and-security.md](fetch-and-security.md). Product overview: [../README.md](../README.md).
 
@@ -32,7 +32,7 @@ minimum SDK is 28 and the code targets the current SDK; all dependency versions 
 ## 2. Package layout
 
 ```text
-app/src/main/java/io/github/yuubiz/feeddeck/
+app/src/main/java/io/github/yuubiz/folirel/
   app/                    Application, AppContainer, MainActivity (navigation), DocumentIo (SAF)
   model/                  Backend-independent models: scopes, list models, normalized feed, errors, subscription tree
   data/db/                Room entities, DAOs, migrations

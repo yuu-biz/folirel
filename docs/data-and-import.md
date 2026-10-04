@@ -1,6 +1,6 @@
 # Data model, OPML and reading state
 
-How FeedDeck stores subscriptions and articles, how entries are identified across fetches, and how OPML import and
+How Folirel stores subscriptions and articles, how entries are identified across fetches, and how OPML import and
 export behave. Fetching and network rules are in [fetch-and-security.md](fetch-and-security.md); module layout is in
 [architecture.md](architecture.md). Product overview: [../README.md](../README.md).
 
@@ -9,7 +9,7 @@ identity).
 
 ## 1. Room model
 
-Database `feeddeck.db`, schema version 3, exported to `app/schemas/`. All timestamps are UTC epoch milliseconds;
+Database `folirel.db`, schema version 3, exported to `app/schemas/`. All timestamps are UTC epoch milliseconds;
 display uses the device time zone. UI code never touches entities directly; it goes through repositories (see
 [architecture.md](architecture.md) section 3).
 

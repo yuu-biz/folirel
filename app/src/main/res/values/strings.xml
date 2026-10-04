@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">FeedDeck</string>
+    <string name="app_name" translatable="false">Folirel</string>
     <string name="action_add_feed">Add feed URL</string>
     <string name="action_back">Back</string>
     <string name="action_clear_search">Clear search</string>
@@ -164,7 +164,7 @@
     <string name="onboarding_point_opml">OPML moves subscriptions only; read/saved state is not transferred.</string>
     <string name="onboarding_point_saved">\"Save\" is a bookmark, not an offline copy of the page.</string>
     <string name="onboarding_skip">Skip</string>
-    <string name="onboarding_title">Welcome to FeedDeck</string>
+    <string name="onboarding_title">Welcome to Folirel</string>
     <string name="scope_all">All articles</string>
     <string name="scope_uncategorized">Uncategorized</string>
     <string name="search_hint">Search in %1$s</string>

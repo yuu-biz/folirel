@@ -1,6 +1,6 @@
-# FeedDeck: instructions for coding agents and contributors
+# Folirel: instructions for coding agents and contributors
 
-FeedDeck is a local-first Android RSS/Atom reader (Kotlin, Jetpack Compose, Room). It has no account, no server and no
+Folirel is a local-first Android RSS/Atom reader (Kotlin, Jetpack Compose, Room). It has no account, no server and no
 analytics. This file holds the project conventions that apply to every contributor, human or AI agent.
 Machine-specific notes, work status and personal preferences do **not** belong here (see
 [Local-only files](#local-only-files)).
@@ -20,7 +20,7 @@ first and third command on every push and pull request.
 
 | Path | Contents |
 |---|---|
-| `app/src/main/java/io/github/yuubiz/feeddeck/` | `ui/` Compose screens and view models, `data/` Room and DataStore, `backend/` fetching and parsing behind `BackendSynchronizer`, `network/` the single HTTP/URL policy, `sync/` refresh coordination and workers |
+| `app/src/main/java/io/github/yuubiz/folirel/` | `ui/` Compose screens and view models, `data/` Room and DataStore, `backend/` fetching and parsing behind `BackendSynchronizer`, `network/` the single HTTP/URL policy, `sync/` refresh coordination and workers |
 | `app/schemas/` | Exported Room schemas (used by migration tests) |
 | `fixtures/` | Synthetic feeds, OPML files and icons used by the tests |
 | `tools/` | Development helper scripts (not part of the app) |

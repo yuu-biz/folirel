@@ -1,4 +1,4 @@
-# Building FeedDeck
+# Building Folirel
 
 This page is for contributors and anyone who wants to build the app from source. For using the app, see the [user guide](user-guide.md) (日本語: [user-guide.ja.md](user-guide.ja.md)). For the code layout, see [architecture.md](architecture.md); for the test strategy, see [testing.md](testing.md); for the project overview, see [../README.md](../README.md).
 
@@ -105,7 +105,7 @@ Notes:
    adb install -r app/build/outputs/apk/debug/app-debug.apk
    ```
 
-`-r` replaces an existing installation and keeps its data, but only if the new APK is signed with the same key (see [Signing](#signing)). If Android reports an inconsistent signature, you must uninstall first, which deletes the app's data; export the subscriptions as OPML beforehand if you want to keep them. The application ID is `io.github.yuubiz.feeddeck`.
+`-r` replaces an existing installation and keeps its data, but only if the new APK is signed with the same key (see [Signing](#signing)). If Android reports an inconsistent signature, you must uninstall first, which deletes the app's data; export the subscriptions as OPML beforehand if you want to keep them. The application ID is `io.github.yuubiz.folirel`.
 
 On Git Bash for Windows, pass device paths such as `/sdcard/...` to `adb` with `MSYS_NO_PATHCONV=1` set, otherwise the shell rewrites them into Windows paths.
 
@@ -177,7 +177,7 @@ Build and test only (not shipped in the APK):
 | AndroidX Test (core, ext-junit, runner, rules), Espresso, UI Automator, Compose UI test | see the version catalogue | Apache-2.0 |
 | kotlinx-coroutines-test, Room testing, WorkManager testing | as above | Apache-2.0 |
 
-FeedDeck itself is released under the MIT License; see the `LICENSE` file in the repository root. The app's Settings, About section lists the main open-source components and their licences.
+Folirel itself is released under the MIT License; see the `LICENSE` file in the repository root. The app's Settings, About section lists the main open-source components and their licences.
 
 ## Signing
 

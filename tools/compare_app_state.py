@@ -5,7 +5,7 @@ FAILS (exit code 1) when something that must not change did.
   python -X utf8 tools/compare_app_state.py --mode install       BEFORE_PREFIX AFTER_PREFIX
   python -X utf8 tools/compare_app_state.py --mode after-refresh BEFORE_PREFIX AFTER_PREFIX
 
-Each prefix names the files `<prefix>-feeddeck.db` (+ `-wal`, `-shm`) and `<prefix>-settings.preferences_pb`, pulled with
+Each prefix names the files `<prefix>-folirel.db` (+ `-wal`, `-shm`) and `<prefix>-settings.preferences_pb`, pulled with
 `adb exec-out run-as ... cat`. Not used by the app or CI; its own tests: `python -X utf8 -m unittest tools.test_compare_app_state`.
 
 Modes
@@ -140,7 +140,7 @@ def encode_preferences(prefs):
 def open_copy(prefix):
     tmp = tempfile.mkdtemp()
     for ext in ("", "-wal", "-shm"):
-        src = f"{prefix}-feeddeck.db{ext}"
+        src = f"{prefix}-folirel.db{ext}"
         if os.path.exists(src):
             shutil.copy(src, os.path.join(tmp, f"app.db{ext}"))
     return sqlite3.connect(os.path.join(tmp, "app.db"))

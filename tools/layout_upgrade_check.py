@@ -30,7 +30,7 @@ import xml.etree.ElementTree as ET
 sys.path.insert(0, os.path.dirname(__file__))
 import compare_app_state as cas  # noqa: E402
 
-PKG = "io.github.yuubiz.feeddeck"
+PKG = "io.github.yuubiz.folirel"
 SETTINGS = "files/datastore/settings.preferences_pb"
 EXPECTED_NEW_NAME = {"MAGAZINE": "LIST", "LIST": "COMPACT_LIST", "CARD": "MAGAZINE"}
 

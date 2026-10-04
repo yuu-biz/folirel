@@ -1,6 +1,6 @@
 # Fetching, refresh and security
 
-How FeedDeck downloads and parses untrusted feeds, schedules refreshes, and restricts network access. Stored data and
+How Folirel downloads and parses untrusted feeds, schedules refreshes, and restricts network access. Stored data and
 entry identity are in [data-and-import.md](data-and-import.md); module layout is in
 [architecture.md](architecture.md). Product overview: [../README.md](../README.md).
 
@@ -93,7 +93,7 @@ Client configuration (OkHttp 5), shared by every request the app makes:
 | Cookies | none (`CookieJar.NO_COOKIES`), no authentication headers |
 | HTTP cache | none |
 | Proxy | direct connections only (`Proxy.NO_PROXY`) |
-| User-Agent | `FeedDeck/<version> (Android; local RSS reader)` |
+| User-Agent | `Folirel/<version> (Android; local RSS reader)` |
 
 Because inactivity timeouts are shorter than the call budget, a stalled TLS handshake fails after 10 s and OkHttp's
 connection retry can still try again within the 25 s budget; certificates are verified in every attempt.

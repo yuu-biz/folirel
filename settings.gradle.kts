@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "FeedDeck"
+rootProject.name = "Folirel"
 include(":app")

@@ -1,10 +1,10 @@
 # Product and UX
 
-This document describes what FeedDeck is and is not, what it is required to do (requirement IDs `R01`-`R20`), and how its screens behave (screen IDs `S00`-`S40`). It describes the app as it is at version 0.3.2. Test scenarios that exercise these requirements are catalogued in [testing.md](testing.md). Internals are described in [architecture.md](architecture.md), [data-and-import.md](data-and-import.md) and [fetch-and-security.md](fetch-and-security.md); end-user instructions are in [user-guide.md](user-guide.md).
+This document describes what Folirel is and is not, what it is required to do (requirement IDs `R01`-`R20`), and how its screens behave (screen IDs `S00`-`S40`). It describes the app as it is at version 0.3.2. Test scenarios that exercise these requirements are catalogued in [testing.md](testing.md). Internals are described in [architecture.md](architecture.md), [data-and-import.md](data-and-import.md) and [fetch-and-security.md](fetch-and-security.md); end-user instructions are in [user-guide.md](user-guide.md).
 
 ## 1. Purpose
 
-FeedDeck is a local RSS/Atom reader for Android. It is built around one loop:
+Folirel is a local RSS/Atom reader for Android. It is built around one loop:
 
 **skim subscribed news quickly, open the original article on its own site, and bookmark the articles worth keeping by hand.**
 

@@ -13,7 +13,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(__file__))
 import compare_app_state as cas  # noqa: E402
 
-SCHEMA = os.path.join(os.path.dirname(__file__), "..", "app", "schemas", "io.github.yuubiz.feeddeck.data.db.AppDatabase", "3.json")
+SCHEMA = os.path.join(os.path.dirname(__file__), "..", "app", "schemas", "io.github.yuubiz.folirel.data.db.AppDatabase", "3.json")
 
 
 def new_db():

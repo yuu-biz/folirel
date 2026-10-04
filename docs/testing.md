@@ -1,6 +1,6 @@
 # Testing
 
-This document explains how to run FeedDeck's tests, how they are layered, what the synthetic fixtures are, and which scenarios the tests cover. Test names, class comments and source comments cite scenario IDs (`T15`, `N12`, `V3-R03`, ...); this page is where those IDs are defined. Requirement IDs (`R01`-`R20`) and screen IDs (`S00`-`S40`) are defined in [product-and-ux.md](product-and-ux.md).
+This document explains how to run Folirel's tests, how they are layered, what the synthetic fixtures are, and which scenarios the tests cover. Test names, class comments and source comments cite scenario IDs (`T15`, `N12`, `V3-R03`, ...); this page is where those IDs are defined. Requirement IDs (`R01`-`R20`) and screen IDs (`S00`-`S40`) are defined in [product-and-ux.md](product-and-ux.md).
 
 ## 1. Running the tests
 

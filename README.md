@@ -1,8 +1,8 @@
-# FeedDeck
+# Folirel
 
 [English](README.md) | [日本語](README.ja.md)
 
-FeedDeck is a local-first RSS/Atom reader for Android. It reads your subscriptions straight from the feeds' own
+Folirel is a local-first RSS/Atom reader for Android. It reads your subscriptions straight from the feeds' own
 servers, keeps everything on the device, and sends your reading habits nowhere: no account, no sync service, no
 analytics, no ads.
 
@@ -35,7 +35,7 @@ open the original page in your browser.
 1. Download the latest APK from the **Releases** page of this repository.
 2. Allow installing apps from your browser or file manager when Android asks, then open the APK. Android 9 (API 28) or
    later is required.
-3. Open FeedDeck and either import an OPML file or add a feed URL.
+3. Open Folirel and either import an OPML file or add a feed URL.
 
 Release APKs are currently signed with a debug key, so they update only over builds signed with the same key.
 Uninstalling the app deletes its data; use *Export OPML* to keep your subscription list.
@@ -86,5 +86,5 @@ scope (some things are deliberately out of scope, for example accounts, a built-
 
 ## License
 
-FeedDeck is released under the [MIT License](LICENSE). Third-party libraries keep their own licenses; see
+Folirel is released under the [MIT License](LICENSE). Third-party libraries keep their own licenses; see
 [docs/building.md](docs/building.md).

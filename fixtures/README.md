@@ -1,6 +1,6 @@
 # Synthetic fixtures
 
-Test data for FeedDeck's parser, importer, network and icon tests. **Everything here is fictional**: the feeds, articles, subscriptions and images were made up for the tests, and URLs use reserved example hosts (`example.com`, `example.net`, `example.org`, `example.invalid`). The only other hosts that appear are XML namespace identifiers (for example `purl.org`, `w3.org`, `search.yahoo.com/mrss/` in `feeds/rss2-basic.xml`), which are never fetched.
+Test data for Folirel's parser, importer, network and icon tests. **Everything here is fictional**: the feeds, articles, subscriptions and images were made up for the tests, and URLs use reserved example hosts (`example.com`, `example.net`, `example.org`, `example.invalid`). The only other hosts that appear are XML namespace identifiers (for example `purl.org`, `w3.org`, `search.yahoo.com/mrss/` in `feeds/rss2-basic.xml`), which are never fetched.
 
 The tests never fetch these paths from a real site. They are served from a local MockWebServer or fed straight to the parsers, using a test-only URL mapping. That mapping must never be added to release code.
 

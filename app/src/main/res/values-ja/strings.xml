@@ -163,7 +163,7 @@
     <string name="onboarding_point_opml">OPMLで移るのは購読先だけです。既読・保存は移りません。</string>
     <string name="onboarding_point_saved">「保存」はブックマークです。ページ自体は保存しません。</string>
     <string name="onboarding_skip">スキップ</string>
-    <string name="onboarding_title">FeedDeckへようこそ</string>
+    <string name="onboarding_title">Folirelへようこそ</string>
     <string name="scope_all">すべての記事</string>
     <string name="scope_uncategorized">未分類</string>
     <string name="search_hint">%1$sを検索</string>
