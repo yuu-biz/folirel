@@ -479,4 +479,25 @@
     <string name="display_layout">レイアウト</string>
     <string name="display_layout_global_note">カテゴリごとの設定がないすべての画面の、既定のレイアウトを変更します。</string>
     <string name="action_choose_category">カテゴリを選ぶ</string>
+    <string name="categories_mode_tree">階層</string>
+    <string name="categories_mode_order">タブの順序</string>
+    <string name="tab_order_title">タブの順序（階層は変えません）</string>
+    <string name="tab_order_pinned">ピン留め</string>
+    <string name="tab_order_others">その他のカテゴリ</string>
+    <string name="tab_order_pin">タブの先頭にピン留めする</string>
+    <string name="tab_order_unpin">ピン留めを外す</string>
+    <string name="tab_order_move_up">上へ移動</string>
+    <string name="tab_order_move_down">下へ移動</string>
+    <string name="tab_order_handle">%1$s をドラッグして並べ替え</string>
+    <string name="tab_order_reset">標準の並び順に戻す</string>
+    <string name="tab_order_reset_note">並び順だけを戻します。ピン留めとカテゴリごとの表示設定はそのままです。</string>
+    <string name="tab_order_no_feeds">購読中のフィードがないためタブはありません</string>
+    <string name="organize_tabs">カテゴリ・タブを整理</string>
+    <string name="picker_search">カテゴリを検索</string>
+    <string name="picker_no_match">一致するカテゴリはありません。</string>
+    <string name="picker_current">表示中</string>
+    <plurals name="picker_results">
+        <item quantity="other">%d 件のカテゴリが見つかりました</item>
+    </plurals>
+    <string name="category_display_settings">表示設定</string>
 </resources>

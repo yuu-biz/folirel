@@ -133,6 +133,76 @@ class MigrationTest {
         context.deleteDatabase(db)
     }
 
+    /**
+     * P1-T30 / DB v4: 3→4 only adds the category preference table. A database as 0.4.2 leaves it (subscriptions in two categories,
+     * articles with reading and saved state, icons) opens validated against the exported schema 4 with every row kept, and every
+     * category has the defaults: no saved place, not pinned, nothing overridden.
+     */
+    @Test
+    fun migration3To4IsValidAndKeepsTheDataOfARealVersion3Database() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(db)
+        helper.createDatabase(db, 3).apply {
+            execSQL("INSERT INTO accounts (id, backendType, displayName, createdAt) VALUES ('acc', 'LOCAL', 'Local', 0)")
+            for (i in 1..3) {
+                execSQL(
+                    "INSERT INTO feeds (id, accountId, subscriptionUrl, fetchUrl, siteUrl, feedTitle, userTitle, isSubscribed, isPaused, createdAt) " +
+                        "VALUES ('f$i', 'acc', 'https://example.com/$i.xml', 'https://example.com/$i.xml', NULL, 'Feed $i', NULL, 1, 0, $i)",
+                )
+                execSQL("INSERT INTO feed_fetch_state (feedId, failureCount, initialized) VALUES ('f$i', 0, 1)")
+            }
+            execSQL("INSERT INTO categories (id, accountId, name, pathSegmentsJson) VALUES ('c1', 'acc', 'Tech', '[\"Tech\"]')")
+            execSQL("INSERT INTO categories (id, accountId, name, pathSegmentsJson) VALUES ('c2', 'acc', 'Web', '[\"Tech\",\"Web\"]')")
+            execSQL("INSERT INTO feed_categories (feedId, categoryId) VALUES ('f1', 'c1')")
+            execSQL("INSERT INTO feed_categories (feedId, categoryId) VALUES ('f1', 'c2')")
+            execSQL("INSERT INTO feed_categories (feedId, categoryId) VALUES ('f2', 'c2')")
+            for (i in 1..6) {
+                execSQL(
+                    "INSERT INTO articles (id, accountId, feedId, entryKey, externalEntryId, linkUrl, title, summaryText, author, publishedAt, firstSeenAt, sortAt, imageUrl, lastSeenAt) " +
+                        "VALUES ('a$i', 'acc', 'f${(i - 1) % 3 + 1}', 'id:$i', NULL, 'https://example.com/$i', 't$i', 's', NULL, $i, $i, $i, NULL, $i)",
+                )
+                execSQL("INSERT INTO article_states (articleId, isRead, isSaved, updatedAt) VALUES ('a$i', ${i % 2}, ${if (i % 3 == 0) 1 else 0}, $i)")
+            }
+            execSQL("INSERT INTO feed_icons (feedId, status, nextAttemptAt, failureCount) VALUES ('f1', 'NONE', 0, 0)")
+            close()
+        }
+        helper.runMigrationsAndValidate(db, 4, true, io.github.yuubiz.folirel.data.db.Migrations.MIGRATION_3_4).close()
+        val room = Room.databaseBuilder(context, AppDatabase::class.java, db).addMigrations(*AppDatabase.MIGRATIONS).build()
+        try {
+            runBlocking {
+                val d = room.subscriptionDao()
+                assertEquals(listOf("c1", "c2"), d.categories("acc").map { it.id }.sorted())
+                assertEquals(3, d.memberships("acc").size)
+                assertEquals(3, d.feeds("acc").size)
+                val states = (1..6).map { room.articleDao().state("a$it")!! }
+                assertEquals(listOf(1, 0, 1, 0, 1, 0), states.map { if (it.isRead) 1 else 0 })
+                assertEquals(listOf(false, false, true, false, false, true), states.map { it.isSaved })
+                assertEquals("no category has a row: every default", emptyList<Any>(), d.categoryPreferences("acc"))
+                // The new table works against the migrated database, and deleting a category removes its row.
+                d.insertPreferenceIfAbsent(io.github.yuubiz.folirel.data.db.CategoryPreferenceEntity("c1"))
+                d.setPinned("c1", true)
+                assertTrue(d.categoryPreferences("acc").single().isPinned)
+                d.deleteCategories(listOf("c1", "c2"))
+                assertEquals(emptyList<Any>(), d.categoryPreferences("acc"))
+            }
+        } finally {
+            room.close()
+            context.deleteDatabase(db)
+        }
+    }
+
+    @Test
+    fun migration1To4ChainsAllSteps() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(db)
+        helper.createDatabase(db, 1).apply {
+            execSQL("INSERT INTO accounts (id, backendType, displayName, createdAt) VALUES ('acc', 'LOCAL', 'Local', 0)")
+            close()
+        }
+        helper.runMigrationsAndValidate(db, 4, true, *io.github.yuubiz.folirel.data.db.AppDatabase.MIGRATIONS).close()
+        context.deleteDatabase(db)
+    }
+
     @Test
     fun unknownNewerVersionFailsInsteadOfWiping() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

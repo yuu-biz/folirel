@@ -152,6 +152,8 @@ class HomeNavigation(
     val addFeed: () -> Unit,
     val subscriptions: () -> Unit,
     val settings: () -> Unit,
+    /** "Organize categories and tabs": the order and the pins of the tabs. */
+    val organizeTabs: () -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -197,6 +199,7 @@ fun HomeScreen(
     var summaryFor by remember { mutableStateOf<ArticleRow?>(null) }
     var overflowOpen by remember { mutableStateOf(false) }
     var displayOpen by rememberSaveable { mutableStateOf(false) }
+    var pickerOpen by rememberSaveable { mutableStateOf(false) }
 
     val messages = HomeMessages.load()
     LaunchedEffect(vm) {
@@ -310,7 +313,7 @@ fun HomeScreen(
                                 modifier = Modifier.fillMaxWidth().testTag("search_field"),
                             )
                         } else {
-                            ScopeTitle(scopeTitle, "${filterLabel(selection.filter)} · ${sortLabel(selection.sort)}") { scope.launch { drawerState.open() } }
+                            ScopeTitle(scopeTitle, "${filterLabel(selection.filter)} · ${sortLabel(selection.sort)}") { pickerOpen = true }
                         }
                     },
                     actions = {
@@ -365,6 +368,11 @@ fun HomeScreen(
                                 )
                                 DropdownMenuItem(text = { Text(stringResource(R.string.menu_refresh)) }, onClick = { overflowOpen = false; requestRefresh() })
                                 HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.organize_tabs)) },
+                                    onClick = { overflowOpen = false; nav.organizeTabs() },
+                                    modifier = Modifier.testTag("menu_organize_tabs"),
+                                )
                                 DropdownMenuItem(text = { Text(stringResource(R.string.action_import_opml)) }, onClick = { overflowOpen = false; nav.importOpml() })
                                 DropdownMenuItem(text = { Text(stringResource(R.string.action_add_feed)) }, onClick = { overflowOpen = false; nav.addFeed() })
                                 DropdownMenuItem(
@@ -428,6 +436,18 @@ fun HomeScreen(
             }
         }
       }
+    }
+
+    if (pickerOpen) {
+        CategoryPicker(
+            structure = structure,
+            selected = selection.scope,
+            // The one already shown: the sheet only closes (no scroll to top, no notice answered).
+            onChoose = { chosen -> pickerOpen = false; if (chosen != selection.scope) vm.selectScope(chosen) },
+            onTogglePin = vm::togglePinned,
+            onOrganize = { pickerOpen = false; nav.organizeTabs() },
+            onDismiss = { pickerOpen = false },
+        )
     }
 
     if (displayOpen) {

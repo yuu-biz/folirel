@@ -5,6 +5,7 @@ import io.github.yuubiz.folirel.backend.local.opml.OpmlDocument
 import io.github.yuubiz.folirel.data.db.AccountEntity
 import io.github.yuubiz.folirel.data.db.AppDatabase
 import io.github.yuubiz.folirel.data.db.CategoryEntity
+import io.github.yuubiz.folirel.data.db.CategoryPreferenceEntity
 import io.github.yuubiz.folirel.data.db.FeedCategoryEntity
 import io.github.yuubiz.folirel.data.db.FeedEntity
 import io.github.yuubiz.folirel.data.db.FeedFetchStateEntity
@@ -12,11 +13,14 @@ import io.github.yuubiz.folirel.data.db.FeedDiagnosticsEntity
 import io.github.yuubiz.folirel.data.db.FeedHttpsMigrationEntity
 import io.github.yuubiz.folirel.data.db.FeedUrlMoveEntity
 import io.github.yuubiz.folirel.backend.FeedResult
+import io.github.yuubiz.folirel.model.CardLayoutStyle
 import io.github.yuubiz.folirel.model.FeedDiagnostics
 import io.github.yuubiz.folirel.model.FeedFetchInfo
 import io.github.yuubiz.folirel.model.FeedUrlMove
 import io.github.yuubiz.folirel.model.FetchError
+import io.github.yuubiz.folirel.model.ListMode
 import io.github.yuubiz.folirel.model.Structure
+import io.github.yuubiz.folirel.model.TabOrder
 import io.github.yuubiz.folirel.network.UrlNormalizer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -73,7 +77,8 @@ class SubscriptionRepository(
         dao.observeCategories(accountId),
         dao.observeMemberships(accountId),
         dao.observeFetchStates(accountId),
-    ) { feeds, categories, memberships, states -> Structure.build(feeds, categories, memberships, states) }
+        dao.observeCategoryPreferences(accountId),
+    ) { feeds, categories, memberships, states, preferences -> Structure.build(feeds, categories, memberships, states, preferences) }
 
     suspend fun fetchState(feedId: String): FeedFetchStateEntity? = dao.fetchState(feedId)
 
@@ -396,6 +401,77 @@ class SubscriptionRepository(
         val root = CategoryPaths.decode(all.first { it.id == categoryId }.pathSegmentsJson)
         val ids = all.filter { CategoryPaths.isSameOrDescendant(CategoryPaths.decode(it.pathSegmentsJson), root) }.map { it.id }
         dao.deleteCategories(ids) // memberships cascade
+    }
+
+    // What the reader chose per category (v4). Every write checks that the category belongs to [accountId], changes only the field it
+    // is about (a missing row is created with the defaults first), and says whether it changed anything.
+
+    private suspend fun ownedCategories(accountId: String): Map<String, CategoryEntity> = dao.categories(accountId).associateBy { it.id }
+
+    private suspend fun ensurePreference(categoryId: String) {
+        dao.insertPreferenceIfAbsent(CategoryPreferenceEntity(categoryId))
+    }
+
+    /** Moves the category to the front group (pinned) or back to the others. Its place in the normal order is kept either way. */
+    suspend fun setCategoryPinned(accountId: String, categoryId: String, pinned: Boolean): Boolean = db.withTransaction {
+        if (categoryId !in ownedCategories(accountId)) return@withTransaction false
+        ensurePreference(categoryId)
+        dao.setPinned(categoryId, pinned)
+        true
+    }
+
+    /**
+     * Saves the new order of one group of tabs: [orderedIds] are the pinned categories (or the others) in the order the reader
+     * left them in. Only that group's members change places among the places they held; the other group does not move. Ids that
+     * are gone or belong to another account are ignored; members that appeared meanwhile keep their old order after the given
+     * ones. Written in one transaction; false when nothing valid was given.
+     */
+    suspend fun reorderCategoryTabs(accountId: String, pinned: Boolean, orderedIds: List<String>): Boolean = db.withTransaction {
+        val owned = ownedCategories(accountId)
+        if (orderedIds.none { it in owned }) return@withTransaction false
+        val prefs = dao.categoryPreferences(accountId).associate { it.categoryId to it }
+        val structure = Structure.build(emptyList(), owned.values.toList(), emptyList(), emptyList(), prefs.values.toList())
+        val sequence = TabOrder.reorderGroup(structure.categories, structure.preferences, pinned, orderedIds)
+        sequence.forEachIndexed { index, id ->
+            ensurePreference(id)
+            dao.setTabOrder(id, index)
+        }
+        true
+    }
+
+    /** "Standard order": only the saved places are forgotten (the path order applies again). Pins and display settings stay. */
+    suspend fun resetCategoryTabOrder(accountId: String) {
+        dao.clearTabOrders(accountId)
+    }
+
+    suspend fun setCategoryListLayout(accountId: String, categoryId: String, mode: ListMode?): Boolean = db.withTransaction {
+        if (categoryId !in ownedCategories(accountId)) return@withTransaction false
+        ensurePreference(categoryId)
+        dao.setListModeOverride(categoryId, mode?.name)
+        true
+    }
+
+    suspend fun setCategoryCardStyle(accountId: String, categoryId: String, style: CardLayoutStyle?): Boolean = db.withTransaction {
+        if (categoryId !in ownedCategories(accountId)) return@withTransaction false
+        ensurePreference(categoryId)
+        dao.setCardStyleOverride(categoryId, style?.name)
+        true
+    }
+
+    /** [columns]: null inherits, 0 is automatic, 1..3 the most columns wanted. */
+    suspend fun setCategoryCardColumns(accountId: String, categoryId: String, columns: Int?): Boolean = db.withTransaction {
+        require(columns == null || columns in 0..3) { "Columns out of range" }
+        if (categoryId !in ownedCategories(accountId)) return@withTransaction false
+        ensurePreference(categoryId)
+        dao.setCardColumnsOverride(categoryId, columns)
+        true
+    }
+
+    /** The three display settings of the category go back to inheriting. Pin, place, subscriptions and reading state stay. */
+    suspend fun resetCategoryLayout(accountId: String, categoryId: String): Boolean = db.withTransaction {
+        if (categoryId !in ownedCategories(accountId)) return@withTransaction false
+        dao.clearLayoutOverrides(categoryId)
+        true
     }
 
     /** Subscribed feeds with their direct category paths, for OPML export. */

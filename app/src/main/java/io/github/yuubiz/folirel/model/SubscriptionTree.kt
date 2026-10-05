@@ -1,6 +1,7 @@
 package io.github.yuubiz.folirel.model
 
 import io.github.yuubiz.folirel.data.db.CategoryEntity
+import io.github.yuubiz.folirel.data.db.CategoryPreferenceEntity
 import io.github.yuubiz.folirel.data.db.FeedCategoryEntity
 import io.github.yuubiz.folirel.data.db.FeedEntity
 import io.github.yuubiz.folirel.data.db.FeedFetchStateEntity
@@ -45,13 +46,20 @@ data class FeedNode(
 
 /** Subscriptions and categories derived for drawer, tabs and scope resolution. */
 data class Structure(
+    /** In path order (the tree); the order of the tabs is [tabOrdered]. */
     val categories: List<CategoryNode> = emptyList(),
     val feeds: Map<String, FeedNode> = emptyMap(),
     val loaded: Boolean = false,
+    /** What the reader chose per category (tab place, pin, display overrides), by category id; a missing id has every default. */
+    val preferences: Map<String, CategoryPreference> = emptyMap(),
 ) {
+    /** Every category in the order of the tabs (pinned first); the one order that tabs, pager, picker and organizer share. */
+    val tabOrdered: List<CategoryNode> = TabOrder.resolve(categories, preferences)
+
     val subscribedFeeds: List<FeedNode> get() = feeds.values.filter { it.subscribed }
     val hasUncategorized: Boolean get() = subscribedFeeds.any { it.categoryIds.isEmpty() }
-    val tabCategories: List<CategoryNode> get() = categories.filter { it.subtreeFeedCount > 0 }
+    /** The categories that get a tab: they or their descendants have a subscribed feed. In tab order. */
+    val tabCategories: List<CategoryNode> get() = tabOrdered.filter { it.subtreeFeedCount > 0 }
 
     /** Subscribed feeds, not paused, whose articles could not be saved: a problem of this device, shown on its own until it is solved. */
     val feedsFailingToSave: Int get() = subscribedFeeds.count { !it.paused && it.lastError == FetchError.STORAGE }
@@ -68,6 +76,7 @@ data class Structure(
             categories: List<CategoryEntity>,
             memberships: List<FeedCategoryEntity>,
             states: List<FeedFetchStateEntity>,
+            preferences: List<CategoryPreferenceEntity> = emptyList(),
         ): Structure {
             val stateById = states.associateBy { it.feedId }
             val categoriesByFeed = memberships.groupBy({ it.feedId }, { it.categoryId })
@@ -107,7 +116,9 @@ data class Structure(
                         directFeedIds = membersByCategory[c.id].orEmpty().sortedBy { feedNodes[it]?.name?.lowercase() },
                     )
                 }
-            return Structure(nodes, feedNodes, loaded = true)
+            val known = categories.map { it.id }.toSet()
+            val prefs = preferences.filter { it.categoryId in known }.associate { it.categoryId to it.toModel() }
+            return Structure(nodes, feedNodes, loaded = true, preferences = prefs)
         }
 
         fun displayName(feed: FeedEntity): String =
@@ -117,3 +128,13 @@ data class Structure(
                 ?: feed.subscriptionUrl
     }
 }
+
+private fun CategoryPreferenceEntity.toModel() = CategoryPreference(
+    categoryId = categoryId,
+    tabOrder = tabOrder,
+    isPinned = isPinned,
+    // An unknown stored name (a newer or older build wrote it) means "inherit": never an error, never a made-up value.
+    listLayout = listModeOverride?.let { v -> ListMode.entries.firstOrNull { it.name == v } },
+    cardStyle = cardStyleOverride?.let { v -> CardLayoutStyle.entries.firstOrNull { it.name == v } },
+    cardColumns = cardColumnsOverride?.takeIf { it in 0..3 },
+)

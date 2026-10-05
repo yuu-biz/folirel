@@ -57,6 +57,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -582,8 +585,10 @@ fun TextInputDialog(title: String, initial: String, label: String? = null, onCon
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CategoriesScreen(vm: SubscriptionsViewModel, onBack: () -> Unit) {
+fun CategoriesScreen(vm: SubscriptionsViewModel, onBack: () -> Unit, initialOrder: Boolean = false) {
     val structure by vm.structure.collectAsStateWithLifecycle()
+    // Two views of the same categories: the hierarchy (rename, add, delete) and the order of the tabs (pins, drag).
+    var orderMode by rememberSaveable { mutableStateOf(initialOrder) }
     val snackbar = remember { SnackbarHostState() }
     var creatingUnder by remember { mutableStateOf<String?>(null) }
     var creating by remember { mutableStateOf(false) }
@@ -603,7 +608,27 @@ fun CategoriesScreen(vm: SubscriptionsViewModel, onBack: () -> Unit) {
             )
         },
     ) { padding ->
-        LazyColumn(Modifier.padding(padding).fillMaxSize()) {
+      Column(Modifier.padding(padding).fillMaxSize()) {
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            SegmentedButton(
+                selected = !orderMode,
+                onClick = { orderMode = false },
+                shape = SegmentedButtonDefaults.itemShape(0, 2),
+                modifier = Modifier.testTag("categories_mode_tree"),
+                label = { Text(stringResource(R.string.categories_mode_tree), maxLines = 1) },
+            )
+            SegmentedButton(
+                selected = orderMode,
+                onClick = { orderMode = true },
+                shape = SegmentedButtonDefaults.itemShape(1, 2),
+                modifier = Modifier.testTag("categories_mode_order"),
+                label = { Text(stringResource(R.string.categories_mode_order), maxLines = 1) },
+            )
+        }
+        if (orderMode) {
+            TabOrderList(vm, onDisplaySettings = {}, modifier = Modifier.weight(1f))
+        } else
+        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
             if (structure.categories.isEmpty()) item { Text(stringResource(R.string.categories_empty), modifier = Modifier.padding(16.dp)) }
             items(structure.categories, key = { it.id }) { category ->
                 var menu by remember { mutableStateOf(false) }
@@ -629,6 +654,7 @@ fun CategoriesScreen(vm: SubscriptionsViewModel, onBack: () -> Unit) {
                 HorizontalDivider()
             }
         }
+      }
     }
     if (creating) {
         TextInputDialog(

@@ -502,4 +502,26 @@
     <string name="display_layout">Layout</string>
     <string name="display_layout_global_note">This changes the default layout for every category that has no layout of its own.</string>
     <string name="action_choose_category">Choose category</string>
+    <string name="categories_mode_tree">Hierarchy</string>
+    <string name="categories_mode_order">Tab order</string>
+    <string name="tab_order_title">Tab order (the hierarchy is not changed)</string>
+    <string name="tab_order_pinned">Pinned</string>
+    <string name="tab_order_others">Other categories</string>
+    <string name="tab_order_pin">Pin to the front of the tabs</string>
+    <string name="tab_order_unpin">Unpin</string>
+    <string name="tab_order_move_up">Move up</string>
+    <string name="tab_order_move_down">Move down</string>
+    <string name="tab_order_handle">Drag to reorder %1$s</string>
+    <string name="tab_order_reset">Back to the standard order</string>
+    <string name="tab_order_reset_note">Only the order is reset. Pins and the display settings of each category stay.</string>
+    <string name="tab_order_no_feeds">No subscribed feed, so no tab</string>
+    <string name="organize_tabs">Organize categories and tabs</string>
+    <string name="picker_search">Search categories</string>
+    <string name="picker_no_match">No category matches.</string>
+    <string name="picker_current">Showing now</string>
+    <plurals name="picker_results">
+        <item quantity="one">%d category found</item>
+        <item quantity="other">%d categories found</item>
+    </plurals>
+    <string name="category_display_settings">Display settings</string>
 </resources>

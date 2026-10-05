@@ -52,4 +52,19 @@ object Migrations {
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_feed_url_moves_toUrl` ON `feed_url_moves` (`toUrl`)")
         }
     }
+
+    /**
+     * v4: what the reader chose per category (tab order, pin, display overrides). One new table; no existing row is touched, and a
+     * category without a row has every default, so the first start after the update changes nothing the reader can see.
+     */
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `category_preferences` (`categoryId` TEXT NOT NULL, `tabOrder` INTEGER, " +
+                    "`isPinned` INTEGER NOT NULL DEFAULT 0, `listModeOverride` TEXT, `cardStyleOverride` TEXT, " +
+                    "`cardColumnsOverride` INTEGER, PRIMARY KEY(`categoryId`), " +
+                    "FOREIGN KEY(`categoryId`) REFERENCES `categories`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+            )
+        }
+    }
 }

@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -62,6 +63,26 @@ fun HomeDrawer(
                     DrawerItem(stringResource(R.string.scope_uncategorized), selection.scope == ArticleScope.Uncategorized) {
                         onSelect(ArticleScope.Uncategorized)
                     }
+                }
+            }
+            val pinned = structure.tabOrdered.filter { structure.preferences[it.id]?.isPinned == true }
+            if (pinned.isNotEmpty()) {
+                item { HorizontalDivider(Modifier.padding(vertical = 4.dp)) }
+                item {
+                    Text(
+                        stringResource(R.string.tab_order_pinned),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+                // Shortcuts only: the same categories are in the tree below, in their place there.
+                items(pinned, key = { "pin-${it.id}" }) { category ->
+                    DrawerItem(
+                        label = category.display,
+                        selected = selection.scope == ArticleScope.Category(category.id),
+                        modifier = Modifier.testTag("drawer_pinned_${category.id}"),
+                    ) { onSelect(ArticleScope.Category(category.id)) }
                 }
             }
             if (structure.categories.isNotEmpty()) {

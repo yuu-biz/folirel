@@ -140,6 +140,39 @@ interface SubscriptionDao {
     @Query("DELETE FROM categories WHERE id IN (:ids)")
     suspend fun deleteCategories(ids: List<String>): Int
 
+    // Category preferences (v4): tab order, pin and display overrides
+
+    @Query("SELECT p.* FROM category_preferences p JOIN categories c ON c.id = p.categoryId WHERE c.accountId = :accountId")
+    fun observeCategoryPreferences(accountId: String): Flow<List<CategoryPreferenceEntity>>
+
+    @Query("SELECT p.* FROM category_preferences p JOIN categories c ON c.id = p.categoryId WHERE c.accountId = :accountId")
+    suspend fun categoryPreferences(accountId: String): List<CategoryPreferenceEntity>
+
+    /** Makes sure the row exists (all defaults) so that a partial update below has something to change. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertPreferenceIfAbsent(row: CategoryPreferenceEntity): Long
+
+    @Query("UPDATE category_preferences SET isPinned = :pinned WHERE categoryId = :categoryId")
+    suspend fun setPinned(categoryId: String, pinned: Boolean): Int
+
+    @Query("UPDATE category_preferences SET tabOrder = :order WHERE categoryId = :categoryId")
+    suspend fun setTabOrder(categoryId: String, order: Int?): Int
+
+    @Query("UPDATE category_preferences SET tabOrder = NULL WHERE categoryId IN (SELECT id FROM categories WHERE accountId = :accountId)")
+    suspend fun clearTabOrders(accountId: String): Int
+
+    @Query("UPDATE category_preferences SET listModeOverride = :value WHERE categoryId = :categoryId")
+    suspend fun setListModeOverride(categoryId: String, value: String?): Int
+
+    @Query("UPDATE category_preferences SET cardStyleOverride = :value WHERE categoryId = :categoryId")
+    suspend fun setCardStyleOverride(categoryId: String, value: String?): Int
+
+    @Query("UPDATE category_preferences SET cardColumnsOverride = :value WHERE categoryId = :categoryId")
+    suspend fun setCardColumnsOverride(categoryId: String, value: Int?): Int
+
+    @Query("UPDATE category_preferences SET listModeOverride = NULL, cardStyleOverride = NULL, cardColumnsOverride = NULL WHERE categoryId = :categoryId")
+    suspend fun clearLayoutOverrides(categoryId: String): Int
+
     // Memberships
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)

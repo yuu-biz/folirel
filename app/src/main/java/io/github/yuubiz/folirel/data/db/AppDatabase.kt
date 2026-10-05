@@ -20,6 +20,7 @@ import androidx.room.migration.Migration
         FeedHttpsMigrationEntity::class,
         FeedIconEntity::class,
         FeedUrlMoveEntity::class,
+        CategoryPreferenceEntity::class,
     ],
     version = AppDatabase.VERSION,
     exportSchema = true,
@@ -31,11 +32,11 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun iconDao(): FeedIconDao
 
     companion object {
-        const val VERSION = 3
+        const val VERSION = 4
         const val NAME = "folirel.db"
 
         /** Explicit migrations only. Destructive fallback is forbidden (docs/data-and-import.md section 6). */
-        val MIGRATIONS: Array<Migration> = arrayOf(Migrations.MIGRATION_1_2, Migrations.MIGRATION_2_3)
+        val MIGRATIONS: Array<Migration> = arrayOf(Migrations.MIGRATION_1_2, Migrations.MIGRATION_2_3, Migrations.MIGRATION_3_4)
 
         /** Database files on disk (main, WAL, shared memory) for the size display. */
         fun fileBytes(context: Context): Long =

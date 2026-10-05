@@ -250,6 +250,16 @@ class HomeViewModel(
         viewModelScope.launch { settingsRepository.setConfirmHttpOpen(false) }
     }
 
+    /** Pins the category to the front of the tabs, or unpins it. Changes nothing else: no article, no subscription, no selection. */
+    fun togglePinned(categoryId: String) {
+        val pinned = structure.value.preferences[categoryId]?.isPinned == true
+        viewModelScope.launch {
+            val account = accountId.value ?: return@launch
+            val ok = runCatching { subscriptions.setCategoryPinned(account, categoryId, !pinned) }.getOrDefault(false)
+            if (!ok) events.send(HomeEvent.Message(HomeEvent.Message.Kind.UPDATE_FAILED))
+        }
+    }
+
     fun setListMode(mode: ListMode) {
         viewModelScope.launch { settingsRepository.setListMode(mode) }
     }

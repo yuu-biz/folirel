@@ -1,5 +1,6 @@
 package io.github.yuubiz.folirel.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -132,6 +133,31 @@ data class CategoryEntity(
     val name: String,
     /** JSON array of NFC-normalized segments; a segment may itself contain "/". */
     val pathSegmentsJson: String,
+)
+
+/**
+ * What the reader chose for one category (v4): the place of its tab, the pin, and the three display settings it overrides. The id
+ * is the category's own, so a rename keeps all of it; deleting the category deletes the row. No row = every default: no saved
+ * place, not pinned, everything inherited. [tabOrder] null = no saved place; [cardColumnsOverride] null = inherit, 0 = automatic.
+ */
+@Entity(
+    tableName = "category_preferences",
+    foreignKeys = [
+        ForeignKey(
+            entity = CategoryEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["categoryId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+)
+data class CategoryPreferenceEntity(
+    @PrimaryKey val categoryId: String,
+    val tabOrder: Int? = null,
+    @ColumnInfo(defaultValue = "0") val isPinned: Boolean = false,
+    val listModeOverride: String? = null,
+    val cardStyleOverride: String? = null,
+    val cardColumnsOverride: Int? = null,
 )
 
 @Entity(

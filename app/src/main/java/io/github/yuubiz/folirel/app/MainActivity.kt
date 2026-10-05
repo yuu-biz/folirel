@@ -166,6 +166,7 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
                         addFeed = { addFeedOpen = true },
                         subscriptions = { push(ROUTE_SUBSCRIPTIONS) },
                         settings = { push(ROUTE_SETTINGS) },
+                        organizeTabs = { push(ROUTE_TAB_ORDER) },
                     ),
                 )
                 route == ROUTE_IMPORT -> ImportScreen(
@@ -190,6 +191,7 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
                 )
                 route == ROUTE_HTTPS -> HttpsUpgradeScreen(subscriptionsVm, onBack = ::pop)
                 route == ROUTE_CATEGORIES -> CategoriesScreen(subscriptionsVm, onBack = ::pop)
+                route == ROUTE_TAB_ORDER -> CategoriesScreen(subscriptionsVm, onBack = ::pop, initialOrder = true)
                 route.startsWith(ROUTE_FEED_PREFIX) -> FeedDetailScreen(subscriptionsVm, route.removePrefix(ROUTE_FEED_PREFIX), onBack = ::pop)
                 route == ROUTE_SETTINGS -> SettingsScreen(settingsVm, onBack = ::pop, onExport = exportOpml, onHttpsCheck = { push(ROUTE_HTTPS) })
             }
@@ -211,6 +213,7 @@ private const val ROUTE_HOME = "home"
 private const val ROUTE_IMPORT = "import"
 private const val ROUTE_SUBSCRIPTIONS = "subscriptions"
 private const val ROUTE_CATEGORIES = "categories"
+private const val ROUTE_TAB_ORDER = "categories/order"
 private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_FEED_PREFIX = "feed/"
 private const val ROUTE_HTTPS = "https"

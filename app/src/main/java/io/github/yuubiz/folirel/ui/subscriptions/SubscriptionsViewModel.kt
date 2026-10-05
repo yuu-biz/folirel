@@ -187,6 +187,34 @@ class SubscriptionsViewModel(
 
     fun deleteCategory(categoryId: String) = guarded { subscriptions.deleteCategory(categoryId) }
 
+    // Tab order and pins (P1-ORG). The tree (paths, memberships) is never touched by these.
+
+    /** Saves the order of one group of tabs; false when the write failed (the screen then shows the stored order again). */
+    suspend fun reorderCategoryTabs(pinned: Boolean, orderedIds: List<String>): Boolean =
+        runCatching { subscriptions.reorderCategoryTabs(subscriptions.ensureLocalAccount(), pinned, orderedIds) }.getOrDefault(false)
+
+    fun reportFailure() = viewModelScope.launch { events.send(SubscriptionEvent.OperationFailed) }
+
+    fun setCategoryPinned(categoryId: String, pinned: Boolean) = viewModelScope.launch {
+        val ok = runCatching { subscriptions.setCategoryPinned(subscriptions.ensureLocalAccount(), categoryId, pinned) }.getOrDefault(false)
+        if (!ok) events.send(SubscriptionEvent.OperationFailed)
+    }
+
+    /** The up/down alternative to dragging: one place within the category's own group. */
+    fun moveCategory(categoryId: String, delta: Int) = viewModelScope.launch {
+        val s = structure.value
+        val pinned = s.preferences[categoryId]?.isPinned == true
+        val group = s.tabOrdered.filter { (s.preferences[it.id]?.isPinned == true) == pinned }.map { it.id }
+        val moved = io.github.yuubiz.folirel.model.TabOrder.move(group, categoryId, delta) ?: return@launch
+        if (!reorderCategoryTabs(pinned, moved)) events.send(SubscriptionEvent.OperationFailed)
+    }
+
+    /** "Standard order": forgets the saved places only. Pins and display settings stay. */
+    fun resetCategoryTabOrder() = viewModelScope.launch {
+        val ok = runCatching { subscriptions.resetCategoryTabOrder(subscriptions.ensureLocalAccount()) }.isSuccess
+        if (!ok) events.send(SubscriptionEvent.OperationFailed)
+    }
+
     /** Writes subscribed feeds and categories only (no reading state). Reports failure explicitly. */
     fun export(uri: Uri) = viewModelScope.launch {
         val ok = runCatching {
