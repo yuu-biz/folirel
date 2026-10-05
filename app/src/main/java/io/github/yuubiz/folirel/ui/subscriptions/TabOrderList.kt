@@ -70,11 +70,14 @@ internal fun TabOrderList(
     val savedPinned = nodes.filter { structure.preferences[it.id]?.isPinned == true }.map { it.id }
     val savedOthers = nodes.filter { structure.preferences[it.id]?.isPinned != true }.map { it.id }
     val byId = nodes.associateBy { it.id }
-    // The edit buffer: the stored order, rebuilt whenever it changes (or a drag is undone).
-    var undo by remember { mutableIntStateOf(0) }
-    val pinned = remember(savedPinned, undo) { mutableStateListOf<String>().apply { addAll(savedPinned) } }
-    val others = remember(savedOthers, undo) { mutableStateListOf<String>().apply { addAll(savedOthers) } }
     var dragging by remember { mutableStateOf<String?>(null) }
+    // The edit buffer: the stored order, rebuilt whenever it changes (or a drag is undone). While a row is being dragged a newer stored
+    // order (the result of an earlier press) waits until the finger is lifted: the row under the finger is never pulled away.
+    var applied by remember { mutableStateOf(savedPinned to savedOthers) }
+    if (dragging == null && applied != (savedPinned to savedOthers)) applied = savedPinned to savedOthers
+    var undo by remember { mutableIntStateOf(0) }
+    val pinned = remember(applied.first, undo) { mutableStateListOf<String>().apply { addAll(applied.first) } }
+    val others = remember(applied.second, undo) { mutableStateListOf<String>().apply { addAll(applied.second) } }
     var dragOffset by remember { mutableFloatStateOf(0f) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -103,8 +106,8 @@ internal fun TabOrderList(
 
     fun finishDrag(id: String, save: Boolean) {
         val group = groupOf(id)
-        val isPinned = group === pinned
-        val ids = group.toList()
+        // Where it was dropped, as "before this neighbour": applied to whatever order is stored when the write runs.
+        val before = group.getOrNull(group.indexOf(id) + 1)
         dragging = null
         dragOffset = 0f
         if (!save) {
@@ -112,7 +115,7 @@ internal fun TabOrderList(
             return
         }
         scope.launch {
-            if (!vm.reorderCategoryTabs(isPinned, ids)) {
+            if (!vm.placeCategory(id, before)) {
                 undo++
                 vm.reportFailure()
             }

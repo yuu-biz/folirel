@@ -71,6 +71,15 @@ object TabOrder {
         return group.toMutableList().also { it.add(to, it.removeAt(from)) }
     }
 
+    /** [group] with [id] put just before [beforeId] (at the end when [beforeId] is null or not in the group); null when nothing changes. */
+    fun moveBefore(group: List<String>, id: String, beforeId: String?): List<String>? {
+        if (id !in group) return null
+        val rest = group.filter { it != id }
+        val at = beforeId?.let { rest.indexOf(it) }?.takeIf { it >= 0 } ?: rest.size
+        val moved = rest.toMutableList().also { it.add(at, id) }
+        return moved.takeIf { it != group }
+    }
+
     /**
      * The normal order (ids) after the members of one group (pinned or not) were put in [wanted] order: they take the places the
      * group's members had, the other group does not move. Ids that are not in the group are ignored; members missing from

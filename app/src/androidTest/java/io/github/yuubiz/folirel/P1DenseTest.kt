@@ -160,4 +160,51 @@ class P1DenseTest : HomeFlowTestBase() {
             closePanel()
         }
     }
+
+    /**
+     * P1-T12 (the part 0.5.0 left open): an update that finishes with new articles and a problem while the display panel is open. The
+     * notice keeps its own five seconds (it is not shown again or lengthened by the panel closing), the new articles are announced by the
+     * banner of the list they belong to once the panel is gone, the list does not move, and nothing is read.
+     */
+    @Test
+    fun anUpdateThatFinishesWhileThePanelIsOpenIsAnnouncedAfterwardsAndMovesNothing() {
+        firstFetchThenShow()
+        addBadFeed()
+        badStatus = 500
+        scrolledDown()
+        val top = firstArticleTop()
+        openPanel()
+        oneNew = (0 until 6).map { "パネル中の新着 $it" }
+        refresh()
+        until(10_000) { coordinator.state.value.requests.isNotEmpty() && coordinator.state.value.requests.none { it.running } }
+        Thread.sleep(6_500) // longer than the notice lives, with the panel open all the time
+        closePanel()
+        assertTrue("the notice ended by its own time and did not come back with the panel gone", !existsAnywhere("refresh_notice"))
+        until(10_000) { exists("new_articles_banner") }
+        assertTrue("the banner counts the six new articles of this list: ${bannerText()}", bannerText().contains("6"))
+        assertEquals("the list did not move", top, firstArticleTop(), 0.5f)
+        assertEquals("the new articles are announced, not answered: nothing was acknowledged by the panel", 6, vm.newArticleIds.value.size)
+        assertEquals(0, readCount())
+    }
+
+    /** The same arrivals while a search is active: the list of the search does not show them, so no banner announces them there; clearing the search shows the notice. */
+    @Test
+    fun arrivalsDuringASearchAreAnnouncedWhenTheSearchEnds() {
+        firstFetchThenShow()
+        compose.onNodeWithTag("search_open").performClick()
+        until(5_000) { existsAnywhere("search_field") }
+        compose.onNodeWithTag("search_field").performTextInput("旧記事 1")
+        until(10_000) { vm.selection.value.search == "旧記事 1" }
+        compose.waitForIdle()
+        oneNew = (0 until 4).map { "検索外の新着 $it" }
+        refresh()
+        until(10_000) { vm.newArticleIds.value.size == 4 }
+        compose.waitForIdle()
+        assertTrue("the arrivals do not match the search: no banner on the list of the search", !exists("new_articles_banner"))
+        assertEquals("they are still announced (not lost)", 4, vm.newArticleIds.value.size)
+        vm.setSearchActive(false)
+        until(10_000) { exists("new_articles_banner") }
+        assertTrue(bannerText().contains("4"))
+        assertEquals(0, readCount())
+    }
 }

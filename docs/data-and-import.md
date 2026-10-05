@@ -279,7 +279,8 @@ change it, so unpinning returns the saved place. `listModeOverride` (`LIST`, `CO
 `cardStyleOverride` (`MIXED`, `EVEN`) and `cardColumnsOverride` (0 = automatic, 1 to 3) are null when inherited from the
 global settings below; an unknown stored value is read as inherited. Writes change one field at a time (a missing row is
 created with the defaults first), refuse a category of another account in the repository, and saving an order writes
-the ranks in one transaction. The tab order is flat: it never changes `categories.pathSegmentsJson` or `feed_categories`.
+the ranks in one transaction. A move ("by n places" or "before this neighbour") is computed from the order stored when the
+transaction runs, never from an order a screen showed, so concurrent moves are each applied to the result of the other. The tab order is flat: it never changes `categories.pathSegmentsJson` or `feed_categories`.
 OPML import and re-import add and merge only: they find the same category by path (the same id) and keep its row;
 a rename keeps it. OPML does not carry these settings, so they are not part of the OPML export; a future backup of the
 reader's own choices would have to include this table (and the DataStore keys below).

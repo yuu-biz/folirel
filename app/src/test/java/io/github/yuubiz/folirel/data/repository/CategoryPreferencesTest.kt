@@ -8,6 +8,8 @@ import io.github.yuubiz.folirel.model.NormalizedEntry
 import io.github.yuubiz.folirel.model.NormalizedFeed
 import io.github.yuubiz.folirel.model.Structure
 import io.github.yuubiz.folirel.testutil.TestEnv
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -163,5 +165,50 @@ class CategoryPreferencesTest {
         repo.deleteCategory(a)
         assertTrue(dao.categoryPreferences(account).isEmpty())
         assertEquals(2, dao.feeds(account).size)
+    }
+
+    /** Moves that are asked for at the same time are each applied to the order the other left: none is lost or undone. */
+    @Test
+    fun movesRunAtTheSameTimeAreAllApplied() = runBlocking {
+        val account = repo.ensureLocalAccount()
+        import(account, listOf("A"), listOf("B"), listOf("C"), listOf("D"), listOf("E"), listOf("F"))
+        val e = idOf(account, "E")
+        val c = idOf(account, "C")
+        // Three presses on E and one on C, all started before any result is looked at.
+        val jobs = List(3) { async { repo.moveCategoryTab(account, e, -1) } } + async { repo.moveCategoryTab(account, c, -1) }
+        assertTrue(jobs.awaitAll().all { it })
+        // E went up three places (fifth to second) and C up one, whichever ran first: the moves end alike.
+        assertEquals(listOf("A", "E", "C", "B", "D", "F"), tabIds(account))
+    }
+
+    @Test
+    fun aDropBeforeANeighbourKeepsMovesStoredMeanwhile() = runBlocking {
+        val account = repo.ensureLocalAccount()
+        import(account, listOf("A"), listOf("B"), listOf("C"), listOf("D"))
+        // The row of D was dragged when the order was A B C D; meanwhile B was moved down one place (A C B D).
+        repo.moveCategoryTab(account, idOf(account, "B"), 1)
+        assertTrue(repo.placeCategoryTab(account, idOf(account, "D"), idOf(account, "C")))
+        // "Before C" in what is stored now: B's move is kept.
+        assertEquals(listOf("A", "D", "C", "B"), tabIds(account))
+        // At the end; before a neighbour that was deleted meanwhile (the end); a category of another account.
+        assertTrue(repo.placeCategoryTab(account, idOf(account, "A"), null))
+        assertEquals(listOf("D", "C", "B", "A"), tabIds(account))
+        assertTrue(repo.placeCategoryTab(account, idOf(account, "D"), "deleted-id"))
+        assertEquals(listOf("C", "B", "A", "D"), tabIds(account))
+        assertTrue(!repo.placeCategoryTab("someone-else", idOf(account, "A"), null))
+        assertTrue(!repo.moveCategoryTab("someone-else", idOf(account, "A"), 1))
+    }
+
+    @Test
+    fun movesStayInsideTheirGroup() = runBlocking {
+        val account = repo.ensureLocalAccount()
+        import(account, listOf("A"), listOf("B"), listOf("C"), listOf("D"))
+        repo.setCategoryPinned(account, idOf(account, "C"), true)
+        repo.setCategoryPinned(account, idOf(account, "D"), true)
+        assertEquals(listOf("C", "D", "A", "B"), tabIds(account))
+        // D up: above C (inside the pinned group). A up: it is first of the others, so nothing moves (it does not cross into the pinned group).
+        repo.moveCategoryTab(account, idOf(account, "D"), -1)
+        repo.moveCategoryTab(account, idOf(account, "A"), -1)
+        assertEquals(listOf("D", "C", "A", "B"), tabIds(account))
     }
 }

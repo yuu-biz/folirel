@@ -87,4 +87,70 @@ class P1MoveTest : HomeFlowTestBase() {
         assertEquals(all, vm.selection.value.scope)
         assertEquals(0, readCount())
     }
+
+    /** T08 through the drawer: opened over the moving list, a category chosen there ends the movement of the page left, like a tab or the picker. */
+    @Test
+    fun choosingThroughTheDrawerEndsTheMovementOfTheOldPage() {
+        firstFetchThenShow()
+        scrolledDown()
+        val before = axis(all)!!
+        val drawerLabel = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.action_open_drawer)
+        compose.mainClock.autoAdvance = false
+        val atSwitch: Float
+        val during = ArrayList<Float>()
+        try {
+            compose.onNode(pageOf(all, "scroll_to_top")).performClick()
+            frames(6)
+            val moving = axis(all)!!
+            assertTrue("the movement was under way ($before -> $moving)", moving < before)
+            compose.onNode(androidx.compose.ui.test.hasContentDescription(drawerLabel)).performClick()
+            framesUntil(90) { existsTag("drawer_item_uncategorized") }
+            compose.onNodeWithTag("drawer_item_uncategorized").performClick()
+            frames(1)
+            atSwitch = axis(all) ?: moving
+            repeat(10) {
+                frames(1)
+                axis(all)?.let { during += it }
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+        until(10_000) { vm.selection.value.scope == b }
+        assertTrue("A was still composed while the pager slid: ${during.size} frames", during.size >= 3)
+        assertTrue("the old page went on moving after the drawer choice: $atSwitch -> $during", during.all { kotlin.math.abs(it - atSwitch) <= 1f })
+        assertEquals(0, readCount())
+    }
+
+    /** And the four seconds of following after the arrow: ended by a drawer choice, arrivals on the old page do not move it. */
+    @Test
+    fun choosingThroughTheDrawerEndsTheFollowingOfTheOldPage() {
+        firstFetchThenShow()
+        scrolledDown()
+        compose.onNode(pageOf(all, "scroll_to_top")).performClick()
+        until(10_000) { (axis(all) ?: 1f) == 0f }
+        val drawerLabel = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.action_open_drawer)
+        compose.mainClock.autoAdvance = false
+        val after = ArrayList<Float>()
+        try {
+            compose.onNode(androidx.compose.ui.test.hasContentDescription(drawerLabel)).performClick()
+            framesUntil(90) { existsTag("drawer_item_uncategorized") }
+            compose.onNodeWithTag("drawer_item_uncategorized").performClick()
+            frames(2)
+            oneNew = (0 until 12).map { "ドロワー後の新着 $it" }
+            refresh()
+            repeat(10) {
+                frames(1)
+                axis(all)?.let { after += it }
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+        until(10_000) { vm.selection.value.scope == b }
+        assertTrue("A was still composed while the articles arrived: ${after.size} frames", after.size >= 3)
+        assertTrue("A followed the arrival after the drawer choice (it would stay at 0): $after", after.takeLast(3).all { it > 1_000f })
+        assertEquals(12, vm.newArticleIds.value.size)
+        assertEquals(0, readCount())
+    }
 }

@@ -201,10 +201,6 @@ class SubscriptionsViewModel(
 
     // Tab order and pins (P1-ORG). The tree (paths, memberships) is never touched by these.
 
-    /** Saves the order of one group of tabs; false when the write failed (the screen then shows the stored order again). */
-    suspend fun reorderCategoryTabs(pinned: Boolean, orderedIds: List<String>): Boolean =
-        runCatching { subscriptions.reorderCategoryTabs(subscriptions.ensureLocalAccount(), pinned, orderedIds) }.getOrDefault(false)
-
     fun reportFailure() = viewModelScope.launch { events.send(SubscriptionEvent.OperationFailed) }
 
     fun setCategoryPinned(categoryId: String, pinned: Boolean) = viewModelScope.launch {
@@ -212,14 +208,18 @@ class SubscriptionsViewModel(
         if (!ok) events.send(SubscriptionEvent.OperationFailed)
     }
 
-    /** The up/down alternative to dragging: one place within the category's own group. */
+    /**
+     * The up/down alternative to dragging: [delta] places within the category's own group, computed by the repository from the stored
+     * order (so presses made in quick succession all count).
+     */
     fun moveCategory(categoryId: String, delta: Int) = viewModelScope.launch {
-        val s = structure.value
-        val pinned = s.preferences[categoryId]?.isPinned == true
-        val group = s.tabOrdered.filter { (s.preferences[it.id]?.isPinned == true) == pinned }.map { it.id }
-        val moved = io.github.yuubiz.folirel.model.TabOrder.move(group, categoryId, delta) ?: return@launch
-        if (!reorderCategoryTabs(pinned, moved)) events.send(SubscriptionEvent.OperationFailed)
+        val ok = runCatching { subscriptions.moveCategoryTab(subscriptions.ensureLocalAccount(), categoryId, delta) }.getOrDefault(false)
+        if (!ok) events.send(SubscriptionEvent.OperationFailed)
     }
+
+    /** A dragged row was dropped just before [beforeCategoryId] (null: at the end of its group). False when the write failed. */
+    suspend fun placeCategory(categoryId: String, beforeCategoryId: String?): Boolean =
+        runCatching { subscriptions.placeCategoryTab(subscriptions.ensureLocalAccount(), categoryId, beforeCategoryId) }.getOrDefault(false)
 
     private fun categoryWrite(write: suspend (account: String) -> Boolean) = viewModelScope.launch {
         val ok = runCatching { write(subscriptions.ensureLocalAccount()) }.getOrDefault(false)

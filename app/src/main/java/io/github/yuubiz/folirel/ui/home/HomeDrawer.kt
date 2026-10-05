@@ -41,7 +41,7 @@ fun HomeDrawer(
     onSettings: () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(setOf<String>()) }
-    ModalDrawerSheet(Modifier.widthIn(max = 320.dp)) {
+    ModalDrawerSheet(Modifier.widthIn(max = 320.dp).testTag("home_drawer")) {
         LazyColumn(Modifier.fillMaxHeight().padding(horizontal = 8.dp)) {
             item {
                 Text(
@@ -51,7 +51,7 @@ fun HomeDrawer(
                 )
             }
             item {
-                DrawerItem(stringResource(R.string.scope_all), selection.scope == ArticleScope.All && selection.filter != ReadFilter.SAVED) {
+                DrawerItem(stringResource(R.string.scope_all), selection.scope == ArticleScope.All && selection.filter != ReadFilter.SAVED, Modifier.testTag("drawer_item_all")) {
                     onSelect(ArticleScope.All)
                 }
             }
@@ -60,7 +60,7 @@ fun HomeDrawer(
             }
             if (structure.hasUncategorized) {
                 item {
-                    DrawerItem(stringResource(R.string.scope_uncategorized), selection.scope == ArticleScope.Uncategorized) {
+                    DrawerItem(stringResource(R.string.scope_uncategorized), selection.scope == ArticleScope.Uncategorized, Modifier.testTag("drawer_item_uncategorized")) {
                         onSelect(ArticleScope.Uncategorized)
                     }
                 }
@@ -103,7 +103,7 @@ fun HomeDrawer(
                         DrawerItem(
                             label = category.path.last(),
                             selected = selection.scope == ArticleScope.Category(category.id),
-                            modifier = Modifier.weight(1f).padding(start = (category.depth * 16).dp),
+                            modifier = Modifier.weight(1f).padding(start = (category.depth * 16).dp).testTag("drawer_item_category:${category.id}"),
                         ) { onSelect(ArticleScope.Category(category.id)) }
                         if (category.directFeedIds.isNotEmpty()) {
                             IconButton(onClick = { expanded = if (isOpen) expanded - category.id else expanded + category.id }) {

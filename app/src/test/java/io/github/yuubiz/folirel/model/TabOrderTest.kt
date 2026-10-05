@@ -77,6 +77,21 @@ class TabOrderTest {
         assertEquals(listOf("b", "a", "a1", "b1", "s"), sequence)
     }
 
+    @Test
+    fun movingBeforeANeighbourAndByPlaces() {
+        val group = listOf("a", "b", "c", "d")
+        assertEquals(listOf("a", "c", "b", "d"), TabOrder.moveBefore(group, "b", "d"))
+        assertEquals(listOf("b", "a", "c", "d"), TabOrder.moveBefore(group, "b", "a"))
+        assertEquals(listOf("a", "c", "d", "b"), TabOrder.moveBefore(group, "b", null))
+        // A neighbour that is gone: to the end. No change: null.
+        assertEquals(listOf("a", "c", "d", "b"), TabOrder.moveBefore(group, "b", "zzz"))
+        assertEquals(null, TabOrder.moveBefore(group, "b", "c"))
+        assertEquals(null, TabOrder.moveBefore(group, "d", null))
+        assertEquals(null, TabOrder.moveBefore(group, "x", "a"))
+        assertEquals(listOf("a", "b", "c", "d").let { listOf("b", "a", "c", "d") }, TabOrder.move(group, "b", -1))
+        assertEquals(null, TabOrder.move(group, "a", -1))
+    }
+
     // Display settings
 
     private val global = ResolvedLayout(ListMode.LIST, CardLayoutStyle.MIXED, 0)

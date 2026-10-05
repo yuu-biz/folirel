@@ -439,6 +439,40 @@ class SubscriptionRepository(
         true
     }
 
+    /**
+     * Moves one category by [delta] places inside its own group (pinned or not), computed from the order that is stored when the
+     * transaction runs, not from the order a screen showed: several presses made before the first result came back are all applied,
+     * one after the other, and none of them is computed from an order another one has already replaced. False when the category is
+     * not in [accountId]; true when nothing had to move (already at the end).
+     */
+    suspend fun moveCategoryTab(accountId: String, categoryId: String, delta: Int): Boolean =
+        changeCategoryTabs(accountId, categoryId) { group -> TabOrder.move(group, categoryId, delta) }
+
+    /**
+     * Puts the category just before [beforeCategoryId] in its group (at the end when that is null, or gone, or in the other group),
+     * also relative to the stored order: what a drag of a row ends in, expressed as "before this neighbour". Other moves that were
+     * stored while the row was being dragged stay.
+     */
+    suspend fun placeCategoryTab(accountId: String, categoryId: String, beforeCategoryId: String?): Boolean =
+        changeCategoryTabs(accountId, categoryId) { group -> TabOrder.moveBefore(group, categoryId, beforeCategoryId) }
+
+    private suspend fun changeCategoryTabs(accountId: String, categoryId: String, change: (List<String>) -> List<String>?): Boolean = db.withTransaction {
+        val owned = ownedCategories(accountId)
+        if (categoryId !in owned) return@withTransaction false
+        val prefs = dao.categoryPreferences(accountId)
+        val structure = Structure.build(emptyList(), owned.values.toList(), emptyList(), emptyList(), prefs)
+        val pinned = structure.preferences[categoryId]?.isPinned == true
+        val group = TabOrder.normal(structure.categories, structure.preferences)
+            .filter { (structure.preferences[it.id]?.isPinned == true) == pinned }.map { it.id }
+        val moved = change(group) ?: return@withTransaction true
+        val sequence = TabOrder.reorderGroup(structure.categories, structure.preferences, pinned, moved)
+        sequence.forEachIndexed { index, id ->
+            ensurePreference(id)
+            dao.setTabOrder(id, index)
+        }
+        true
+    }
+
     /** "Standard order": only the saved places are forgotten (the path order applies again). Pins and display settings stay. */
     suspend fun resetCategoryTabOrder(accountId: String) {
         dao.clearTabOrders(accountId)
