@@ -93,7 +93,7 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
             initializer {
                 HomeViewModel(
                     container.articles, container.subscriptions, container.settings, container.refresh,
-                    container.networkStatus.observe(), createSavedStateHandle(),
+                    container.networkStatus.observe(), createSavedStateHandle(), container.clock,
                 )
             }
         },

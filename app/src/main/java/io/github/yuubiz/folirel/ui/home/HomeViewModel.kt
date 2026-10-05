@@ -12,6 +12,7 @@ import io.github.yuubiz.folirel.data.repository.SubscriptionRepository
 import io.github.yuubiz.folirel.model.ArticleQuerySpec
 import io.github.yuubiz.folirel.model.ArticleRow
 import io.github.yuubiz.folirel.model.ArticleScope
+import io.github.yuubiz.folirel.model.FeedListFilter
 import io.github.yuubiz.folirel.model.ListMode
 import io.github.yuubiz.folirel.model.ReadFilter
 import io.github.yuubiz.folirel.model.SortOrder
@@ -19,6 +20,7 @@ import io.github.yuubiz.folirel.model.Structure
 import io.github.yuubiz.folirel.network.NetworkState
 import io.github.yuubiz.folirel.sync.RefreshCoordinator
 import io.github.yuubiz.folirel.sync.RefreshState
+import java.time.Clock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
@@ -57,6 +59,7 @@ class HomeViewModel(
     private val coordinator: RefreshCoordinator,
     network: Flow<NetworkState>,
     private val savedState: SavedStateHandle,
+    private val clock: Clock = Clock.systemUTC(),
 ) : ViewModel(), ListHost {
 
     private val accountId = MutableStateFlow<String?>(null)
@@ -81,14 +84,35 @@ class HomeViewModel(
 
     val refreshState: StateFlow<RefreshState> = coordinator.state
 
+    /**
+     * Feeds to look at (failed, held for HTTP, or not finished): the small warning on the subscriptions entry. It follows the
+     * stored state, so it stays when the notice of an update is gone and ends when the feeds are fetched again.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val feedsNeedingAttention: StateFlow<Int> = accountId.filterNotNull()
+        .flatMapLatest { account ->
+            combine(structure, subscriptions.observeDiagnostics(account), coordinator.state.map { !it.running }.distinctUntilChanged()) { s, d, idle ->
+                FeedListFilter.needingAttention(s, d, countUnfinished = idle)
+            }
+        }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
     val network: StateFlow<NetworkState> = network.stateIn(viewModelScope, SharingStarted.Eagerly, NetworkState(true, false))
 
     /**
-     * Articles inserted by finished refreshes and not yet seen. Each list counts only the ones it contains, so a
-     * banner never announces arrivals that the current category, filter or search does not show (REV-02).
+     * Articles inserted by finished refreshes that the user has not answered yet. Each list counts only the ones it
+     * contains, so a banner never announces arrivals that the current category, filter or search does not show (REV-02).
      */
-    private val _newArticleIds = MutableStateFlow<Set<String>>(emptySet())
-    val newArticleIds: StateFlow<Set<String>> = _newArticleIds.asStateFlow()
+    private val notices = NewArticleNotices()
+    val newArticleIds: StateFlow<Set<String>> = notices.pending
+
+    /**
+     * The notice a finished update left (H02), kept for a few seconds. A request that has been seen once never makes a second
+     * notice (see the collector below), and the board drops a notice by its own request id.
+     */
+    private val noticeBoard = RefreshNoticeBoard(clock, viewModelScope, NOTICE_KEEP_MS)
+    internal val refreshNotice: StateFlow<RefreshNotice?> = noticeBoard.current
 
     /** Pages of the category pager, in tab order: All, Uncategorized (when present), categories with feeds. */
     val pageScopes: StateFlow<List<ArticleScope>> = structure
@@ -159,7 +183,8 @@ class HomeViewModel(
                 for (request in state.requests) {
                     if (request.running || !seen.add(request.id)) continue
                     val added = request.report?.newArticleIds.orEmpty()
-                    if (added.isNotEmpty()) _newArticleIds.update { (it + added).toList().takeLast(MAX_NEW_IDS).toSet() }
+                    notices.announce(added)
+                    RefreshNotice.of(request, state)?.let { noticeBoard.post(it) }
                 }
             }
         }
@@ -285,11 +310,11 @@ class HomeViewModel(
         viewModelScope.launch { coordinator.refresh(RefreshScope.Pending, RefreshReason.MANUAL) }
     }
 
-    /** New articles that were shown (or jumped to) are no longer announced. */
-    override fun markNewSeen(ids: Collection<String>) {
-        if (ids.isEmpty()) return
-        _newArticleIds.update { current -> if (ids.none { it in current }) current else current - ids.toSet() }
-    }
+    /** The notice ran out or was closed. Only the notice of that request: a newer one stays. */
+    internal fun dismissNotice(requestId: Long) = noticeBoard.dismiss(requestId)
+
+    /** The banner was tapped, the list went to its top, or the banner was dismissed: these are no longer announced. */
+    override fun acknowledgeNew(ids: Collection<String>) = notices.acknowledge(ids)
 
     // Position restore per list (scope + filter + sort + search): article id + pixel offset, bounded history.
     // Survives rotation and process death; switching category and coming back restores each list (REV-01).
@@ -318,6 +343,9 @@ class HomeViewModel(
 
     companion object {
         const val SEARCH_DEBOUNCE_MS = 250L
+
+        /** How long the vm keeps a notice at most; the screen hides it earlier (see HomeNotices). */
+        const val NOTICE_KEEP_MS = 30_000L
         private const val KEY_SCOPE = "scope"
         private const val KEY_FILTER = "filter"
         private const val KEY_SORT = "sort"
@@ -326,7 +354,6 @@ class HomeViewModel(
         private const val KEY_ANCHORS = "anchors"
         private const val ANCHOR_SEPARATOR = "\u0001"
         private const val MAX_ANCHORS = 40
-        private const val MAX_NEW_IDS = 5_000
 
         fun refreshTargetFor(selection: Selection): RefreshScope = when (val scope = selection.scope) {
             ArticleScope.All -> RefreshScope.All

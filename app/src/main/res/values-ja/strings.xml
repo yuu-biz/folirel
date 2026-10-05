@@ -232,8 +232,17 @@
     <plurals name="msg_bulk_marked">
         <item quantity="other">%d件を既読にしました。</item>
     </plurals>
-    <plurals name="new_articles_banner">
-        <item quantity="other">新着%d件</item>
+    <plurals name="new_articles_banner_top">
+        <item quantity="other">新着%d件・先頭へ</item>
+    </plurals>
+    <plurals name="new_articles_banner_position">
+        <item quantity="other">新着%d件・新着の位置へ</item>
+    </plurals>
+    <string name="new_articles_dismiss">新着の通知を閉じる</string>
+    <string name="notice_dismiss">閉じる</string>
+    <string name="notice_details">詳細</string>
+    <plurals name="nav_subscriptions_attention">
+        <item quantity="other">購読管理・要確認%d件</item>
     </plurals>
     <string name="action_refetch_revalidate">キャッシュを再検証して再取得</string>
     <string name="action_refresh_this_feed">このフィードを更新</string>

@@ -239,9 +239,20 @@
         <item quantity="one">Marked %d article as read.</item>
         <item quantity="other">Marked %d articles as read.</item>
     </plurals>
-    <plurals name="new_articles_banner">
-        <item quantity="one">%d new article</item>
-        <item quantity="other">%d new articles</item>
+    <plurals name="new_articles_banner_top">
+        <item quantity="one">%d new article · to top</item>
+        <item quantity="other">%d new articles · to top</item>
+    </plurals>
+    <plurals name="new_articles_banner_position">
+        <item quantity="one">%d new article · to its place</item>
+        <item quantity="other">%d new articles · to their place</item>
+    </plurals>
+    <string name="new_articles_dismiss">Dismiss new articles notice</string>
+    <string name="notice_dismiss">Close</string>
+    <string name="notice_details">Details</string>
+    <plurals name="nav_subscriptions_attention">
+        <item quantity="one">Subscriptions · %d feed needs attention</item>
+        <item quantity="other">Subscriptions · %d feeds need attention</item>
     </plurals>
     <string name="action_refetch_revalidate">Revalidate and refetch</string>
     <string name="action_refresh_this_feed">Refresh this feed</string>

@@ -33,6 +33,7 @@ import io.github.yuubiz.folirel.model.Structure
 fun HomeDrawer(
     structure: Structure,
     selection: Selection,
+    attention: Int,
     onSelect: (ArticleScope) -> Unit,
     onSaved: () -> Unit,
     onSubscriptions: () -> Unit,
@@ -111,7 +112,7 @@ fun HomeDrawer(
                 }
             }
             item { HorizontalDivider(Modifier.padding(vertical = 4.dp)) }
-            item { DrawerItem(stringResource(R.string.nav_subscriptions), false, onClick = onSubscriptions) }
+            item { DrawerItem(subscriptionsLabel(attention), false, onClick = onSubscriptions) }
             item { DrawerItem(stringResource(R.string.nav_settings), false, onClick = onSettings) }
         }
     }

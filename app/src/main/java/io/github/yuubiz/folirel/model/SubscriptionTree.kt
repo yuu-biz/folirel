@@ -53,6 +53,9 @@ data class Structure(
     val hasUncategorized: Boolean get() = subscribedFeeds.any { it.categoryIds.isEmpty() }
     val tabCategories: List<CategoryNode> get() = categories.filter { it.subtreeFeedCount > 0 }
 
+    /** Subscribed feeds, not paused, whose articles could not be saved: a problem of this device, shown on its own until it is solved. */
+    val feedsFailingToSave: Int get() = subscribedFeeds.count { !it.paused && it.lastError == FetchError.STORAGE }
+
     /** The selected category plus all descendants. */
     fun categoryIdsFor(categoryId: String): List<String> {
         val root = categories.firstOrNull { it.id == categoryId } ?: return listOf(categoryId)

@@ -38,14 +38,17 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -74,6 +77,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -165,6 +169,7 @@ fun HomeScreen(
     val searchActive by vm.searchActive.collectAsStateWithLifecycle()
     val searchText by vm.searchText.collectAsStateWithLifecycle()
     val newIds by vm.newArticleIds.collectAsStateWithLifecycle()
+    val notice by vm.refreshNotice.collectAsStateWithLifecycle()
     val https by httpsState.collectAsStateWithLifecycle()
     val checkingHttps = https.running
 
@@ -227,6 +232,7 @@ fun HomeScreen(
     val scopeTitle = scopeTitle(selection.scope, structure)
     val unreadInList = list.items.count { !it.isRead }
     val target = HomeViewModel.refreshTargetFor(selection)
+    val attention by vm.feedsNeedingAttention.collectAsStateWithLifecycle()
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -236,6 +242,7 @@ fun HomeScreen(
             HomeDrawer(
                 structure = structure,
                 selection = selection,
+                attention = attention,
                 onSelect = { s ->
                     vm.selectScope(s)
                     scope.launch { drawerState.close() }
@@ -297,6 +304,25 @@ fun HomeScreen(
                         }
                     },
                     actions = {
+                        // What stays when the notices are gone, as small marks that take no room from the list: no connection,
+                        // and feeds whose articles could not be saved (their reasons are in subscription management).
+                        if (!network.connected) {
+                            Icon(
+                                painterResource(R.drawable.ic_cloud_off),
+                                contentDescription = stringResource(R.string.status_offline),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 6.dp).size(20.dp).testTag("offline_indicator"),
+                            )
+                        }
+                        if (structure.feedsFailingToSave > 0) {
+                            IconButton(onClick = nav.subscriptions, modifier = Modifier.testTag("storage_warning")) {
+                                Icon(
+                                    Icons.Filled.Warning,
+                                    contentDescription = pluralStringResource(R.plurals.status_storage_failed, structure.feedsFailingToSave, structure.feedsFailingToSave),
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
                         if (!searchActive) {
                             IconButton(onClick = { vm.setSearchActive(true) }) {
                                 Icon(Icons.Filled.Search, stringResource(R.string.action_search))
@@ -304,7 +330,9 @@ fun HomeScreen(
                         }
                         Box {
                             IconButton(onClick = { overflowOpen = true }, modifier = Modifier.testTag("home_more")) {
-                                Icon(Icons.Filled.MoreVert, stringResource(R.string.action_more))
+                                BadgedBox(badge = { if (attention > 0) Badge(Modifier.testTag("attention_badge")) }) {
+                                    Icon(Icons.Filled.MoreVert, stringResource(R.string.action_more))
+                                }
                             }
                             DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
                                 listOf(
@@ -338,7 +366,11 @@ fun HomeScreen(
                                 HorizontalDivider()
                                 DropdownMenuItem(text = { Text(stringResource(R.string.action_import_opml)) }, onClick = { overflowOpen = false; nav.importOpml() })
                                 DropdownMenuItem(text = { Text(stringResource(R.string.action_add_feed)) }, onClick = { overflowOpen = false; nav.addFeed() })
-                                DropdownMenuItem(text = { Text(stringResource(R.string.nav_subscriptions)) }, onClick = { overflowOpen = false; nav.subscriptions() })
+                                DropdownMenuItem(
+                                    text = { Text(subscriptionsLabel(attention)) },
+                                    onClick = { overflowOpen = false; nav.subscriptions() },
+                                    modifier = Modifier.testTag("menu_subscriptions"),
+                                )
                                 DropdownMenuItem(text = { Text(stringResource(R.string.nav_settings)) }, onClick = { overflowOpen = false; nav.settings() })
                             }
                         }
@@ -352,15 +384,6 @@ fun HomeScreen(
                     ScopeTabs(structure, pages, selection.scope, pagerState, vm::selectScope) { scrollToTopTick++ }
                 }
                 FilterBar(selection, vm::selectFilter, vm::toggleSort)
-                StatusBar(
-                    refresh = refresh,
-                    target = target,
-                    offline = !network.connected,
-                    structure = structure,
-                    checkingHttps = checkingHttps,
-                    onOpenSubscriptions = nav.subscriptions,
-                    onRetry = vm::retryPending,
-                )
                 PullToRefreshBox(
                     isRefreshing = refresh.runningFor(target) != null,
                     onRefresh = { requestRefresh() },
@@ -388,6 +411,16 @@ fun HomeScreen(
                         pagerMode -> CategoryPager(vm, pages, selection.scope, pagerState, page)
                         else -> page(selection.scope, true)
                     }
+                    HomeNotices(
+                        refresh = refresh,
+                        target = target,
+                        structure = structure,
+                        checkingHttps = checkingHttps,
+                        notice = notice,
+                        onDismissNotice = vm::dismissNotice,
+                        onOpenSubscriptions = nav.subscriptions,
+                        onRetry = vm::retryPending,
+                    )
                 }
             }
         }
@@ -539,7 +572,6 @@ private fun ScopePage(
     }
 }
 
-/** Scroll position of the article list, the same operations for the List/Compact list column and the Magazine grid. */
 /** Items scrolled past before the "back to top" button appears. */
 private const val SCROLL_TOP_BUTTON_AFTER = 6
 
@@ -550,44 +582,7 @@ private const val SCROLL_TOP_BUTTON_AFTER = 6
  */
 private const val FOLLOW_HEAD_AFTER_BACK_TO_TOP_MS = 4_000L
 
-private interface ScrollHandle {
-    /** The underlying Compose state object; effects restart when it changes. */
-    val owner: Any
-    val firstIndex: Int
-    val firstOffset: Int
-    val visibleKeys: List<Any>
-    suspend fun scrollTo(index: Int)
-
-    /** Back to the first article, animated; it ends on the first article even if articles arrive at the head meanwhile. */
-    suspend fun animateToTop()
-}
-
-/** Articles that arrive above while the animation runs leave it a few rows short; go on until the real top is reached. */
-private const val BACK_TO_TOP_ATTEMPTS = 4
-
-private class ListScroll(private val s: LazyListState) : ScrollHandle {
-    override val owner: Any get() = s
-    override val firstIndex: Int get() = s.firstVisibleItemIndex
-    override val firstOffset: Int get() = s.firstVisibleItemScrollOffset
-    override val visibleKeys: List<Any> get() = s.layoutInfo.visibleItemsInfo.map { it.key }
-    override suspend fun scrollTo(index: Int) = s.scrollToItem(index)
-    override suspend fun animateToTop() {
-        var attempts = 0
-        do s.animateScrollToItem(0) while ((s.firstVisibleItemIndex != 0 || s.firstVisibleItemScrollOffset != 0) && ++attempts < BACK_TO_TOP_ATTEMPTS)
-    }
-}
-
-private class GridScroll(private val s: LazyGridState) : ScrollHandle {
-    override val owner: Any get() = s
-    override val firstIndex: Int get() = s.firstVisibleItemIndex
-    override val firstOffset: Int get() = s.firstVisibleItemScrollOffset
-    override val visibleKeys: List<Any> get() = s.layoutInfo.visibleItemsInfo.map { it.key }
-    override suspend fun scrollTo(index: Int) = s.scrollToItem(index)
-    override suspend fun animateToTop() {
-        var attempts = 0
-        do s.animateScrollToItem(0) while ((s.firstVisibleItemIndex != 0 || s.firstVisibleItemScrollOffset != 0) && ++attempts < BACK_TO_TOP_ATTEMPTS)
-    }
-}
+private const val MOVE_TO_TOP = "top"
 
 @Composable
 internal fun ArticleList(
@@ -604,7 +599,10 @@ internal fun ArticleList(
     isCurrent: Boolean,
     scrollToTopTick: Int,
 ) {
-    val items = state.items
+    // While the list moves, it keeps the articles it is moving over: a refresh delivers feed after feed, and articles
+    // inserted above the moving list would change its distance on every batch. They are applied when the movement ends.
+    var held by remember(state.key) { mutableStateOf<List<ArticleRow>?>(null) }
+    val items = held ?: state.items
     val isMagazine = mode == ListMode.MAGAZINE
     // Restore from this list's own anchor (article id + offset); if it is gone, use the nearest remaining article.
     // Switching list style, rotating or resizing the window keeps the same article near the top.
@@ -637,19 +635,49 @@ internal fun ArticleList(
             currentItems.getOrNull(index)?.let { host.saveAnchor(ListAnchor(state.key, it.id, it.sortAt, offset)) }
         }
     }
-    // New articles count as seen once they are on screen, judged on this list's own state (REV-02 / N06).
-    LaunchedEffect(scroll.owner, isCurrent) {
-        if (!isCurrent) return@LaunchedEffect
-        // Both sides are observed: a marker added later for an article that is already shown is consumed too (V3-R03).
-        NewArticleSeen.visibleNew({ currentScroll.visibleKeys }, { currentNew }).collect { host.markNewSeen(it) }
+    var followHeadUntil by remember(scroll.owner) { mutableLongStateOf(0L) }
+    val scope = rememberCoroutineScope()
+    val mover = remember(scroll.owner) { ListMover(scope) }
+    DisposableEffect(mover) { onDispose { mover.cancel() } }
+
+    /**
+     * The user answers the new-article notice: every new article this list shows is acknowledged at once, at the moment of
+     * the request. A movement that is cancelled afterwards does not bring the notice back, and nothing here marks an
+     * article read.
+     */
+    fun answerNotice() {
+        host.acknowledgeNew(currentItems.filter { it.id in currentNew }.map { it.id })
     }
+
+    /** One movement back to the start of the list. A second request while it runs joins it instead of starting it over. */
+    fun goToTop() {
+        mover.launch(MOVE_TO_TOP) {
+            held = currentItems
+            var arrived = false
+            try {
+                currentScroll.glideToStart()
+                arrived = true
+            } finally {
+                // Armed before the held articles are released, so what arrived meanwhile is followed (and never after a touch).
+                if (arrived) followHeadUntil = SystemClock.uptimeMillis() + FOLLOW_HEAD_AFTER_BACK_TO_TOP_MS
+                held = null
+            }
+        }
+    }
+
+    fun backToTop() {
+        answerNotice()
+        goToTop()
+    }
+
+    /** The banner of an oldest-first list: to the first new article in that order, or to the start when it is gone. */
+    fun goToArticle(articleId: String) {
+        val index = currentItems.indexOfFirst { it.id == articleId }
+        if (index < 0) goToTop() else mover.launch(articleId) { currentScroll.scrollTo(index) }
+    }
+
     // "Back to top": the selected tab was tapped again (only the list on screen follows, and only a tap made after this list appeared).
     val firstTick = remember { scrollToTopTick }
-    var followHeadUntil by remember(scroll.owner) { mutableLongStateOf(0L) }
-    suspend fun backToTop() {
-        currentScroll.animateToTop()
-        followHeadUntil = SystemClock.uptimeMillis() + FOLLOW_HEAD_AFTER_BACK_TO_TOP_MS
-    }
     LaunchedEffect(scrollToTopTick) {
         if (isCurrent && scrollToTopTick != firstTick) backToTop()
     }
@@ -661,20 +689,21 @@ internal fun ArticleList(
     }
     // Far enough down that the way back is long; the button is for that case only.
     val farDown by remember(scroll.owner) { derivedStateOf { currentScroll.firstIndex > SCROLL_TOP_BUTTON_AFTER } }
-    // The banner counts only the new articles this list shows and jumps to the first of them in the current order.
-    val firstNewIndex by remember(scroll.owner) { derivedStateOf { currentItems.indexOfFirst { it.id in currentNew } } }
+    // The banner counts only the new articles this list shows.
     val newCount = remember(items, newIds) { items.count { it.id in newIds } }
-    val scope = rememberCoroutineScope()
     val now = remember(items) { System.currentTimeMillis() }
     Box(
-        Modifier.fillMaxSize().pointerInput(scroll.owner) {
+        Modifier.fillMaxSize().pointerInput(mover) {
             // Watches only: the Initial pass sees every press and wheel scroll first and consumes nothing, so taps, swipes and
-            // long presses reach the cards as before. The "back to top" button starts the follow only after its own animation,
-            // so its press cannot cancel the follow it is about to start.
+            // long presses reach the cards as before. A touch ends the movement and the following (the user comes first). The
+            // buttons act on release, after this, so their own press cannot cancel the movement they are about to start.
             awaitPointerEventScope {
                 while (true) {
                     val event = awaitPointerEvent(PointerEventPass.Initial)
-                    if (event.type == PointerEventType.Press || event.type == PointerEventType.Scroll) followHeadUntil = 0L
+                    if (event.type == PointerEventType.Press || event.type == PointerEventType.Scroll) {
+                        followHeadUntil = 0L
+                        mover.cancel()
+                    }
                 }
             }
         },
@@ -736,24 +765,55 @@ internal fun ArticleList(
                 }
             }
         }
-        if (newCount > 0 && firstNewIndex >= 0) {
-            // New arrivals never move the list on their own; the user jumps explicitly.
-            FilledTonalButton(
+        if (newCount > 0) {
+            // New arrivals never move the list on their own; one tap answers the notice: it goes away and the list moves.
+            NewArticlesBanner(
+                count = newCount,
+                toTop = newestFirst,
+                // Newest first the new articles are not necessarily at the head (a feed can deliver old articles), so the
+                // banner says "to top" and goes there. Oldest first it goes to the first new article in that order.
                 onClick = {
-                    val jumpTo = firstNewIndex
-                    scope.launch { if (jumpTo >= 0) currentScroll.scrollTo(jumpTo) }
+                    val firstNew = currentItems.firstOrNull { it.id in currentNew }?.id
+                    answerNotice()
+                    if (newestFirst || firstNew == null) goToTop() else goToArticle(firstNew)
                 },
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp).testTag("new_articles_banner"),
-            ) { Text(pluralStringResource(R.plurals.new_articles_banner, newCount, newCount)) }
+                onDismiss = { answerNotice() },
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
+            )
         }
         if (farDown) {
             SmallFloatingActionButton(
-                onClick = { scope.launch { backToTop() } },
+                onClick = { backToTop() },
                 // Bottom centre: the per-article buttons (save, menu) sit at the right edge and must stay reachable.
                 modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp).testTag("scroll_to_top"),
                 containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.92f),
             ) {
                 Icon(painterResource(R.drawable.ic_arrow_upward), contentDescription = stringResource(R.string.scroll_to_top))
+            }
+        }
+    }
+}
+
+/** The notice for new articles: the text moves the list and closes the notice, the cross only closes it. */
+@Composable
+private fun NewArticlesBanner(count: Int, toTop: Boolean, onClick: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shadowElevation = 3.dp,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(
+                onClick = onClick,
+                modifier = Modifier.testTag("new_articles_banner"),
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSecondaryContainer),
+            ) {
+                Text(pluralStringResource(if (toTop) R.plurals.new_articles_banner_top else R.plurals.new_articles_banner_position, count, count))
+            }
+            IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp).testTag("new_articles_dismiss")) {
+                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.new_articles_dismiss), modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -875,99 +935,6 @@ private fun FilterBar(selection: Selection, onFilter: (ReadFilter) -> Unit, onTo
     }
 }
 
-/**
- * Progress and result of the request for the shown scope (not of some other refresh), plus a short line when a
- * different refresh is running. Partial results are never shown as complete (SYNC-02/04).
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun StatusBar(
-    refresh: RefreshState,
-    target: RefreshScope,
-    offline: Boolean,
-    structure: Structure,
-    checkingHttps: Boolean,
-    onOpenSubscriptions: () -> Unit,
-    onRetry: () -> Unit,
-) {
-    val own: RequestStatus? = refresh.latestFor(target)
-    val other = refresh.requests.lastOrNull { it.running && it.scope != target }
-    val report = own?.report?.takeIf { !own.running }
-    var showRetry = false
-    val lines = buildList {
-        if (own?.running == true) {
-            val p = own.progress
-            val firstFetch = structure.subscribedFeeds.isNotEmpty() && structure.subscribedFeeds.none { it.initialized }
-            add(
-                when {
-                    firstFetch -> stringResource(R.string.status_first_fetch)
-                    p != null && p.total > 0 -> stringResource(R.string.status_refreshing_progress, p.completed, p.total)
-                    else -> stringResource(R.string.status_refreshing)
-                },
-            )
-        }
-        if (other != null) {
-            val p = other.progress
-            add(
-                if (p != null && p.total > 0) stringResource(R.string.status_other_refresh_progress, p.completed, p.total)
-                else stringResource(R.string.status_other_refresh),
-            )
-        }
-        if (checkingHttps) add(stringResource(R.string.status_https_checking))
-        if (offline) add(stringResource(R.string.status_offline))
-        if (own != null && !own.running && own.report == null) add(stringResource(R.string.status_interrupted))
-        if (report != null && report.total > 0) {
-            val results = report.perFeed.values
-            // Feeds this request left to the request that followed an address change: their present state counts here,
-            // the request itself (history) does not (V31-C02).
-            val replacedNow = refresh.replacedNow(own)
-            val failedCount = report.failed.size + replacedNow.failed
-            val notReached = report.notAttempted + replacedNow.unreached
-            val ok = results.count { it.result == FeedResult.UPDATED || it.result == FeedResult.NOT_MODIFIED }
-            val waiting = results.count { it.result == FeedResult.BACKOFF || it.result == FeedResult.OFFLINE }
-            // An all-clear result shows nothing (no permanent "9 feeds: OK 9 · failed 0 ..." line); only what needs
-            // attention is listed, with its count.
-            val parts = buildList {
-                if (failedCount > 0 || waiting > 0 || notReached > 0 || report.httpPending > 0) {
-                    if (ok > 0) add(stringResource(R.string.status_part_ok, ok))
-                    if (failedCount > 0) add(stringResource(R.string.status_part_failed, failedCount))
-                    if (waiting > 0) add(stringResource(R.string.status_part_waiting, waiting))
-                    if (notReached > 0) add(stringResource(R.string.status_part_not_reached, notReached))
-                    if (report.httpPending > 0) add(stringResource(R.string.status_part_http, report.httpPending))
-                }
-            }
-            if (parts.isNotEmpty()) add(stringResource(R.string.status_result_compact, report.total, parts.joinToString(stringResource(R.string.status_part_separator))))
-            val storage = report.failed.values.count { it == FetchError.STORAGE }
-            if (storage > 0) add(pluralStringResource(R.plurals.status_storage_failed, storage, storage))
-            if (report.deferredConstraint > 0 && report.offline && !offline) add(stringResource(R.string.status_deferred_offline))
-            showRetry = (notReached > 0 || failedCount > 0) && !refresh.running
-        }
-    }
-    if (lines.isEmpty()) return
-    Surface(color = MaterialTheme.colorScheme.surfaceVariant, onClick = onOpenSubscriptions, modifier = Modifier.fillMaxWidth().testTag("status_bar")) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
-            if (own?.running == true) {
-                val p = own.progress
-                if (p != null && p.total > 0) {
-                    LinearProgressIndicator(progress = { p.completed.toFloat() / p.total }, modifier = Modifier.fillMaxWidth())
-                } else {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
-                }
-            }
-            FlowRow(itemVerticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    lines.joinToString(" · "),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (showRetry) {
-                    TextButton(onClick = onRetry, modifier = Modifier.testTag("retry_unfinished")) { Text(stringResource(R.string.action_retry_unfinished)) }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun NoSubscriptions(onImport: () -> Unit, onAdd: () -> Unit) {
     CenteredMessage(stringResource(R.string.empty_no_subscriptions)) {
@@ -1076,3 +1043,8 @@ private class HomeMessages(
         }
     }
 }
+
+/** "Subscriptions", with how many feeds need a look when some do (the small warning that outlives the notices, H02). */
+@Composable
+internal fun subscriptionsLabel(attention: Int): String =
+    if (attention > 0) pluralStringResource(R.plurals.nav_subscriptions_attention, attention, attention) else stringResource(R.string.nav_subscriptions)

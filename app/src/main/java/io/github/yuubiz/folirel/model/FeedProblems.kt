@@ -91,5 +91,16 @@ enum class FeedListFilter {
     companion object {
         fun isHttpPending(feed: FeedNode, diagnostics: FeedDiagnostics?): Boolean =
             diagnostics?.result == FeedResult.HTTP_DISABLED || (!feed.initialized && feed.fetchUrl.startsWith("http://", ignoreCase = true))
+
+        /**
+         * How many feeds the home screen marks on the subscriptions entry: the ones the "Failed", "HTTP pending" and unfinished
+         * (queued, never completed) lists show. It follows the stored state, so it outlives any notice and ends when a feed is
+         * fetched again. [countUnfinished] is false while an update runs: every feed it has queued is then unfinished, which is
+         * work in progress, not something to look at.
+         */
+        fun needingAttention(structure: Structure, diagnostics: Map<String, FeedDiagnostics>, countUnfinished: Boolean): Int =
+            structure.subscribedFeeds.count { f ->
+                !f.paused && (f.lastError != null || isHttpPending(f, diagnostics[f.id]) || (countUnfinished && diagnostics[f.id]?.pendingSince != null))
+            }
     }
 }

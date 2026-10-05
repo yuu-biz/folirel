@@ -126,4 +126,6 @@ dependencies {
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.room.testing)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+    // The home flow test serves feeds from the device itself (the test source set only; production never allows loopback).
+    androidTestImplementation(libs.okhttp.mockwebserver3)
 }
