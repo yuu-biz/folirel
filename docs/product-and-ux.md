@@ -102,7 +102,7 @@ Importing works offline; fetching is then reported as pending.
 Toolbar:  [Menu]  <current scope>                    [Search] [More]
 Tabs:     All | Uncategorized | Tech / AI | News | ...
 Filter:   [All] [Unread] [Saved]                      [Newest first / Oldest first]
-Status:   updating / progress / offline / result of the last refresh (only when needed)
+Notices:  drawn over the list, never inside the layout: progress, the result of an update that needs attention (a few seconds), offline mark
 List:     articles of the current scope and filter
 ```
 
@@ -110,7 +110,10 @@ Layout rules:
 
 - The toolbar is 56 dp high and respects system insets. There is no permanent large heading, no promo card and no bottom navigation bar. On a short screen the header never takes half the height.
 - The filter row wraps instead of clipping at large text sizes.
-- The status area is shown only when there is something to say: an update in progress with `n/m` progress, "first fetch in progress", offline, an interrupted update, or a result that is not fully successful (for example "5 feeds: OK 3 · failed 1 · waiting 1"). A fully successful refresh shows nothing. Tapping a result opens subscription management. A retry button for unfinished feeds is offered when relevant.
+- Nothing about an update takes room from the list. Notices are drawn over it (outside the list's own touch area), so an article never moves when one comes or goes, and pressing one is never taken for a touch of the list:
+  - *Running*: a thin progress bar at the top edge and, above the back-to-top button, what is running (`n/m`, "first fetch in progress", another update running, checking HTTPS). It stays as long as the update runs.
+  - *Finished*: an update the reader asked for (manual refresh, import) that ends with something to look at (failed, not reached, waiting, HTTP held, storage failure, interrupted, deferred because offline) leaves one notice, for about 5 seconds (longer if the system asks for more time for accessibility), with a close cross, "Details" (subscription management) and, when failed or not-reached feeds can be asked for again, "Retry unfinished". A fully successful update shows nothing. The end belongs to the update's request: rotating, switching tabs or coming back never shows it again or makes it last longer, and the timer of an older notice never removes a newer one. Automatic updates (startup, periodic) show no notice; their failures are left to the marks below.
+  - *What stays*, from the stored state of the feeds (the notice is only a courtesy): a small badge on the menu button and the count on the "Subscriptions" entries (menu and drawer) for feeds that failed, are held for HTTP, or were left unfinished (not counted while an update is running, when every queued feed is unfinished); a warning icon in the toolbar while a feed's articles cannot be saved; a small cloud-off icon in the toolbar while offline. Each leads to subscription management, where the reason and the way to retry are.
 
 The overflow menu contains the three list layouts (the current one is checked), the sort toggle, "Mark all as read", "Refresh", "Import OPML", "Add feed URL", "Subscriptions" and "Settings".
 
@@ -121,7 +124,7 @@ The overflow menu contains the three list layouts (the current one is checked), 
 - Swiping the pages, tapping a tab and choosing a category in the drawer select the same page. The ends do not wrap around.
 - The highlighted tab and its underline follow the finger while the page is dragged; the underline is centred under the tab title, at least 24 dp wide.
 - Only the visible page (and its neighbour being pre-composed) holds a database subscription.
-- Tapping the already-selected tab scrolls the visible list back to the top. A small up-arrow button appears at the bottom centre after scrolling more than six items down and does the same. (It sits at the bottom centre because the per-article buttons occupy the right edge.) Neither action changes read state.
+- Tapping the already-selected tab scrolls the visible list back to the top. A small up-arrow button appears at the bottom centre after scrolling more than six items down and does the same. (It sits at the bottom centre because the per-article buttons occupy the right edge.) It is one movement (section 6), and it also answers the new-article notice of that list. Neither action changes read state.
 - When a single feed is selected from the drawer the tabs are hidden and the toolbar shows the feed name.
 
 **Scope and filter.** Scope is one of: all, uncategorized, a category (including its descendant categories) or a single feed. The read filter is independent: All / Unread / Saved. Moving between categories or tabs keeps the current filter. "Saved articles" in the drawer selects the whole-collection scope with the Saved filter.
@@ -221,7 +224,18 @@ Rules:
 
 The scroll position of each list is kept as the identity of an anchor article plus a pixel offset, keyed by account, scope, read filter, sort order and search text. The list layout is deliberately not part of the key, so changing the layout keeps the same article in view. Positions survive returning from the browser, rotation and process recreation (through saved instance state; at most 40 lists are remembered). If the anchor article no longer exists, the nearest remaining article is used. Switching to another category and back restores each category's own place.
 
-New articles never scroll the list by themselves. Articles that arrive while the user is reading appear as a banner ("n new articles"); tapping it jumps to the first new article in the current order. Only articles of feeds that have already been fetched before count (the first fetch is not "new"), only those that belong to the list being shown count, and a marker is cleared as soon as the article has been on screen. The banner works in both sort orders. The one exception is the user's own "back to the top" (the arrow button or tapping the selected tab): it always ends on the first article, and for a few seconds afterwards articles that arrive at the head (a refresh delivers feed after feed) are followed so the newest one is not left above the screen; any touch of the list (a finger put down, a drag, a long press, a tap on a card or its menu) or a wheel scroll ends that at once. The button's own press does not cancel the following it starts. Manual save and read changes apply immediately.
+**Back to the top** (the arrow button, tapping the selected tab, the new-article banner of a newest-first list) is one movement of the list, not a series of animations: an ease-in-out of about a quarter to two thirds of a second (the time grows with the distance, at most 650 ms; none at all when the system animations are switched off). A list far from its start skips once to about two and a half screens from it and moves the rest. Every frame moves the list by the share of the distance left that the curve asks for, and the distance left is measured again every frame, so the list does not stop and start again card by card, and it lands exactly on the first article. While it moves the list keeps the articles it was moving over; articles that arrive meanwhile (a refresh delivers feed after feed) are applied when it arrives, and for four seconds afterwards articles that arrive at the head are followed instantly, so the newest one is not left above the screen. A second request while it moves joins it. Any touch of the list (a finger put down, a drag, a long press, a tap on a card or its menu) or a wheel scroll ends the movement and the following at once and nothing starts them again; changing category or filter, or leaving the screen, ends them too. The buttons act on release, so their own press never cancels the movement they start.
+
+**New articles** never scroll the list by themselves. Articles that arrive while the user is reading appear as a notice at the top of the list: "n new · to top" (newest first) or "n new · to their place" (oldest first), with a close cross. Only articles of feeds that have already been fetched before count (the first fetch is not "new"), and only those that belong to the list being shown. The notice is answered once:
+
+| Action | Moves to | The notice | Read / saved state |
+|---|---|---|---|
+| Tap the notice, newest first | the start of the list (new articles are new to this device; they need not be the newest by date, so the text says "to top") | goes away for all the new articles this list shows | unchanged |
+| Tap the notice, oldest first | the first new article in that order (the start of the list if it has gone) | goes away for all of them | unchanged |
+| Cross | does not move | goes away for all of them | unchanged |
+| Arrow button, tap on the selected tab | the start of the list | goes away for all the new articles this list shows | unchanged |
+
+Being on screen does not count a new article down: there is no "n left to look at". An answered article is remembered (a bounded set of ids), so a request that finishes later and lists the same articles again, which happens when two requests share a feed, does not announce them again; articles that really arrive afterwards are announced as new. An article that is new in two lists (a feed in two categories) is answered with the list the reader answered; articles the list does not show are never answered. Acknowledging a notice is not reading: it never touches read or saved state, and opening an article never marks it read. Manual save and read changes apply immediately.
 
 ## 7. Required states
 

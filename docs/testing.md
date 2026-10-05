@@ -32,7 +32,7 @@ Lint is configured to abort the build on errors.
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-These tests need an emulator or a device running Android 9 (API 28) or later. They use seeded data only and make no network requests. Things to know:
+These tests need an emulator or a device running Android 9 (API 28) or later. They use seeded data and, for the home flow tests, a local server inside the test process; they make no requests to the internet. Things to know:
 
 - Use a test device or emulator, never a device that holds your own subscriptions. The tests clear the app's database (`clearAllTables`) and rewrite its settings, and Gradle uninstalls the app after the run, which also removes its data and per-app language setting.
 - Keep the screen awake while the tests run (`adb shell svc power stayon true`).
@@ -66,7 +66,7 @@ The scripts in `tools/` are development aids; they are not used by the app. The 
 |---|---|---|---|
 | JVM | `app/src/test` | JUnit, Robolectric (plain `Application`, no WorkManager side effects), in-memory Room, MockWebServer bound to `127.0.0.1`, a settable clock | Parsers, URL rules, address policy, repositories, refresh coordination, the full fetch pipeline against a local server |
 | Static guards | `app/src/test` | Source scanning | Architecture boundaries (`T48`), no code path that sets read state automatically (`T29`), the HTTP-open confirmation setting is not read by network code (`U07`) |
-| Device | `app/src/androidTest` | Compose UI tests on a real Android runtime, the production `AppContainer`, seeded data | UI flows, list layouts, pager, Room migrations, icon decoding, settings upgrade, performance measurement |
+| Device | `app/src/androidTest` | Compose UI tests on a real Android runtime, the production `AppContainer`, seeded data, and for the home flows a MockWebServer on the device with the real fetch pipeline (loopback is allowed in the test source set only; production always uses the public-only address policy) | UI flows, list layouts, pager, Room migrations, icon decoding, settings upgrade, performance measurement |
 | Helper-script tests | `tools/test_*.py` | `unittest` with a fake adb | The upgrade-check scripts must really fail when they should |
 | Manual | emulator or phone | `tools/adb_ui.py`, screenshots | TalkBack, 200% text, landscape, split screen, real feeds |
 
@@ -86,13 +86,61 @@ Rules that apply to every layer:
 | `HomeFlowTest` | First launch without data (`T01`), opening/scrolling/returning never marks read (`T29`), Custom Tabs path and URL-less article (`T32`), position after rotation and recreation (`T34`), layouts and images off (`T31`, `T37`) |
 | `PagerAndMagazineTest` | Category pager and tabs (`N01`, `N03`, `N24`), layouts List / Compact list / Magazine persisted (`N09`), tabs following the drag, underline position, back to top (arrow and tab re-tap) in every layout, quick successive taps, distant tabs at large text (`V31-T03`) |
 | `UxNextTest` | Position kept across layout changes (`U03`), category round trip in Magazine (`U04`), HTTP confirmation and "do not ask again" (`U06`), bulk unsubscribe and undo (`U10`, `U11`) |
-| `NewArticleBannerTest` | The new-articles banner on the real list composable in all three layouts, both sort orders, neighbour pages, arrivals at the head (`V31-T02`, `V3-R03`); back to the top from far down a long list of uneven rows while articles arrive (`V4-R01`) |
+| `NewArticleBannerTest` | The new-article banner on the real list composable in all three layouts and both orders: one tap answers it for every new article of the list (it goes to the top, or to the first new article when oldest first), the cross only closes it, the arrow and the second tap on the tab answer it, only the list shown is answered, articles arriving after the tap are announced as new, arrivals at the head keep the reading place (`UXR-12` to `UXR-18`) |
+| `HomeBannerFlowTest`, `HomeNoticeFlowTest` | The real thing end to end (`HomeFlowTestBase`): feeds served by a local MockWebServer, fetched by the real `LocalBackend`, saved by the real `FeedStore` into the app's Room database, driven by a real `RefreshCoordinator`, seen through the real `HomeViewModel` and drawn by the real `HomeScreen` (pager, tabs, list, banner, notices). Only the address policy differs from the app (loopback allowed in the test source set). Banner: one tap goes to the top and ends the notice, the cross, a report that lists answered articles again does not bring them back (`UXR-12`, `UXR-14`, `UXR-17`, `UXR-19`). Notices: partial failure notice and its end, no second notice after the screen is built again, a newer notice survives the older one's timer, the warning badge and offline mark stay, "Retry" and "Details", feeds the update did not reach, the notice and the banner together (`UXR-07` to `UXR-11`, `UXR-21`) |
+| `BackToTopListTest` | End positions of back to top on the real list with 3,000 uneven rows in all three layouts: after arrivals, with arrivals during the movement, with many batches (`V4-R01`) |
+| `BackToTopInterruptTest` | A touch ends the movement for good and arrivals afterwards do not start it again, repeated requests are one movement, a replaced list is not moved by the request made for the one before (`UXR-04` to `UXR-06`) |
+| `UxrScrollTraceTest` | The way back to the top as a movement, frame by frame on the test clock with pictures loading for real: no stop on the way, no start over, no step away from the top, at most one skip, no late snap, in List, Compact list and Magazine (2 and 3 columns, with pictures), near and far, with batches arriving meanwhile (`UXR-01` to `UXR-03`) |
+| `UxrRealtimeTest` | The same in real time: the arrow is pressed through the accessibility tree and the first visible article is timed on every change. Meant to be screen-recorded (see "Position traces and recordings") |
 | `BackToTopTest` | Back to the top (arrow and tab re-tap) through the whole app with Room: articles arriving at the head during and right after the way up end on the newest article in all three layouts, and stop following as soon as the user touches the list: drag, finger put down without a drag, long press, article menu (`V4-R01`) |
 | `MigrationTest` | Room v1 to v2 and v2 to v3 migrations validated against exported schemas, data kept, chained 1 to 3, an unknown newer version fails instead of wiping data (`T38`, `N25`) |
 | `IconDecoderTest` | Source-icon decoding on a real Android runtime: PNG, ICO with PNG entry, ICO with BMP entry, wide logo, 512 px image, non-images (`U08`) |
 | `PerformanceTest` | Synthetic 300 feeds / 5,000 articles: warm start to a visible list and local search timings (`T47`) |
 
 `TestData` seeds the app through its own repositories; there is no demo mode in the app.
+
+### Position traces and recordings
+
+"The list ended on the first article" does not show that the movement was smooth. Two kinds of device test look at the movement itself; both write to logcat and neither is a frame-rate measurement of a phone (an emulator draws slowly, and a debug build is not optimised).
+
+- **`UxrScrollTraceTest`** drives the real list with the test's own frame clock (one sample per 16 ms frame; pictures are real PNG files that load between the frames). `ScrollTrace` computes the movement of every frame from the cards that are on screen in two frames (the median shift) and reports `duration`, `stalls` (a frame without movement before the run-out ends), `restarts` (the movement came almost to rest and took off again after cruising), `reversals`, `teleports` (frames where no card is shared with the last frame: the one skip is allowed) and `finalSnap` (an instant correction at the end). Run `adb shell am instrument -w -e class io.github.yuubiz.folirel.UxrScrollTraceTest io.github.yuubiz.folirel.test/androidx.test.runner.AndroidJUnitRunner` after installing the app and the test APK (`./gradlew :app:installDebug :app:installDebugAndroidTest`), then read `adb logcat -d -s UXR_TRACE:I`: the first line of each run is the summary, the following lines are `label,frame,axis,shiftPx,px|est,first cards (id:top/height)`.
+- **`UxrRealtimeTest`** uses real time (no compose test rule, whose frame clock only runs while the test pumps it). `adb logcat -d -s UXR_REALTIME:I` has a summary per run (`updates`, `duration`, the gap between changes of the first visible article as p50/p95/max, `reversals`, `endIndex`) and the trace lines `label,msSinceStart,articleId,offsetPx`. To record the screen at the same time:
+
+  ```sh
+  adb shell screenrecord --size 540x1080 --bit-rate 3000000 --time-limit 170 /sdcard/run.mp4 &
+  adb shell am instrument -w -e class io.github.yuubiz.folirel.UxrRealtimeTest io.github.yuubiz.folirel.test/androidx.test.runner.AndroidJUnitRunner
+  adb shell pkill -INT screenrecord; adb pull /sdcard/run.mp4
+  ```
+
+  Keep the screen on (`adb shell svc power stayon true`). Compare a recording of the previous version with one of the new version from the same emulator.
+
+Comparisons against a previous commit are done in a second work tree (`git worktree add --detach ../folirel-head <commit>`) with the same test files copied in (the old `ListHost` method is `markNewSeen`, the new one `acknowledgeNew`); remove the work tree afterwards.
+
+### Home refinement scenarios (UXR-01 to UXR-21)
+
+| ID | Scenario | Test classes |
+|---|---|---|
+| UXR-01 | Back to top from near and far with no update running: one movement, no restart card by card | `UxrScrollTraceTest`, `UxrRealtimeTest` |
+| UXR-02 | 3,000 rows of uneven height, pictures loading: no repeated stop in the trace or the recording (List, Compact list, Magazine with 2 and 3 columns) | `UxrScrollTraceTest`, `UxrRealtimeTest` |
+| UXR-03 | Batches arriving during and right after the movement: it ends on the newest article without chasing | `UxrScrollTraceTest`, `BackToTopListTest`, `BackToTopTest` |
+| UXR-04 | A press, drag, long press or menu during or after the movement: the user wins and nothing resumes it | `BackToTopInterruptTest`, `BackToTopTest` |
+| UXR-05 | Arrow and tab pressed repeatedly: one movement, correct end | `BackToTopInterruptTest`, `PagerAndMagazineTest` |
+| UXR-06 | Category or filter changed during the movement, or the screen left: the old request does not move the other list | `BackToTopInterruptTest` |
+| UXR-07 | A finished update that needs attention leaves one notice that goes after its time; the diagnostics stay | `RefreshNoticeTest`, `HomeNoticeFlowTest` |
+| UXR-08 | Closing the notice, switching tabs, building the screen again: it does not come back and does not last longer | `RefreshNoticeBoardTest`, `HomeNoticeFlowTest` |
+| UXR-09 | An older notice's timer never removes a newer notice or progress | `RefreshNoticeBoardTest`, `HomeNoticeFlowTest` |
+| UXR-10 | A feed that moved address: its present state decides (a current problem is shown, a recovery clears it) | `RefreshNoticeTest` (the coordinator side: `ReplacedFeedStatusTest`) |
+| UXR-11 | Offline and HTTP held: a small mark and a badge stay when the notice is gone; "Subscriptions" leads to the reason | `HomeNoticeFlowTest`, `FeedAttentionTest` |
+| UXR-12 | 120 new articles, newest first: one tap goes to the top and the notice for all 120 is gone | `NewArticleBannerTest` (three layouts), `HomeBannerFlowTest` |
+| UXR-13 | Some of the new articles are already on screen: no counting down, one answer for all | `NewArticleBannerTest`, `NewArticleNoticesTest` |
+| UXR-14 | The cross: no move, no read/saved change, no article lost | `NewArticleBannerTest`, `HomeBannerFlowTest` |
+| UXR-15 | Oldest first: one move to the first new article of that order, the order kept | `NewArticleBannerTest` |
+| UXR-16 | Only the new articles of the list shown are answered | `NewArticleBannerTest` |
+| UXR-17 | New articles arriving after the tap, and a late report listing the answered ones again | `NewArticleNoticesTest`, `NewArticleBannerTest`, `HomeBannerFlowTest` |
+| UXR-18 | New articles that are not at the head: counted, nothing dropped, the text says "to top" | `NewArticleBannerTest` |
+| UXR-19 | Real coordinator, Room, view model and pager from the update to the answer | `HomeBannerFlowTest`, `HomeNoticeFlowTest` |
+| UXR-20 | Overwrite install over data (subscriptions, categories, read, saved, settings, article IDs) | manual with `tools/compare_app_state.py` (emulator only) |
+| UXR-21 | Notice and banner together with going to the top and the notice ending: nothing moves the articles | `HomeNoticeFlowTest` |
 
 ### Performance targets
 
@@ -148,7 +196,7 @@ Column "Test classes" lists the classes whose comments cite that ID. A dash mean
 | T32 | R10 | Original site. Custom Tabs, then `ACTION_VIEW` when Custom Tabs is unavailable, then the "no app" message; unsafe schemes rejected; HTTP confirmation; the short-summary path for articles without a URL; no WebView. | UI + device | `BrowserLauncherTest`, `HomeFlowTest` |
 | T33 | R12 | Share. Exactly one article's title and original URL; no image cache path, database content, other articles or query diagnostics attached. | UI | `BrowserLauncherTest` |
 | T34 | R15 | Position restore. From the middle of a list: round trip to the site, rotation and process recreation restore the anchor, scope, filter, sort, query; the list does not jump to the top. | Device | `HomeFlowTest` |
-| T35 | R15, R07 | New arrivals. A fetch while reading mid-list is announced by the banner and the position holds until it is tapped. | UI + HTTP | - (exercised by `V31-T02`) |
+| T35 | R15, R07 | New arrivals. A fetch while reading mid-list is announced by the banner and the position holds until the reader answers it (one tap, the cross, the arrow or the tab). | UI + HTTP | `HomeBannerFlowTest`, `NewArticleBannerTest` |
 | T36 | R13 | Japanese search. Japanese substrings, Latin, whitespace, and `%`, `_` as literal text; the scope and filter are respected; an old search response never overwrites a newer query. | Room + UI | `ArticleQueryTest` |
 | T37 | R14, R09 | Settings and image traffic. List layout, text size and theme are restored. With images off there are no image requests; clearing the cache removes images only. Public articles trigger no Open Graph fetches in the background. | UI + HTTP | `HomeFlowTest` |
 | T38 | R16, R18 | Database persistence and migration. Subscriptions, categories, articles and state survive being killed mid-operation and a schema change. There is no destructive fallback. The migration test infrastructure exists even when no earlier schema had been released. | Room + device | `MigrationTest`, `DataKeepingTest`, `DatabaseSmokeTest` |
@@ -173,8 +221,8 @@ Column "Test classes" lists the classes whose comments cite that ID. A dash mean
 | N04 | Vertical scroll, pull to refresh, article tap and the Android back action do not interfere with horizontal paging. | - |
 | N05 | Deleting, adding or reordering categories does not carry the position or selection of one page into another. | - |
 | N06 | After a category switch, new-article detection looks at the current list's own state. | `NewArticleSeenTest` (see `V3-R03`) |
-| N07 | Arrivals only in another category, under the Saved filter or under a search do not produce an unrelated banner. | - |
-| N08 | In both newest-first and oldest-first order the banner moves to the new articles, and nothing scrolls before the user acts. | `NewArticleBannerTest` |
+| N07 | Arrivals only in another category, under the Saved filter or under a search do not produce an unrelated banner, and answering the banner answers only the articles of the list it was shown on (`UXR-16`). | `NewArticleBannerTest` |
+| N08 | In newest-first order the banner goes to the start of the list, in oldest-first order to the first new article of that order, and nothing scrolls before the user acts. | `NewArticleBannerTest`, `HomeBannerFlowTest` |
 | N09 | The three layouts (List, Compact list, Magazine) and the selection persist across restart and keep the same article near the top. | `PagerAndMagazineTest` |
 | N10 | Magazine cards with image, without image, failed image, images off, long Japanese titles, 200% text and dark theme. | - |
 | N11 | Atom XHTML `A<b>B</b>C` becomes `ABC`; in-content images and `xml:base` resolve safely; tracking pixels and dangerous URLs are excluded. | `XhtmlContentTest` |
@@ -224,7 +272,7 @@ These `S` IDs are refresh scenarios. They are not the screen IDs `S00`-`S40` of 
 | U02 | Choosing 1, 2 or 3 columns, 200% text and split screens keep headlines and actions usable (a choice that does not fit is reduced and shown). | `CardGridLayoutTest` |
 | U03 | After column, rotation or layout changes the same article stays near the top and nothing is marked read. | `UxNextTest`, `HomeFlowTest` |
 | U04 | Category round trips in the Magazine layout keep each category's position; new arrivals and the oldest-first banner jump work. | `UxNextTest` |
-| U05 | Pre-composing a neighbour page does not consume new-article markers. | `NewArticleBannerTest` |
+| U05 | Pre-composing a neighbour page does not answer the new-article notice (only the arrow, the tab, the banner and the cross do; being on screen does not). | `NewArticleBannerTest` |
 | U06 | Skipping the HTTP-open confirmation persists across restart, is not saved when cancelled, and can be turned back on in settings. | `HttpOpenSettingTest`, `UxNextTest` |
 | U07 | Skipping the confirmation changes neither the HTTP feed/image allowance nor TLS verification. | `HttpOpenSettingTest` |
 | U08 | Source icons: declared icon, relative URLs, PNG/ICO, no icon and failure fallback. | `FeedIconTest`, `IconDecoderTest` |
@@ -244,7 +292,7 @@ These `S` IDs are refresh scenarios. They are not the screen IDs `S00`-`S40` of 
 |---|---|---|
 | V3-R01 | A fetch result is applied only if it belongs to the fetch URL its request started with. When the fetch URL changes (approved move, HTTPS migration) while a fetch runs, the new address gets a fresh job; late results of the old address, whether success, 429, a permanent redirect or 304, are discarded; A to B to A applies the response of the current address. | `StaleFetchResponseTest` |
 | V3-R02 | One definition of "same article" (`EntryKeyAliases`) serves discovery's shared-article count and storage after a move: only `id:`/`url:` prefix, `http`/`https` and a leading `www.` differ, URL-shaped keys only, never across feeds, and only for feeds with a recorded move or HTTPS migration. | `MovedFeedIdentityTest`, `EntryKeyAliasesTest` |
-| V3-R03 | The new-articles banner also clears when the marker is added after the article is already on screen. | `NewArticleSeenTest`, `NewArticleBannerTest` |
+| V3-R03 | Superseded by H03 (`UXR-13`): the banner is no longer counted down by what is on screen, so a marker added after the article is already on screen changes nothing; it is answered by the reader. | `NewArticleBannerTest`, `NewArticleNoticesTest` |
 | V3-R04 | A cancelled or replaced moved-feed discovery never writes its outcome into the state of the newer one; an adopted candidate is tied to the fetch URL it was found for. | `DiscoveryControllerTest`, `FeedDiscoveryTest` |
 | V3-R05 | What a page is follows from its root element, not from a leading `<?xml` (XHTML pages are pages; feeds with a BOM or comments before the root are feeds). | `HtmlRootElementTest`, `FeedDiscoveryTest` |
 | V31-R01 | After an address change, the refresh coordinator does not coalesce a new request into an older in-flight request for the old address (normal, forced and All refreshes); repeated taps with an unchanged address still fetch once. | `RefreshAfterAddressChangeTest` |
@@ -252,7 +300,7 @@ These `S` IDs are refresh scenarios. They are not the screen IDs `S00`-`S40` of 
 | V31-C02 | A replaced feed is not counted as unfinished work, nor offered for retry. | `ReplacedFeedStatusTest` |
 | V31-T01 | Upgrading by overwrite install (without uninstalling) keeps rows, reading state and settings unchanged, and a following ordinary refresh creates no duplicates. | `tools/compare_app_state.py` (manual device procedure) |
 | V31-T02 | The new-articles banner behaves correctly on the real list composable in all layouts and both orders. | `NewArticleBannerTest` |
-| V4-R01 | "Back to the top" ends on the first article even when articles arrive at the head meanwhile or right after (a refresh), and the list does not follow arrivals once the user has touched it. | `BackToTopTest`, `NewArticleBannerTest` |
+| V4-R01 | "Back to the top" ends on the first article even when articles arrive at the head meanwhile or right after (a refresh), and the list does not follow arrivals once the user has touched it. | `BackToTopTest`, `BackToTopListTest`, `BackToTopInterruptTest` |
 | V31-T03 | Tabs, underline, pages and the saved selection agree after drags, quick taps and distant tabs at large text; back to top works in every layout and does not change other categories' positions or any state. | `PagerAndMagazineTest` |
 
 ### 4.6 Design topics cited in source comments
@@ -267,7 +315,7 @@ Source comments name the design topic a piece of code belongs to. They are not t
 | DATA-01 | Fetch diagnostics per feed: the last request, the last real HTTP exchange and the last applied document, kept apart. |
 | CFG-02 | Retention ("articles to keep") and image cache settings; deletion only after consent, unread and saved articles protected. |
 | REV-01 | Each category keeps its own scroll position. |
-| REV-02 | The new-articles banner: its state, scope and where it moves to. |
+| REV-02 | The new-articles banner: its state, scope, answer and where it moves to (see product-and-ux section 6). |
 | REV-03 | Atom XHTML text order and in-content images. |
 | REV-05 | Pager loading design: only visible pages hold a database subscription. |
 | UX-01 | Switching categories by horizontal swipe. |
