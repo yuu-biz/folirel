@@ -5,6 +5,8 @@ import androidx.compose.foundation.gestures.ScrollScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.MotionDurationScale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -162,4 +164,17 @@ internal class ListMover(private val scope: CoroutineScope) {
         job = null
         kind = null
     }
+}
+
+/**
+ * Where the buttons that ask for a movement (the arrow, the new-article notice) are, in the box of the list. A press on one
+ * of them is the request itself and must not be taken for a touch of the list: that would end the movement before the
+ * button's own click is seen, so asking for the same movement again would stop it and start it over. A press anywhere else
+ * on the list (a card, its buttons, empty space) still ends the movement.
+ */
+internal class ControlBounds {
+    var arrow: Rect? = null
+    var banner: Rect? = null
+
+    fun contains(point: Offset): Boolean = arrow?.contains(point) == true || banner?.contains(point) == true
 }

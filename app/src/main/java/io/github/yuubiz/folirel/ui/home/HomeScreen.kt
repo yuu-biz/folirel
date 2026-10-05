@@ -109,6 +109,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.geometry.Offset
@@ -569,6 +570,7 @@ private fun ScopePage(
                 newIds = newIds,
                 newestFirst = selection.sort == SortOrder.NEWEST,
                 isCurrent = isCurrent,
+                isSelected = pageScope == selection.scope,
                 scrollToTopTick = scrollToTopTick,
             )
         }
@@ -601,6 +603,8 @@ internal fun ArticleList(
     newestFirst: Boolean,
     isCurrent: Boolean,
     scrollToTopTick: Int,
+    /** The category the reader has chosen is this list's: false from the moment another one is chosen, while the pager may still show this page. */
+    isSelected: Boolean = true,
 ) {
     // While the list moves, it keeps the articles it is moving over: a refresh delivers feed after feed, and articles
     // inserted above the moving list would change its distance on every batch. They are applied when the movement ends.
@@ -688,22 +692,33 @@ internal fun ArticleList(
     // ended on and the newest ones sit above the screen); the user touching the list ends this (see the pointerInput below).
     val headId = items.firstOrNull()?.id
     LaunchedEffect(headId) {
-        if (SystemClock.uptimeMillis() < followHeadUntil) currentScroll.scrollTo(0)
+        if (isSelected && SystemClock.uptimeMillis() < followHeadUntil) currentScroll.scrollTo(0)
+    }
+    // Another category was chosen (tab, drawer): what this list moves and follows belongs to the category left, so both end now.
+    // The pager may keep this page composed until the slide has settled; ending must not wait for the page to go.
+    LaunchedEffect(isSelected) {
+        if (!isSelected) {
+            followHeadUntil = 0L
+            mover.cancel()
+        }
     }
     // Far enough down that the way back is long; the button is for that case only.
     val farDown by remember(scroll.owner) { derivedStateOf { currentScroll.firstIndex > SCROLL_TOP_BUTTON_AFTER } }
     // The banner counts only the new articles this list shows.
     val newCount = remember(items, newIds) { items.count { it.id in newIds } }
     val now = remember(items) { System.currentTimeMillis() }
+    // Where the buttons that ask for a movement are (in this box): a press on them is the request itself, not a touch of the list.
+    val controls = remember { ControlBounds() }
     Box(
         Modifier.fillMaxSize().pointerInput(mover) {
             // Watches only: the Initial pass sees every press and wheel scroll first and consumes nothing, so taps, swipes and
-            // long presses reach the cards as before. A touch ends the movement and the following (the user comes first). The
-            // buttons act on release, after this, so their own press cannot cancel the movement they are about to start.
+            // long presses reach the cards as before. A touch ends the movement and the following (the user comes first), except a
+            // press on the arrow or the notice: that press is the request for a movement, which then joins the one that runs.
             awaitPointerEventScope {
                 while (true) {
                     val event = awaitPointerEvent(PointerEventPass.Initial)
-                    if (event.type == PointerEventType.Press || event.type == PointerEventType.Scroll) {
+                    val pressOnAControl = event.type == PointerEventType.Press && event.changes.firstOrNull()?.position?.let { controls.contains(it) } == true
+                    if ((event.type == PointerEventType.Press && !pressOnAControl) || event.type == PointerEventType.Scroll) {
                         followHeadUntil = 0L
                         mover.cancel()
                     }
@@ -769,6 +784,7 @@ internal fun ArticleList(
             }
         }
         if (newCount > 0) {
+            DisposableEffect(Unit) { onDispose { controls.banner = null } }
             // New arrivals never move the list on their own; one tap answers the notice: it goes away and the list moves.
             NewArticlesBanner(
                 count = newCount,
@@ -781,14 +797,15 @@ internal fun ArticleList(
                     if (newestFirst || firstNew == null) goToTop() else goToArticle(firstNew)
                 },
                 onDismiss = { answerNotice() },
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp).onGloballyPositioned { controls.banner = it.boundsInParent() },
             )
         }
         if (farDown) {
+            DisposableEffect(Unit) { onDispose { controls.arrow = null } }
             SmallFloatingActionButton(
                 onClick = { backToTop() },
                 // Bottom centre: the per-article buttons (save, menu) sit at the right edge and must stay reachable.
-                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp).testTag("scroll_to_top"),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp).onGloballyPositioned { controls.arrow = it.boundsInParent() }.testTag("scroll_to_top"),
                 containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.92f),
             ) {
                 Icon(painterResource(R.drawable.ic_arrow_upward), contentDescription = stringResource(R.string.scroll_to_top))

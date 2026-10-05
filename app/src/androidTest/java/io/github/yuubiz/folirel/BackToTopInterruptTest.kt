@@ -104,5 +104,43 @@ class BackToTopInterruptTest {
         assertTrue("and it was shown at that place right after it replaced the other: $startedAt", startedAt == other[1500].id)
     }
 
+
+    private fun arrowShown() = compose.onAllNodes(androidx.compose.ui.test.hasTestTag("scroll_to_top")).fetchSemanticsNodes().isNotEmpty()
+
+    /** A real press and release on the arrow (down and up through the pointer input of the list, not the click function and not the tick). */
+    private fun pressArrow() {
+        if (arrowShown()) compose.onNodeWithTag("scroll_to_top").performTouchInput { down(center); up() }
+    }
+
+    /** R01: the arrow pressed again and again while the list is moving is the same request: it joins, it does not stop the movement and start it over. */
+    private fun realPressesOnTheArrowJoinTheMovement(mode: ListMode) {
+        prepare(mode)
+        val trace = ScrollTrace.record("arrow-$mode", compose, h, maxFrames = 300, start = { pressArrow() }, between = { i ->
+            if (i in listOf(8, 12, 16, 20)) pressArrow()
+        })
+        assertEquals("$mode: the movement started over after a press on the arrow: ${trace.summary()}", 0, trace.restarts)
+        assertEquals("$mode: the movement stopped on its way: ${trace.summary()}", 0, trace.stallFrames)
+        assertEquals(0, trace.reversals)
+        // One movement of the usual length: a restart at every press would add the time of a new curve each time.
+        assertTrue("$mode: it took ${trace.durationMs} ms: ${trace.summary()}", trace.durationMs <= 700)
+        compose.waitForIdle()
+        assertTrue("$mode: ends on the first article", h.sample().tops[h.items.first().id]?.let { it in 0f..96f } == true)
+    }
+
+    @Test fun realPressesOnTheArrowInTheListLayout() = realPressesOnTheArrowJoinTheMovement(ListMode.LIST)
+    @Test fun realPressesOnTheArrowInTheMagazineLayout() = realPressesOnTheArrowJoinTheMovement(ListMode.MAGAZINE)
+
+    /** A press on a card still stops the movement (the user comes first), also in the layouts where the arrow is exempt. */
+    @Test
+    fun aPressOnACardStillEndsTheMovementAfterArrowPresses() {
+        prepare(ListMode.LIST)
+        val trace = ScrollTrace.record("card-after-arrow", compose, h, start = { pressArrow() }, between = { i ->
+            if (i == 6) pressArrow()
+            if (i == 10) touchList()
+        })
+        assertTrue("moved before the card was pressed: ${trace.summary()}", trace.speeds.take(10).any { it > 5f })
+        assertTrue("nothing moved the list after the card press", trace.speeds.drop(12).all { abs(it) <= 0.5f })
+    }
+
     private companion object { const val BIG = 3000 }
 }
