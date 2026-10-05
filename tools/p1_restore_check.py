@@ -248,9 +248,15 @@ def panel_layout(category):
                 row = n
         tap(row)
         wait_for(lambda r: title_text(r) == category)
-    root = dump()
-    tap(find_desc(root, "Display and filters"))
-    root = wait_for(lambda r: find_text(r, "Layout of this category"))
+    root = None
+    for _attempt in range(3):  # a tap that lands while a sheet or the keyboard is still moving is simply made again
+        tap(find_desc(dump(), "Display and filters"))
+        root = wait_for(lambda r: find_text(r, "Layout of this category") is not None, 6)
+        if root is not None:
+            break
+        back()
+    if root is None:
+        raise SystemExit(f"the display panel of {category} did not open")
     layout = [t for t in checked_rows(root) if t in ("Use the default (List)", "Use the default (Compact list)", "Use the default (Magazine)", "List", "Compact list", "Magazine")]
     details = []
     if find_text(root, "Arrangement and columns…") is not None:
@@ -355,8 +361,12 @@ def main():
     pid_before = pid()
     adb("shell", "input", "keyevent", "3")  # Home: the app goes to the background with its screen state saved
     time.sleep(2)
-    adb("shell", "am", "kill", PKG)
-    time.sleep(2)
+    # `am kill` only takes a background (cached) process; it may need a moment after Home before the app counts as one.
+    for _attempt in range(10):
+        adb("shell", "am", "kill", PKG)
+        time.sleep(1.5)
+        if pid() == "":
+            break
     check("the process is gone", pid() == "", f"pid before {pid_before}, now '{pid()}'")
     launch()
     pid_after = pid()
