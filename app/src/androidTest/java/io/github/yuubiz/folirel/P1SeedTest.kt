@@ -18,7 +18,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class P1SeedTest {
     @Test
-    fun seedForTheUpgradeCheck() = runBlocking {
+    fun seedForTheUpgradeCheck() = runBlocking<Unit> {
         TestData.reset()
         val seeded = TestData.seedCategories(listOf("Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta"), perCategory = 30)
         val articles = seeded.values.flatten()
