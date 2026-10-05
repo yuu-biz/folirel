@@ -152,6 +152,10 @@ def rows(conn, table, key_columns):
     return {tuple(r[cols.index(k)] for k in key_columns): dict(zip(cols, r)) for r in cur.fetchall()}
 
 
+def table_exists(conn, name):
+    return conn.execute("select 1 from sqlite_master where type = 'table' and name = ?", (name,)).fetchone() is not None
+
+
 def link_counts(conn):
     return {(f, l): n for f, l, n in conn.execute(
         "select feedId, linkUrl, count(*) from articles where linkUrl is not null group by feedId, linkUrl")}
@@ -187,6 +191,13 @@ def compare(before_conn, after_conn, before_settings, after_settings, mode):
         new_states = {k[0] for k in rows(after_conn, "article_states", ("articleId",)) if k not in rows(before_conn, "article_states", ("articleId",))}
         problems += [f"article_states: state of new article {a} is missing" for a in new_articles - new_states]
         problems += [f"article_states: state for {a} has no article" for a in new_states - new_articles]
+    # Schema 4 adds category_preferences (the intended difference). Updating chooses nothing for the reader, so it holds no row: every
+    # category has the defaults (no saved place, not pinned, nothing overridden).
+    if table_exists(after_conn, "category_preferences"):
+        n = after_conn.execute("select count(*) from category_preferences").fetchone()[0]
+        info.append(f"category_preferences: new table, {n} rows")
+        if n:
+            problems.append(f"category_preferences: {n} rows right after the update (every category must have the defaults)")
     cb, ca = link_counts(before_conn), link_counts(after_conn)
     for key, n in ca.items():
         if n > 1 and n > cb.get(key, 0):

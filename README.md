@@ -21,7 +21,7 @@ open the original page in your browser.
 - **Direct fetching** of RSS 2.0, Atom 1.0 and RSS 1.0 feeds, with conditional requests, charset detection (including
   Shift_JIS) and per-feed diagnostics when a feed fails.
 - **Three list layouts:** List, Compact list and Magazine (mixed card sizes with thumbnails and summaries).
-- **Categories** with nesting, a navigation drawer, category tabs and left/right swiping between them.
+- **Categories** with nesting, a navigation drawer, category tabs that follow your finger while you swipe between them, a category picker with search, pinned and re-orderable tabs, and a layout of their own per category if you want one.
 - **Explicit read state.** Articles are marked read, unread or saved only when you say so. Opening an article never
   marks it read.
 - **Original site first.** Articles open in Custom Tabs (or your external browser); there is no built-in reader.

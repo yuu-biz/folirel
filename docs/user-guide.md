@@ -74,15 +74,19 @@ Read, unread and saved are changed only by explicit actions. Refreshing never ov
 ### Moving around
 
 - **Navigation menu**: open it with the menu button at the top left (**Open navigation**). It contains All articles, Saved articles, Uncategorized, your Categories (expandable), Subscriptions and Settings.
-- **Tabs and swiping**: tabs at the top show **All**, **Uncategorized** and your categories. Swipe the list left or right to move between them; the order stops at both ends and does not wrap around. Each tab remembers its scroll position.
-- **Filter and sort**: the chips **All** / **Unread** / **Saved**, and **Newest first** / **Oldest first** (also in the more-options menu).
+- **Tabs and swiping**: tabs at the top show **All**, **Uncategorized**, your pinned categories and your other categories. Swipe the list left or right to move between them; the tab row moves with your finger, and the order stops at both ends and does not wrap around. Each tab remembers its scroll position. You can also slide the tab row itself to look for a tab; that does not change the category.
+- **Go to a category**: press the category name at the top (with the small arrow). Choose a category from the list, or type part of a name or of its parent's name to search. The pin button on each row pins it to the front of the tabs.
+- **Display and filters**: the button next to search opens **Display and filters**: **All** / **Unread** / **Saved**, **Newest first** / **Oldest first**, and the layout. A small line under the category name shows the current range and order.
 - **Search**: the magnifier icon searches titles, summaries and sources of articles already on the device, within the current scope. It never contacts the network.
-- **List style**: in the more-options menu or in Settings, choose one of three layouts:
+- **List style**: in **Display and filters** (for the category you are looking at, or for everything when you are on All) or in Settings (the default for all categories), choose one of three layouts:
   - **List**: one column with headline, summary and thumbnail.
   - **Compact list**: one dense line per article.
   - **Magazine**: cards of mixed sizes (or all the same size, see Settings) in up to three columns on wide screens.
 
 ## Categories
+
+- **Order of the tabs**: more-options menu, **Organize categories and tabs** (or the same button at the bottom of the category list). Pin a category to put it in front, drag the handle to move it, or use the row's menu (**Move up** / **Move down**). **Back to the standard order** only resets the order; pins and each category's display settings stay. This changes the order of the tabs only, not which categories contain which feeds.
+- **Display of one category**: with that category open, **Display and filters** changes its layout only (the first choice, **Use the default**, follows Settings). **Arrangement and columns…** sets the Magazine arrangement and the most columns for that category; **Reset the display of this category** puts all three back to the default.
 
 Categories are optional and can be nested.
 

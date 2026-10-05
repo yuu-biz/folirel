@@ -56,7 +56,7 @@ The scripts in `tools/` are development aids; they are not used by the app. The 
 |---|---|
 | `tools/verify.sh`, `tools/verify.ps1` | Run the Gradle verification command (and optionally the device tests). |
 | `tools/adb_ui.py` | A tiny adb and uiautomator driver for manual emulator checks: `dump`, `texts`, `tap TEXT`, `tapxy X Y`, `type TEXT` (ASCII only), `key KEYCODE`, `shot PATH`, `wait TEXT [SECONDS]`, `swipe X1 Y1 X2 Y2 [MS]`, with an optional `-s SERIAL`. |
-| `tools/compare_app_state.py` | Upgrade check. Compares two pulled copies of the app's Room database and DataStore and exits with code 1 when something that must not change did. `--mode install` (right after an overwrite install, before any fetch): nothing may differ in subscriptions, categories, articles, reading state or settings. `--mode after-refresh` (after one ordinary refresh): new articles are allowed and existing articles may change only the columns a refresh rewrites; their ID, key, feed and read/saved state may not change. Usage: `python -X utf8 tools/compare_app_state.py --mode install BEFORE_PREFIX AFTER_PREFIX`. |
+| `tools/compare_app_state.py` | Upgrade check. Compares two pulled copies of the app's Room database and DataStore and exits with code 1 when something that must not change did. `--mode install` (right after an overwrite install, before any fetch): nothing may differ in subscriptions, categories, articles, reading state or settings; the `category_preferences` table that schema 4 adds is expected and must be empty. `--mode after-refresh` (after one ordinary refresh): new articles are allowed and existing articles may change only the columns a refresh rewrites; their ID, key, feed and read/saved state may not change. Usage: `python -X utf8 tools/compare_app_state.py --mode install BEFORE_PREFIX AFTER_PREFIX`. |
 | `tools/make_icon_fixtures.py` | Regenerates the synthetic images in `fixtures/icons/`. |
 | `tools/fixtures/datastore-settings-0.3.0.preferences_pb` | A DataStore settings file as an older version wrote it, for upgrade checks. |
 
@@ -94,7 +94,13 @@ Rules that apply to every layer:
 | `UxrScrollTraceTest` | The way back to the top as a movement, frame by frame on the test clock with pictures loading for real: no stop on the way, no start over, no step away from the top, at most one skip, no late snap, in List, Compact list and Magazine (2 and 3 columns, with pictures), near and far, with batches arriving meanwhile (`UXR-01` to `UXR-03`) |
 | `UxrRealtimeTest` | The same in real time: the arrow is pressed through the accessibility tree and the first visible article is timed on every change. Meant to be screen-recorded (see "Position traces and recordings") |
 | `BackToTopTest` | Back to the top (arrow and tab re-tap) through the whole app with Room: articles arriving at the head during and right after the way up end on the newest article in all three layouts, and stop following as soon as the user touches the list: drag, finger put down without a drag, long press, article menu (`V4-R01`) |
-| `MigrationTest` | Room v1 to v2 and v2 to v3 migrations validated against exported schemas, data kept, chained 1 to 3, an unknown newer version fails instead of wiping data (`T38`, `N25`) |
+| `MigrationTest` | Room v1 to v2, v2 to v3 and v3 to v4 migrations validated against exported schemas, data kept (v3 to v4 on a populated database: subscriptions in two categories, read and saved states, icons), chained 1 to 3 and 1 to 4, an unknown newer version fails instead of wiping data (`T38`, `N25`, `P1-T30`) |
+| `P1NavTest` | The real app with 30 categories (short, long and equal names) and real pointer input: the tab row and the underline at 25/50/75 % of an unfinished drag, a drag that comes back, the row scrolled by hand alone and the follow resuming without a jump, the ends of the row, quick choices of far categories (`P1-T01` to `P1-T06`). Per-frame positions go to logcat tag `P1NAV` |
+| `P1DenseTest`, `P1MoveTest` | The real `HomeScreen` with the real coordinator: the two-row header and 48 dp touch areas, the display panel and the state line, mark-all coverage, a notice that outlives the panel, 320/411/733 dp at 100 % and 200 % text, choosing through the picker during the movement back to the top (`P1-T08`, `P1-T09` to `P1-T12`) |
+| `P1OrgTest` | The real app: the picker (local search by name and parent path, same category = close only), pin and unpin, drag with the handle and a cancelled drag, up/down and standard order, a pin that changes the index of the category on screen (it keeps its identity and its place), an emptied or deleted category (`P1-T14` to `P1-T21`) |
+| `P1LayoutTest` | Per-category layout: three pages with three layouts while dragged, one feed in two categories, a global change reaching only what inherits, the same article kept in view across layout changes and a recreate, the details sheet and reset, a stored column choice that does not fit (`P1-T24` to `P1-T28`) |
+| `P1ScaleTest` | Empty install, one category, 30 categories with 300 feeds and 5,000 articles (only the pages on screen are composed), the organizer at 200 % text (`P1-T32`, `P1-T33`) |
+| `P1ShotTest` | Writes screenshots of the home screen for the before/after comparison; asserts nothing |
 | `IconDecoderTest` | Source-icon decoding on a real Android runtime: PNG, ICO with PNG entry, ICO with BMP entry, wide logo, 512 px image, non-images (`U08`) |
 | `PerformanceTest` | Synthetic 300 feeds / 5,000 articles: warm start to a visible list and local search timings (`T47`) |
 
@@ -304,7 +310,46 @@ These `S` IDs are refresh scenarios. They are not the screen IDs `S00`-`S40` of 
 | V4-R01 | "Back to the top" ends on the first article even when articles arrive at the head meanwhile or right after (a refresh), and the list does not follow arrivals once the user has touched it. | `BackToTopTest`, `BackToTopListTest`, `BackToTopInterruptTest` |
 | V31-T03 | Tabs, underline, pages and the saved selection agree after drags, quick taps and distant tabs at large text; back to top works in every layout and does not change other categories' positions or any state. | `PagerAndMagazineTest` |
 
-### 4.6 Design topics cited in source comments
+### 4.6 Phase 1 scenarios: navigation, density, organizing, layout (P1-T01 to P1-T34)
+
+| ID | Rule | Test |
+|---|---|---|
+| P1-T01 | With 30 categories the titles and the underline are at the same continuous place at 25, 50 and 75 % of an unfinished drag. | `P1NavTest`, `TabFollowTest` |
+| P1-T02 | The underline is centred under short, long and equal-named titles; tab touch areas are 48 dp. | `P1NavTest`, `PagerAndMagazineTest`, `P1DenseTest` |
+| P1-T03 | A drag that comes back leaves the selection and the saved settings as they were, and the row and underline come back. | `P1NavTest` |
+| P1-T04 | The first and last tab and a row that fits: no empty space added, no needless movement. | `P1NavTest`, `TabFollowTest` |
+| P1-T05 | Scrolling the row alone selects nothing and does not fight the next pager drag. | `P1NavTest`, `TabFollowTest` |
+| P1-T06 | Far choices in quick succession end on the last one and select nothing in between. | `P1NavTest`, `TabFollowTest` (`SettleGuard`) |
+| P1-T07 | Pressing the selected tab again or the arrow (real down and up) is one movement to the top; a press on an article ends it. | `BackToTopInterruptTest`, `BackToTopTest` |
+| P1-T08 | Choosing another category through a tab, the picker or the drawer ends the old page's movement and following. | `HomePagerMoveTest`, `P1MoveTest` |
+| P1-T09 | The header is the toolbar and the tabs (about 104 dp); the touch areas are 48 dp. | `P1DenseTest` |
+| P1-T10 | At 320, 411 and 733 dp and 100 % and 200 % text the display panel, the picker and the search are reachable without overlap. | `P1DenseTest`, `P1ScaleTest` |
+| P1-T11 | Range and order chosen in the panel reach the list, the state line and the mark-all coverage. | `P1DenseTest` |
+| P1-T12 | A panel or a search does not restart, extend or bring back a notice, and does not move the list. | `P1DenseTest`, `HomeNoticeFlowTest` |
+| P1-T13 | Offline, held HTTP and storage failure keep a small way to the details. | `HomeNoticeFlowTest` |
+| P1-T14 | The picker searches names and parent paths locally; the same category only closes it; its search is separate from the article search. | `P1OrgTest`, `P1MoveTest` |
+| P1-T15 | Pin and unpin: one tab, in front; unpinning restores the place; kept across a restart. | `P1OrgTest`, `CategoryPreferencesTest` |
+| P1-T16 | The handle moves a row within its group; a cancelled drag changes nothing; tabs follow the stored order. | `P1OrgTest` |
+| P1-T17 | Up/down in the menu and the standard order (which keeps pins). | `P1OrgTest`, `P1ScaleTest`, `CategoryPreferencesTest` |
+| P1-T18 | Reordering changes no category id, path, membership, article or state. | `CategoryPreferencesTest` |
+| P1-T19 | A pin or move that changes the index of the shown category does not change the selection or the list place. | `P1OrgTest` |
+| P1-T20 | A reorder and a new category, a rename and a re-import: the saved order stays, new ones go to the end. | `CategoryPreferencesTest`, `TabOrderTest` |
+| P1-T21 | No feed left, resubscribe, delete: settings kept or removed at the right boundary; an emptied category stays on screen; delete returns to All. | `CategoryPreferencesTest`, `P1OrgTest` |
+| P1-T22 | Equal child names, names with `/`, depth: the tab order is independent of the tree. | `TabOrderTest` |
+| P1-T23 | Resolution of inherited, explicit and automatic (0) settings for All, Uncategorized, a feed, a parent and a child. | `TabOrderTest` |
+| P1-T24 | Three categories with three layouts, also while dragged between two pages. | `P1LayoutTest` |
+| P1-T25 | One feed in two categories: A's change leaves B, the articles and their state alone. | `P1LayoutTest` |
+| P1-T26 | A global change reaches only what inherits; resetting a category keeps its pin and order. | `P1LayoutTest`, `CategoryPreferencesTest` |
+| P1-T27 | The same article stays in view across layout changes and a recreate. | `P1LayoutTest`, `UxNextTest` |
+| P1-T28 | A column choice that does not fit is reduced on screen and kept as stored; images off stay off. | `P1LayoutTest`, `CardGridLayoutTest` |
+| P1-T29 | After a restart the selected id, the order, the pins and the overrides are kept and no wrong page is saved before the order is read. | `P1OrgTest`, `P1LayoutTest` |
+| P1-T30 | A populated schema 3 database migrates to schema 4 with every row kept and every category at the defaults. | `MigrationTest` |
+| P1-T31 | Installing the new APK over the previous one (without uninstalling) keeps rows, reading state and settings; the new table is empty. | `tools/compare_app_state.py` (manual device procedure) |
+| P1-T32 | Empty install, one category, 30 categories with 300 feeds and 5,000 articles: no crash, only the pages on screen composed. | `P1ScaleTest` |
+| P1-T33 | At 200 % text the new controls (pin, menu, up/down) are operable and 48 dp. | `P1ScaleTest`, `P1DenseTest` |
+| P1-T34 | The 0.4.2 scenarios (back to top, one answer to the notice, the cross does not move, an old page stops, the arrow pressed repeatedly joins one movement) still hold. | `BackToTopTest`, `BackToTopInterruptTest`, `HomePagerMoveTest`, `NewArticleBannerTest`, `HomeBannerFlowTest`, `HomeNoticeFlowTest` |
+
+### 4.7 Design topics cited in source comments
 
 Source comments name the design topic a piece of code belongs to. They are not test IDs.
 

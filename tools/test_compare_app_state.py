@@ -160,5 +160,35 @@ class CompareAppStateTest(unittest.TestCase):
         self.assertFails(run("after-refresh", lambda c: c.execute("delete from feed_categories")), "missing")
 
 
+class CategoryPreferencesTableTest(unittest.TestCase):
+    """Schema 4 adds category_preferences: the new table is expected, but it must be empty right after the update."""
+
+    @staticmethod
+    def with_table(conn, rows=0):
+        conn.execute("create table category_preferences (categoryId text not null primary key, tabOrder integer, isPinned integer not null default 0, "
+                     "listModeOverride text, cardStyleOverride text, cardColumnsOverride integer)")
+        for i in range(rows):
+            conn.execute("insert into category_preferences (categoryId) values (?)", (f"c{i}",))
+        conn.commit()
+
+    def test_a_new_empty_table_is_the_intended_difference(self):
+        before, after = seed(new_db()), seed(new_db())
+        self.with_table(after)
+        problems, info = cas.compare(before, after, dict(SETTINGS), dict(SETTINGS), "install")
+        self.assertEqual([], problems)
+        self.assertIn("category_preferences: new table, 0 rows", info)
+
+    def test_a_row_right_after_the_update_fails(self):
+        problems = run("install", lambda after: self.with_table(after, rows=1))
+        self.assertTrue(any("category_preferences" in p for p in problems), problems)
+
+    def test_user_data_is_still_compared_with_the_new_table_present(self):
+        def mutate(after):
+            self.with_table(after)
+            after.execute("update article_states set isRead = 1 where articleId = 'a3'")
+        problems = run("install", mutate)
+        self.assertTrue(any("article_states" in p for p in problems), problems)
+
+
 if __name__ == "__main__":
     unittest.main()

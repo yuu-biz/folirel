@@ -80,6 +80,17 @@ whose sizes are chosen from a hash of the article id, packed into gap-free rows;
 The list position is remembered per list key (account, scope, filter, sort order, search), up to 40 keys, and the
 layout is deliberately not part of the key.
 
+The order of the pages is one function, `TabOrder.resolve` (pinned categories first, each group by the saved rank, the
+unplaced after the placed in path order); `Structure` carries it (`tabOrdered`, `tabCategories`) together with the per-category
+preferences read from `category_preferences`, so the tabs, the pager, the picker, the drawer shortcuts and the organizer
+cannot disagree. The layout of a page is `CategoryDisplay.resolve(pageScope, global, preferences)`, resolved for each page
+separately. `HomeScreen` keeps three things apart: the pager's drawn position (`currentPage + currentPageOffsetFraction`),
+the chosen category id (`HomeViewModel.selection`) and the settled page (`SettleGuard` decides what a settle means after a
+newer choice). `ScopeTabs` is a plain horizontal scroll container whose scroll is set directly by `TabFollower` for each
+pager position (the geometry is in `TabFollow`, free of Compose), with the titles measured in the content of the row and keyed
+by scope id. The pager re-syncs to the chosen id when the pages are reordered. A selected scope that is not a page (a single
+feed, a category without subscribed feeds) is shown without the pager.
+
 ## 4. Backend boundary
 
 One backend, `LocalBackend`, is implemented. A refresh is addressed to an account and a scope rather than to

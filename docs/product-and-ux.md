@@ -1,6 +1,6 @@
 # Product and UX
 
-This document describes what Folirel is and is not, what it is required to do (requirement IDs `R01`-`R20`), and how its screens behave (screen IDs `S00`-`S40`). It describes the app as it is at version 0.4.2. Test scenarios that exercise these requirements are catalogued in [testing.md](testing.md). Internals are described in [architecture.md](architecture.md), [data-and-import.md](data-and-import.md) and [fetch-and-security.md](fetch-and-security.md); end-user instructions are in [user-guide.md](user-guide.md).
+This document describes what Folirel is and is not, what it is required to do (requirement IDs `R01`-`R20`), and how its screens behave (screen IDs `S00`-`S40`). It describes the app as it is at version 0.5.0. Test scenarios that exercise these requirements are catalogued in [testing.md](testing.md). Internals are described in [architecture.md](architecture.md), [data-and-import.md](data-and-import.md) and [fetch-and-security.md](fetch-and-security.md); end-user instructions are in [user-guide.md](user-guide.md).
 
 ## 1. Purpose
 
@@ -99,37 +99,64 @@ Importing works offline; fetching is then reported as pending.
 ### S10 Home
 
 ```text
-Toolbar:  [Menu]  <current scope>                    [Search] [More]
-Tabs:     All | Uncategorized | Tech / AI | News | ...
-Filter:   [All] [Unread] [Saved]                      [Newest first / Oldest first]
+Toolbar:  [Menu]  <category name> v                  [Display] [Search] [More]
+          <range> . <order>   (small line under the name, e.g. "Unread . Newest first")
+Tabs:     All | Uncategorized | pinned categories | Tech / AI | News | ...
 Notices:  drawn over the list, never inside the layout: progress, the result of an update that needs attention (a few seconds), offline mark
 List:     articles of the current scope and filter
 ```
 
 Layout rules:
 
-- The toolbar is 56 dp high and respects system insets. There is no permanent large heading, no promo card and no bottom navigation bar. On a short screen the header never takes half the height.
-- The filter row wraps instead of clipping at large text sizes.
+- The header is two rows: the toolbar (56 dp, or 80 dp when the text is above 130 %) and the tab row (48 dp), about 104 dp at normal text size, not counting the system bars. There is no row of filter chips, no permanent large heading, no promo card and no bottom navigation bar. On a short screen the header never takes half the height. Nothing is shrunk to reach these numbers: touch targets stay 48 dp, and at large text or a narrow window the header grows instead.
+- The toolbar title is the name of the category on screen with a small down arrow. Pressing it opens the category picker (S10b). Under the name a small line says what the list shows (range and order, "Unread . Oldest first"), so the state is never guessed from an icon. The button to its right opens the display panel (S10a).
+- In a window narrower than 360 dp the search icon moves into the overflow menu; the title, the display button and the menu stay on the bar.
 - Nothing about an update takes room from the list. Notices are drawn over it (outside the list's own touch area), so an article never moves when one comes or goes, and pressing one is never taken for a touch of the list:
   - *Running*: a thin progress bar at the top edge and, above the back-to-top button, what is running (`n/m`, "first fetch in progress", another update running, checking HTTPS). It stays as long as the update runs.
   - *Finished*: an update the reader asked for (manual refresh, import) that ends with something to look at (failed, not reached, waiting, HTTP held, storage failure, interrupted, deferred because offline) leaves one notice, for about 5 seconds (longer if the system asks for more time for accessibility), with a close cross, "Details" (subscription management) and, when failed or not-reached feeds can be asked for again, "Retry unfinished". A fully successful update shows nothing. The end belongs to the update's request: rotating, switching tabs or coming back never shows it again or makes it last longer, and the timer of an older notice never removes a newer one. Automatic updates (startup, periodic) show no notice; their failures are left to the marks below.
   - *What stays*, from the stored state of the feeds (the notice is only a courtesy): a small badge on the menu button and the count on the "Subscriptions" entries (menu and drawer) for feeds that failed, are held for HTTP, or were left unfinished (not counted while an update is running, when every queued feed is unfinished); a warning icon in the toolbar while a feed's articles cannot be saved; a small cloud-off icon in the toolbar while offline. Each leads to subscription management, where the reason and the way to retry are.
 
-The overflow menu contains the three list layouts (the current one is checked), the sort toggle, "Mark all as read", "Refresh", "Import OPML", "Add feed URL", "Subscriptions" and "Settings".
+The overflow menu contains "Mark all as read", "Refresh", "Organize categories and tabs", "Import OPML", "Add feed URL", "Subscriptions" and "Settings" (and "Search" in a narrow window). The layouts and the sort order are in the display panel only, so no setting is written from two places.
 
-**Drawer.** "All articles", "Saved articles", "Uncategorized" (only if there are such feeds), then categories (nested, with a per-category expander that lists its feeds), then uncategorized feeds, "Subscriptions" and "Settings". A feed in several categories appears under each of them; its articles and their saved state are shared. The drawer is opened from the menu button only; a left-edge swipe does not open it, because horizontal swipes belong to the category pages.
+**Drawer.** "All articles", "Saved articles", "Uncategorized" (only if there are such feeds), the pinned categories as shortcuts (only if any are pinned; the same categories are also in the tree below), then categories (nested, with a per-category expander that lists its feeds), then uncategorized feeds, "Subscriptions" and "Settings". A feed in several categories appears under each of them; its articles and their saved state are shared. The drawer is opened from the menu button only; a left-edge swipe does not open it, because horizontal swipes belong to the category pages.
 
-**Tabs and pages.** Tabs are "All", "Uncategorized" (when present) and every category that has at least one subscribed feed in it or below it. Nested categories show their path, for example `Tech / AI`. The tab row and the pages are one control:
+**Tabs and pages.** Tabs are "All", "Uncategorized" (when present), the pinned categories and every other category that has at least one subscribed feed in it or below it, in the order of section S10c (path order until the reader changes it). Nested categories show their path, for example `Tech / AI`. The tab row and the pages are one control:
 
 - Swiping the pages, tapping a tab and choosing a category in the drawer select the same page. The ends do not wrap around.
-- The highlighted tab and its underline follow the finger while the page is dragged; the underline is centred under the tab title, at least 24 dp wide.
+- The tab row follows the pager continuously from the first pixel of a drag (not when the page settles): the titles scroll so that the point between the two neighbouring titles, at the pager's fractional position, is in the middle of the row, and the underline (centred under the title, as wide as it, at least 24 dp) moves with them in the same frame. A row whose tabs all fit is not moved, and the ends stop at the ends of what can be scrolled (no empty space is added to centre the first or last tab). Dragging back moves the row back; there is no second animation on landing. A long jump (a tab far away, the picker) lands directly instead of sweeping every category in between.
+- The row can be scrolled by hand to look for a tab. That selects nothing and is never pulled back; when the pager moves next, the row resumes from where it is and the displacement fades over the first page of movement, so nothing jumps.
+- Three things are kept apart: the position the pager is drawn at (what the row follows), the category the reader chose (an id, set the moment a tab, the drawer or the picker is used) and the page the pager settled on (what a swipe commits). A page that settles a moment after a newer choice does not undo that choice; the last explicit choice wins. Tabs are keyed by category id, so a reorder or pin changes which index a category has, never which category is selected, and the list keeps its place.
+- A tab pressed again counts as "again" only when its page is settled and on screen; while the pager is still moving toward it, the press is not a new request.
 - Only the visible page (and its neighbour being pre-composed) holds a database subscription.
 - Tapping the already-selected tab scrolls the visible list back to the top. A small up-arrow button appears at the bottom centre after scrolling more than six items down and does the same. (It sits at the bottom centre because the per-article buttons occupy the right edge.) It is one movement (section 6), and it also answers the new-article notice of that list. Neither action changes read state.
 - When a single feed is selected from the drawer the tabs are hidden and the toolbar shows the feed name.
 
 **Scope and filter.** Scope is one of: all, uncategorized, a category (including its descendant categories) or a single feed. The read filter is independent: All / Unread / Saved. Moving between categories or tabs keeps the current filter. "Saved articles" in the drawer selects the whole-collection scope with the Saved filter.
 
-Unsubscribed feeds are excluded from normal lists and unread counts. Under the Saved filter their saved articles remain visible and are marked "Unsubscribed". Empty categories stay in subscription management and are hidden from the tabs.
+Unsubscribed feeds are excluded from normal lists and unread counts. Under the Saved filter their saved articles remain visible and are marked "Unsubscribed". Empty categories stay in subscription management, in the picker, in the drawer and in the organizer, and have no tab. Choosing an empty category shows it on its own (without tabs, like a single feed) with its empty message; if the category on screen loses its last feed it stays on screen the same way and is never silently replaced by another one. Its order, pin and layout settings are kept while the category exists, so they return when a feed is subscribed again. Deleting a category deletes its settings and returns to "All".
+
+### S10a Display panel
+
+A bottom sheet opened by one button of the toolbar. It is the one place for what the list shows:
+
+1. **Articles**: All / Unread / Saved.
+2. **Order**: Newest first / Oldest first.
+3. **Layout**: List / Compact list / Magazine. For a category the choice is that category's own, with "Use the default (…)" as the first row and a button for the arrangement and the columns (S11); for All, Uncategorized and a single feed it writes the global default, and says so.
+
+A choice applies at once. Opening and closing the panel changes no setting, no position and no notice. Segmented buttons are used for the short choices when the labels fit; a narrow window, text above 115 % or long labels (the layouts) use 48 dp selectable rows. The range and the order are one shared state, not kept per category. Search is unchanged (the toolbar field, 250 ms debounce, current scope, cleared when closed); the picker has its own search text.
+
+### S10b Category picker
+
+A bottom sheet opened by the toolbar title. Rows: All, Uncategorized (when present), a "Pinned" group, then the other categories, in the tab order, each with its parent path in small text so two children of one name can be told apart; the one on screen is marked. A search field filters the names and parent paths on the device (no network) and reports how many entries match (not a count of articles or feeds). Choosing a row closes the sheet and ends in the same selection a tab or the drawer uses; choosing the category already on screen only closes it (no scroll to the top, no notice answered). A pin button on each row pins or unpins; searching and pinning change no article, no read state and no fetch. "Organize categories and tabs" is at the bottom.
+
+### S10c Organizing the tabs
+
+"Organize categories and tabs" (the picker, the toolbar menu) opens the category screen on its "Tab order" view; the "Hierarchy" view beside it is the existing rename / add / delete list. The tab order is flat and independent of the category tree: paths, parents and which feed is in which category are never changed by it.
+
+- **Order of the tabs**: All and Uncategorized first and fixed; then the pinned categories; then the others. Each group is in the reader's saved order; a category without a saved place follows the saved ones in path order, so a new category lands at the end and nothing already placed moves. Before any choice, the order is the path order (the update to 0.5.0 changes no order). Pinning moves a category to the front group; it is one tab, never two. Unpinning gives it back its saved place, which pinning does not discard. Renaming, refreshing and re-importing OPML keep the order (it follows the category id).
+- **Row**: name and parent path, the number of feeds (or "no subscribed feed, so no tab"), a drag handle, a pin button and a menu (move up, move down, display settings). Dragging starts at the handle only and moves a row within its group; a long press on a page never reorders anything. The order being dragged is kept on the screen and saved once, when the finger is lifted; cancelling or a failed write shows the stored order again. The menu items and the accessibility actions "Move up" / "Move down" are the way without dragging.
+- **Back to the standard order** forgets the saved places only; pins and the display settings of each category stay (the screen says so).
+- A pin, a move or a reset changes only these settings: no category id, path, membership, article, read or saved state.
 
 ### S11 List layouts
 
@@ -156,6 +183,8 @@ The same buttons exist on every row: a save/unsave bookmark and a "more" menu, e
 - An alternative setting draws every card at the same size ("Same size for every card").
 - Number of columns: automatic keeps each card at least 220 dp wide (maximum 3 columns); the user can choose up to 1, 2 or 3 columns, which may go down to 150 dp per card. Both minimums scale with the text size (the factor applies when the font scale is above 1), and columns are dropped if they would not fit. Text is never shrunk to fit. Settings shows the current number of columns and whether the choice was reduced.
 
+**Per-category layout.** A category can override three things: the layout (List / Compact list / Magazine), the Magazine arrangement (mixed / even) and the most columns (automatic, 1, 2, 3); each can also stay "use the default". The default is the global setting (Settings); "automatic columns" is a choice of its own, not the same as inheriting. Only a category has settings of its own: All, Uncategorized and a single feed use the global ones; a parent category uses its own and a child never inherits from its parent; a feed that is in two categories is shown with the settings of the category that is open (nothing is written to the feed). Each page of the pager resolves its own layout, so a page dragged in beside another keeps its own. The arrangement and the columns apply only in the Magazine layout: for another layout the sheet says so, and the values are kept for later. A column count that does not fit the window or the text size is reduced exactly as for the global setting, and the stored choice is not changed. "Reset the display of this category" sends these three back to the default and touches nothing else (not the pin, the order, the subscriptions or any read state). Changing a layout moves no article, marks nothing and fetches nothing; the same article stays in view (the list position is remembered per list, never per layout). Images switched off in Settings stay off in every layout.
+
 **Text and fallbacks.** Manual text size is 0.9 / 1.0 / 1.15 / 1.3, and it multiplies the system font scale rather than adding to it. Row heights have minimums but no maximum that would clip text; at 200% text no text or control may be lost. A title that is missing is shown as "(Untitled)" and an unknown date as "Date unknown". A missing or broken thumbnail shows a neutral placeholder of the same size, so rows do not jump when an image finishes loading. When images are off the image area is removed completely and no image request is made.
 
 Images come from what the feed itself provides (media extensions, enclosures, or an `<img>` in the entry content; tracking pixels and unsafe URLs are discarded). Article pages are never scraped for Open Graph images, and a feed with no images simply has none.
@@ -170,7 +199,9 @@ Images come from what the feed itself provides (media extensions, enclosures, or
 | Bookmark button | Saves or removes from saved. Does not open the article. |
 | "More" menu button or long press | Mark as read / unread, save / remove from saved, share, open in external browser. |
 | Pull to refresh | Refreshes the current scope. The read filter, sort and search only narrow what is shown, never what is fetched. |
-| Toolbar overflow menu | List layout, sort order, mark all as read (current scope), refresh, import, add feed, subscriptions, settings. |
+| Toolbar title | Opens the category picker. |
+| Display button | Opens the display panel: range, order, layout. |
+| Toolbar overflow menu | Mark all as read (current scope), refresh, organize categories and tabs, import, add feed, subscriptions, settings (and search in a narrow window). |
 | Search | Searches stored articles within the current scope and filter. |
 
 Read state is never automatic, so changing it by hand takes one menu step. Rows have no swipe gestures and there is no multi-select mode.

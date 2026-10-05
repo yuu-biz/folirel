@@ -9,7 +9,7 @@ identity).
 
 ## 1. Room model
 
-Database `folirel.db`, schema version 3, exported to `app/schemas/`. All timestamps are UTC epoch milliseconds;
+Database `folirel.db`, schema version 4, exported to `app/schemas/`. All timestamps are UTC epoch milliseconds;
 display uses the device time zone. UI code never touches entities directly; it goes through repositories (see
 [architecture.md](architecture.md) section 3).
 
@@ -19,6 +19,7 @@ display uses the device time zone. UI code never touches entities directly; it g
 | Feed (`feeds`) | `id` (UUID), `accountId`, `subscriptionUrl`, `fetchUrl`, `siteUrl?`, `feedTitle?`, `userTitle?`, `isSubscribed`, `isPaused`, `createdAt`. UNIQUE(`accountId`, `subscriptionUrl`). |
 | FeedFetchState (`feed_fetch_state`) | `feedId` (PK), `etag?`, `lastModified?`, `validatorUrl?`, `lastAttemptAt?`, `lastSuccessAt?`, `lastErrorCode?`, `failureCount`, `nextEligibleAt?`, `initialized`, `retryAfterUntil?`. |
 | Category (`categories`) | `id`, `accountId`, `name` (last path segment, for display), `pathSegmentsJson`. UNIQUE(`accountId`, `pathSegmentsJson`). |
+| CategoryPreference (`category_preferences`) | What the reader chose for one category (section 8): `categoryId` (PK, FK to `categories` with delete cascade), `tabOrder?`, `isPinned`, `listModeOverride?`, `cardStyleOverride?`, `cardColumnsOverride?`. A category without a row has every default. |
 | FeedCategory (`feed_categories`) | `feedId`, `categoryId`; composite PK. Deleting a category cascades to its rows. |
 | Article (`articles`) | `id` (UUID), `accountId`, `feedId`, `entryKey`, `externalEntryId?` (reserved, currently always null), `linkUrl?`, `title`, `summaryText`, `author?`, `publishedAt?`, `firstSeenAt`, `sortAt`, `imageUrl?`, `lastSeenAt`. |
 | ArticleState (`article_states`) | `articleId` (PK), `isRead`, `isSaved`, `updatedAt`. Independent of article updates. Deleted with its article (cascade). |
@@ -238,9 +239,12 @@ uniqueness collisions. A name containing `/` remains one segment.
 | 1 | Accounts, feeds, fetch state, categories, memberships, articles, article states. |
 | 2 | Column `feed_fetch_state.retryAfterUntil`; tables `feed_diagnostics`, `pruned_entries`, `feed_https_migrations`. |
 | 3 | Tables `feed_icons`, `feed_url_moves`. |
+| 4 | Table `category_preferences`. |
 
 Migrations are `CREATE TABLE`/`CREATE INDEX`/`ADD COLUMN` only and never rewrite existing rows. Instrumented
-tests (`MigrationTest`) check 1 to 2, 2 to 3 and the chained 1 to 3 upgrade against the exported schemas.
+tests (`MigrationTest`) check 1 to 2, 2 to 3, 3 to 4 (on a populated version 3 database: subscriptions in two categories,
+articles with read and saved state, icons; every row kept, no category has a preference row) and the chained 1 to 3 and
+1 to 4 upgrades against the exported schemas.
 
 ### Supporting tables
 
@@ -251,6 +255,7 @@ tests (`MigrationTest`) check 1 to 2, 2 to 3 and the chained 1 to 3 upgrade agai
 | `feed_https_migrations` | One row per feed moved from `http://` to `https://` after consent and verification: `httpUrl`, `httpsUrl`, `migratedAt`. |
 | `feed_url_moves` | History of approved fetch-URL changes: `id`, `feedId`, `fromUrl`, `toUrl`, `movedAt`. |
 | `feed_icons` | Persistent cache of source icons, see below. |
+| `category_preferences` | Tab order, pin and display overrides per category, see below. |
 
 **Address changes.** An HTTPS migration or an approved move (see
 [fetch-and-security.md](fetch-and-security.md) sections 8 and 9) changes only `feeds.fetchUrl`. The feed id,
@@ -267,12 +272,24 @@ the URL the request started with; otherwise it is dropped as a whole (`ApplyResu
 failure never changes the feed's fetch state. The lookup procedure and schedule are in
 [fetch-and-security.md](fetch-and-security.md) section 8.
 
+**Category preferences (`category_preferences`).** Keyed by the category's id (never by name or path), so a rename keeps
+every setting; deleting the category deletes the row; no row means all defaults. `tabOrder` is one rank among all the
+categories (null: no saved place, the path order applies and a new category follows the placed ones); `isPinned` does not
+change it, so unpinning returns the saved place. `listModeOverride` (`LIST`, `COMPACT_LIST`, `MAGAZINE`),
+`cardStyleOverride` (`MIXED`, `EVEN`) and `cardColumnsOverride` (0 = automatic, 1 to 3) are null when inherited from the
+global settings below; an unknown stored value is read as inherited. Writes change one field at a time (a missing row is
+created with the defaults first), refuse a category of another account in the repository, and saving an order writes
+the ranks in one transaction. The tab order is flat: it never changes `categories.pathSegmentsJson` or `feed_categories`.
+OPML import and re-import add and merge only: they find the same category by path (the same id) and keep its row;
+a rename keeps it. OPML does not carry these settings, so they are not part of the OPML export; a future backup of the
+reader's own choices would have to include this table (and the DataStore keys below).
+
 ### Preferences (DataStore)
 
 | Key | Meaning | Default |
 |---|---|---|
 | `theme` | `SYSTEM`, `LIGHT`, `DARK` | `SYSTEM` |
-| `list_layout` | `LIST`, `COMPACT_LIST`, `MAGAZINE` | `LIST` |
+| `list_layout` | `LIST`, `COMPACT_LIST`, `MAGAZINE`; the default of every category that has no override | `LIST` |
 | `card_columns` | Maximum Magazine columns: 0 = automatic, 1 to 3 | 0 |
 | `card_style` | Magazine arrangement: `MIXED` or `EVEN` | `MIXED` |
 | `text_scale` | 0.9, 1.0, 1.15, 1.3 | 1.0 |
