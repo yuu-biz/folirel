@@ -1,5 +1,6 @@
 package io.github.yuubiz.folirel.ui.home
 
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -122,7 +123,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
+import kotlin.math.abs
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.ImageLoader
 import io.github.yuubiz.folirel.R
@@ -383,9 +384,11 @@ fun HomeScreen(
             },
         ) { padding ->
             Column(Modifier.padding(padding).fillMaxSize()) {
-                val pagerMode = selection.scope !is ArticleScope.Feed && structure.subscribedFeeds.isNotEmpty()
+                // A scope that is not a page (a single feed, or a category with no subscribed feed) is shown on its own without tabs:
+                // it is never silently replaced by another category.
+                val pagerMode = pages.contains(selection.scope) && structure.subscribedFeeds.isNotEmpty()
                 if (pagerMode) {
-                    ScopeTabs(structure, pages, selection.scope, pagerState, vm::selectScope) { scrollToTopTick++ }
+                    ScopeTabs(tabItems(structure, pages), selection.scope, pagerState, vm::selectScope) { scrollToTopTick++ }
                 }
                 FilterBar(selection, vm::selectFilter, vm::toggleSort)
                 PullToRefreshBox(
@@ -505,6 +508,10 @@ private fun HttpOpenDialog(onOpen: (dontAskAgain: Boolean) -> Unit, onDismiss: (
  * All / Uncategorized / categories as horizontally swipeable pages (UX-01). One selection state: tab, drawer and
  * swipe all end in [HomeViewModel.selectScope]; a page change caused by the selection does not feed back.
  * Not circular. Only the visible page (and its neighbour while swiping) is composed and queries the DB.
+ *
+ * Three things are kept apart: the position the pager is drawn at (offset, followed by the tabs), the category the reader chose
+ * (the selection, an id, set at once by a tap) and the page the pager settled on (what a swipe commits, see [SettleGuard]).
+ * The pages are ids: a reorder or a pin changes the index of a category, never which category is selected.
  */
 @Composable
 private fun CategoryPager(
@@ -514,17 +521,27 @@ private fun CategoryPager(
     pagerState: PagerState,
     page: @Composable (ArticleScope, Boolean) -> Unit,
 ) {
-    val selectedIndex = pages.indexOf(selected)
-    LaunchedEffect(selectedIndex, pages) {
-        if (selectedIndex >= 0 && pagerState.currentPage != selectedIndex && !pagerState.isScrollInProgress) {
-            pagerState.animateScrollToPage(selectedIndex)
-        }
-    }
     val currentPages by rememberUpdatedState(pages)
+    var drags by remember { mutableIntStateOf(0) }
+    val guard = remember { SettleGuard(selected) }
+    LaunchedEffect(pagerState) {
+        pagerState.interactionSource.interactions.collect { if (it is DragInteraction.Start) drags++ }
+    }
+    // The chosen category is the page to show. A choice (tab, drawer, picker) moves the pager; the same category at another index
+    // (the pages were reordered) puts the pager back on it at once. A far move lands directly instead of sweeping the pages between.
+    var lastChoice by remember { mutableStateOf(selected) }
+    LaunchedEffect(selected, pages) {
+        val index = pages.indexOf(selected)
+        val chosen = lastChoice != selected
+        lastChoice = selected
+        if (index < 0) return@LaunchedEffect
+        if (pagerState.currentPage == index && pagerState.targetPage == index) return@LaunchedEffect
+        if (!chosen || abs(index - pagerState.currentPage) > 1) pagerState.scrollToPage(index) else pagerState.animateScrollToPage(index)
+    }
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.settledPage }.collect { index ->
             val scopeAtPage = currentPages.getOrNull(index) ?: return@collect
-            if (scopeAtPage != vm.selection.value.scope) vm.selectScope(scopeAtPage)
+            guard.onSettled(scopeAtPage, vm.selection.value.scope, drags)?.let { vm.selectScope(it) }
         }
     }
     HorizontalPager(
@@ -838,98 +855,6 @@ private fun NewArticlesBanner(count: Int, toTop: Boolean, onClick: () -> Unit, o
         }
     }
 }
-
-/** Narrowest tab underline: a one-letter title still gets a visible bar. */
-private val TAB_INDICATOR_MIN_WIDTH = 24.dp
-private val TAB_INDICATOR_HEIGHT = 3.dp
-
-@Composable
-private fun ScopeTabs(
-    structure: Structure,
-    pages: List<ArticleScope>,
-    current: ArticleScope,
-    pagerState: PagerState,
-    onSelect: (ArticleScope) -> Unit,
-    onReselect: () -> Unit,
-) {
-    val all = stringResource(R.string.tab_all)
-    val uncategorized = stringResource(R.string.scope_uncategorized)
-    val tabs = pages.map { scope ->
-        scope to when (scope) {
-            ArticleScope.All -> all
-            ArticleScope.Uncategorized -> uncategorized
-            is ArticleScope.Category -> structure.categories.firstOrNull { it.id == scope.categoryId }?.display.orEmpty()
-            is ArticleScope.Feed -> ""
-        }
-    }
-    // The highlighted tab and the underline follow the pager while it is dragged or animated; the selection (which
-    // is saved) only follows once the page has settled, so it is not what the tabs wait for.
-    val selected = pagerState.currentPage.coerceIn(0, (tabs.size - 1).coerceAtLeast(0))
-    val scope = rememberCoroutineScope()
-    // Where each title really is (screen coordinates), and where this row is. The underline is placed from these:
-    // centred on the title, as wide as it with a minimum, and sliding between two titles with the pager's position.
-    val titleBounds = remember { mutableStateMapOf<Int, Rect>() }
-    var rowOrigin by remember { mutableStateOf(Offset.Zero) }
-    val barColor = MaterialTheme.colorScheme.primary
-    Box(Modifier.fillMaxWidth().clipToBounds().onGloballyPositioned { rowOrigin = it.positionInRoot() }) {
-        PrimaryScrollableTabRow(
-            selectedTabIndex = selected,
-            edgePadding = 8.dp,
-            minTabWidth = 48.dp,
-            indicator = {},
-        ) {
-            tabs.forEachIndexed { index, (tabScope, label) ->
-                Tab(
-                    selected = index == selected,
-                    onClick = {
-                        if (index == selected) {
-                            onReselect()
-                        } else {
-                            // Start moving the page at once; the selection catches up when the page has settled.
-                            scope.launch { pagerState.animateScrollToPage(index) }
-                            onSelect(tabScope)
-                        }
-                    },
-                    text = {
-                        Text(
-                            label,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.onGloballyPositioned { titleBounds[index] = it.boundsInRoot() },
-                        )
-                    },
-                    modifier = Modifier.heightIn(min = 48.dp).testTag("tab_${tabScope.encode()}"),
-                )
-            }
-        }
-        // Left edge and width (px) of the underline relative to this row, or null until the titles are measured.
-        fun Density.bar(): Pair<Int, Int>? {
-            val position = pagerState.currentPage + pagerState.currentPageOffsetFraction
-            val from = position.toInt().coerceIn(0, tabs.lastIndex.coerceAtLeast(0))
-            val to = (from + 1).coerceAtMost(tabs.lastIndex.coerceAtLeast(0))
-            val a = titleBounds[from] ?: return null
-            val b = titleBounds[to] ?: a
-            val f = (position - from).coerceIn(0f, 1f)
-            val centre = a.center.x + (b.center.x - a.center.x) * f
-            val width = maxOf(a.width + (b.width - a.width) * f, TAB_INDICATOR_MIN_WIDTH.toPx())
-            return (centre - width / 2f - rowOrigin.x).roundToInt() to width.roundToInt()
-        }
-        Box(
-            Modifier
-                .align(Alignment.BottomStart)
-                .layout { measurable, constraints ->
-                    val bar = bar()
-                    val p = measurable.measure(constraints.copy(minWidth = bar?.second ?: 0, maxWidth = bar?.second ?: 0))
-                    layout(p.width, p.height) { p.place(0, 0) }
-                }
-                .offset { IntOffset(bar()?.first ?: 0, 0) }
-                .height(TAB_INDICATOR_HEIGHT)
-                .background(barColor, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
-                .testTag("tab_indicator"),
-        )
-    }
-}
-
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

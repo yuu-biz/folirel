@@ -107,4 +107,32 @@ object TestData {
             categories.getValue(n).id to c.database.articleDao().articlesOfFeed(feedId).map { it.id }
         }
     }
+
+    /**
+     * One feed under each category path (a path is a list of segments; parents are categories of their own because their subtree
+     * has a subscribed feed), [perCategory] articles each, no network. Returns the path joined with " / " → category id.
+     */
+    fun seedPaths(paths: List<List<String>>, perCategory: Int): Map<String, String> = runBlocking {
+        val c = container
+        val account = c.subscriptions.ensureLocalAccount()
+        fun esc(s: String) = s.replace("&", "&amp;").replace("\"", "&quot;")
+        val outlines = paths.mapIndexed { i, path ->
+            val feed = """<outline text="feed ${esc(path.joinToString("-"))}" xmlUrl="https://feed.example.com/p$i.xml"/>"""
+            path.foldRight(feed) { segment, inner -> """<outline text="${esc(segment)}">$inner</outline>""" }
+        }.joinToString("")
+        c.subscriptions.commitImport(account, OpmlParser.parse("""<opml version="2.0"><body>$outlines</body></opml>""".toByteArray()))
+        val store = FeedStore(c.database, Clock.systemUTC(), IdGenerator.Random)
+        val now = System.currentTimeMillis()
+        val feeds = c.database.subscriptionDao().feeds(account).associateBy { it.subscriptionUrl }
+        paths.forEachIndexed { i, path ->
+            val feedId = feeds.getValue("https://feed.example.com/p$i.xml").id
+            val entries = (0 until perCategory).map { n ->
+                NormalizedEntry("id:p$i-$n", "${path.last()} 記事 $n", "https://www.example.com/", "概要 $i $n", null, now - n * 60_000L - i, null)
+            }
+            store.applySuccess(feedId, NormalizedFeed("feed $i", null, entries), FetchMetadata(null, null, "https://feed.example.com/p$i.xml", null))
+        }
+        c.database.subscriptionDao().categories(account).associate {
+            io.github.yuubiz.folirel.data.repository.CategoryPaths.display(io.github.yuubiz.folirel.data.repository.CategoryPaths.decode(it.pathSegmentsJson)) to it.id
+        }
+    }
 }
