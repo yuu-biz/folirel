@@ -106,7 +106,7 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
             initializer {
                 SubscriptionsViewModel(
                     container.subscriptions, container.refresh, container.httpsUpgrade, container.discovery, container.documents,
-                    { container.settings.current().allowHttp }, container.clock,
+                    { container.settings.current().allowHttp }, container.clock, container.settings,
                 )
             }
         },

@@ -136,6 +136,8 @@ import io.github.yuubiz.folirel.data.preferences.BrowserMode
 import io.github.yuubiz.folirel.model.ArticleRow
 import io.github.yuubiz.folirel.model.ArticleScope
 import io.github.yuubiz.folirel.model.CardLayoutStyle
+import io.github.yuubiz.folirel.model.CategoryDisplay
+import io.github.yuubiz.folirel.model.ResolvedLayout
 import io.github.yuubiz.folirel.model.FetchError
 import io.github.yuubiz.folirel.model.ListMode
 import io.github.yuubiz.folirel.model.ReadFilter
@@ -166,6 +168,7 @@ fun HomeScreen(
     httpsState: StateFlow<HttpsUpgradeState>,
 ) {
     val settings by vm.settings.collectAsStateWithLifecycle()
+    val settingsLoaded by vm.settingsLoaded.collectAsStateWithLifecycle()
     val selection by vm.selection.collectAsStateWithLifecycle()
     val structure by vm.structure.collectAsStateWithLifecycle()
     val pages by vm.pageScopes.collectAsStateWithLifecycle()
@@ -406,6 +409,8 @@ fun HomeScreen(
                             vm = vm,
                             pageScope = pageScope,
                             selection = selection,
+                            // Each page resolves its own layout: a page does not take the layout of the one shown beside it.
+                            layout = CategoryDisplay.resolve(pageScope, ResolvedLayout(settings.listMode, settings.cardStyle, settings.cardColumns), structure.preferences),
                             settings = settings,
                             imageLoader = imageLoader,
                             actions = actions,
@@ -417,7 +422,7 @@ fun HomeScreen(
                         )
                     }
                     when {
-                        !structure.loaded -> Unit
+                        !structure.loaded || !settingsLoaded -> Unit
                         structure.feeds.isEmpty() -> NoSubscriptions(nav.importOpml, nav.addFeed)
                         pagerMode -> CategoryPager(vm, pages, selection.scope, pagerState, page)
                         else -> page(selection.scope, true)
@@ -450,6 +455,9 @@ fun HomeScreen(
         )
     }
 
+    var layoutDetails by rememberSaveable { mutableStateOf(false) }
+    val globalLayout = ResolvedLayout(settings.listMode, settings.cardStyle, settings.cardColumns)
+    val shownCategory = (selection.scope as? ArticleScope.Category)?.categoryId?.let { id -> structure.categories.firstOrNull { it.id == id } }
     if (displayOpen) {
         DisplayPanel(
             filter = selection.filter,
@@ -458,17 +466,51 @@ fun HomeScreen(
             onSort = vm::selectSort,
             onDismiss = { displayOpen = false },
         ) {
-            SectionTitle(stringResource(R.string.display_layout))
-            Choice(
-                options = listOf(ListMode.LIST, ListMode.COMPACT_LIST, ListMode.MAGAZINE),
-                selected = settings.listMode,
-                label = { listModeLabel(it) },
-                tag = { "layout_${it.name}" },
-                onSelect = vm::setListMode,
-                forceRows = true,
-            )
-            Text(stringResource(R.string.display_layout_global_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (shownCategory != null) {
+                // A category: the choice is this category's own, and "use the default" is a choice of its own.
+                val own = structure.preferences[shownCategory.id]
+                SectionTitle(stringResource(R.string.display_layout_category))
+                Choice(
+                    options = listOf<Pick<ListMode>>(Pick.Inherit) + ListMode.entries.map { Pick.Value(it) },
+                    selected = own?.listLayout?.let { Pick.Value(it) } ?: Pick.Inherit,
+                    label = { if (it is Pick.Value) listModeLabel(it.value) else stringResource(R.string.layout_inherit, listModeLabel(settings.listMode)) },
+                    tag = { if (it is Pick.Value) "layout_${it.value.name}" else "layout_INHERIT" },
+                    onSelect = { vm.setLayout(selection.scope, (it as? Pick.Value)?.value) },
+                    forceRows = true,
+                )
+                Text(
+                    stringResource(R.string.display_layout_category_note, shownCategory.display),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(onClick = { layoutDetails = true }, modifier = Modifier.heightIn(min = 48.dp).testTag("layout_details")) {
+                    Text(stringResource(R.string.display_layout_details))
+                }
+            } else {
+                SectionTitle(stringResource(R.string.display_layout))
+                Choice(
+                    options = listOf(ListMode.LIST, ListMode.COMPACT_LIST, ListMode.MAGAZINE),
+                    selected = settings.listMode,
+                    label = { listModeLabel(it) },
+                    tag = { "layout_${it.name}" },
+                    onSelect = { vm.setLayout(selection.scope, it) },
+                    forceRows = true,
+                )
+                Text(stringResource(R.string.display_layout_global_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
+    }
+    if (layoutDetails && shownCategory != null) {
+        CategoryLayoutSheet(
+            categoryName = shownCategory.display,
+            preference = structure.preferences[shownCategory.id],
+            global = globalLayout,
+            onList = { vm.setCategoryListLayout(shownCategory.id, it) },
+            onStyle = { vm.setCategoryCardStyle(shownCategory.id, it) },
+            onColumns = { vm.setCategoryCardColumns(shownCategory.id, it) },
+            onReset = { vm.resetCategoryLayout(shownCategory.id) },
+            onDismiss = { layoutDetails = false },
+        )
     }
 
     markAllRequest?.let { request ->
@@ -598,6 +640,7 @@ private fun ScopePage(
     vm: HomeViewModel,
     pageScope: ArticleScope,
     selection: Selection,
+    layout: ResolvedLayout,
     settings: AppSettings,
     imageLoader: ImageLoader,
     actions: ArticleActions,
@@ -616,10 +659,10 @@ private fun ScopePage(
             else -> ArticleList(
                 host = vm,
                 state = list,
-                mode = settings.listMode,
+                mode = layout.listMode,
                 showImages = settings.showImages,
-                cardColumns = settings.cardColumns,
-                cardStyle = settings.cardStyle,
+                cardColumns = layout.cardColumns,
+                cardStyle = layout.cardStyle,
                 imageLoader = imageLoader,
                 actions = actions,
                 newIds = newIds,

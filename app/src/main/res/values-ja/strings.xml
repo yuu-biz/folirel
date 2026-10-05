@@ -500,4 +500,14 @@
         <item quantity="other">%d 件のカテゴリが見つかりました</item>
     </plurals>
     <string name="category_display_settings">表示設定</string>
+    <string name="layout_inherit">全体の設定を使う（%1$s）</string>
+    <string name="layout_magazine_only">マガジンのレイアウトのときだけ使われます。ここでの選択は消えず、マガジン表示のときに使われます。</string>
+    <string name="layout_columns_note">選んだ列数は、画面の幅や文字の大きさに収まらない場合は自動で減らされます。</string>
+    <string name="category_display_of">「%1$s」の表示</string>
+    <string name="category_display_reset">このカテゴリの表示をリセット</string>
+    <string name="category_display_reset_note">レイアウト・並べ方・列数だけを全体の設定に戻します。ピン留め・並び順・購読・既読は変わりません。</string>
+    <string name="display_layout_category">このカテゴリのレイアウト</string>
+    <string name="display_layout_category_note">「%1$s」だけに適用されます。他のカテゴリは変わりません。</string>
+    <string name="display_layout_details">並べ方と列数…</string>
+    <string name="settings_display_default_note">以下の一覧形式・並べ方・列数は、すべてのカテゴリの既定値です。カテゴリごとに別の設定にすることもできます（ホーム画面の表示パネル）。</string>
 </resources>

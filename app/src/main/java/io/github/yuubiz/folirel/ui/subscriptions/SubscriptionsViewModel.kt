@@ -9,7 +9,13 @@ import io.github.yuubiz.folirel.backend.RefreshScope
 import io.github.yuubiz.folirel.backend.local.opml.OpmlWriter
 import io.github.yuubiz.folirel.data.repository.AddFeedResult
 import io.github.yuubiz.folirel.data.repository.SubscriptionRepository
+import io.github.yuubiz.folirel.data.preferences.AppSettings
+import io.github.yuubiz.folirel.data.preferences.SettingsRepository
+import io.github.yuubiz.folirel.model.CardLayoutStyle
 import io.github.yuubiz.folirel.model.DiscoveryResult
+import io.github.yuubiz.folirel.model.ListMode
+import io.github.yuubiz.folirel.model.ResolvedLayout
+import kotlinx.coroutines.flow.map
 import io.github.yuubiz.folirel.model.FeedDiagnostics
 import io.github.yuubiz.folirel.model.FeedListFilter
 import io.github.yuubiz.folirel.model.FeedProblem
@@ -79,7 +85,13 @@ class SubscriptionsViewModel(
     private val documents: DocumentIo,
     private val allowHttp: suspend () -> Boolean,
     private val clock: Clock,
+    settings: SettingsRepository? = null,
 ) : ViewModel() {
+    /** The global display defaults (what "use the default" means for a category), when the screen needs them. */
+    val globalLayout: StateFlow<ResolvedLayout> = (settings?.settings ?: kotlinx.coroutines.flow.flowOf(AppSettings()))
+        .map { ResolvedLayout(it.listMode, it.cardStyle, it.cardColumns) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ResolvedLayout(ListMode.LIST, CardLayoutStyle.MIXED, 0))
+
     private val accountId = MutableStateFlow<String?>(null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -208,6 +220,16 @@ class SubscriptionsViewModel(
         val moved = io.github.yuubiz.folirel.model.TabOrder.move(group, categoryId, delta) ?: return@launch
         if (!reorderCategoryTabs(pinned, moved)) events.send(SubscriptionEvent.OperationFailed)
     }
+
+    private fun categoryWrite(write: suspend (account: String) -> Boolean) = viewModelScope.launch {
+        val ok = runCatching { write(subscriptions.ensureLocalAccount()) }.getOrDefault(false)
+        if (!ok) events.send(SubscriptionEvent.OperationFailed)
+    }
+
+    fun setCategoryListLayout(categoryId: String, mode: ListMode?) = categoryWrite { subscriptions.setCategoryListLayout(it, categoryId, mode) }
+    fun setCategoryCardStyle(categoryId: String, style: CardLayoutStyle?) = categoryWrite { subscriptions.setCategoryCardStyle(it, categoryId, style) }
+    fun setCategoryCardColumns(categoryId: String, columns: Int?) = categoryWrite { subscriptions.setCategoryCardColumns(it, categoryId, columns) }
+    fun resetCategoryLayout(categoryId: String) = categoryWrite { subscriptions.resetCategoryLayout(it, categoryId) }
 
     /** "Standard order": forgets the saved places only. Pins and display settings stay. */
     fun resetCategoryTabOrder() = viewModelScope.launch {

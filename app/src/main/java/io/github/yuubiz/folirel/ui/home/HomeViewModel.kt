@@ -12,6 +12,7 @@ import io.github.yuubiz.folirel.data.repository.SubscriptionRepository
 import io.github.yuubiz.folirel.model.ArticleQuerySpec
 import io.github.yuubiz.folirel.model.ArticleRow
 import io.github.yuubiz.folirel.model.ArticleScope
+import io.github.yuubiz.folirel.model.CardLayoutStyle
 import io.github.yuubiz.folirel.model.FeedListFilter
 import io.github.yuubiz.folirel.model.ListMode
 import io.github.yuubiz.folirel.model.ReadFilter
@@ -66,6 +67,10 @@ class HomeViewModel(
 
     val settings: StateFlow<AppSettings> = settingsRepository.settings
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
+
+    /** The global display settings have been read: before that, a list would be drawn with defaults and then jump to the real ones. */
+    val settingsLoaded: StateFlow<Boolean> = settingsRepository.settings.map { true }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _selection = MutableStateFlow(Selection())
     val selection: StateFlow<Selection> = _selection.asStateFlow()
@@ -263,6 +268,24 @@ class HomeViewModel(
     fun setListMode(mode: ListMode) {
         viewModelScope.launch { settingsRepository.setListMode(mode) }
     }
+
+    /** The layout chosen in the display panel is written where the panel says: the category's own setting, or the global default. */
+    fun setLayout(scope: ArticleScope, mode: ListMode?) {
+        if (scope is ArticleScope.Category) setCategoryListLayout(scope.categoryId, mode) else if (mode != null) setListMode(mode)
+    }
+
+    private fun categoryWrite(write: suspend (account: String) -> Boolean) {
+        viewModelScope.launch {
+            val account = accountId.value ?: return@launch
+            val ok = runCatching { write(account) }.getOrDefault(false)
+            if (!ok) events.send(HomeEvent.Message(HomeEvent.Message.Kind.UPDATE_FAILED))
+        }
+    }
+
+    fun setCategoryListLayout(categoryId: String, mode: ListMode?) = categoryWrite { subscriptions.setCategoryListLayout(it, categoryId, mode) }
+    fun setCategoryCardStyle(categoryId: String, style: CardLayoutStyle?) = categoryWrite { subscriptions.setCategoryCardStyle(it, categoryId, style) }
+    fun setCategoryCardColumns(categoryId: String, columns: Int?) = categoryWrite { subscriptions.setCategoryCardColumns(it, categoryId, columns) }
+    fun resetCategoryLayout(categoryId: String) = categoryWrite { subscriptions.resetCategoryLayout(it, categoryId) }
 
     fun setSearchText(text: String) {
         _searchText.value = text

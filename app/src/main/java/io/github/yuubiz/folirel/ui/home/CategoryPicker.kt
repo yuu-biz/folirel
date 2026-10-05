@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.dp
 import io.github.yuubiz.folirel.R
 import io.github.yuubiz.folirel.model.ArticleScope
 import io.github.yuubiz.folirel.model.Structure
-import java.util.Locale
 
 /** One line of the picker: where it goes, how it is called, the path above it (so two categories of one name differ), and its pin. */
 private data class PickerEntry(val scope: ArticleScope, val name: String, val parentPath: String, val pinned: Boolean?)
@@ -81,8 +80,8 @@ internal fun CategoryPicker(
             )
         }
     }
-    val needle = query.trim().lowercase(Locale.getDefault())
-    fun matches(e: PickerEntry) = needle.isEmpty() || e.name.lowercase(Locale.getDefault()).contains(needle) || e.parentPath.lowercase(Locale.getDefault()).contains(needle)
+    val needle = query.trim().lowercase()
+    fun matches(e: PickerEntry) = needle.isEmpty() || e.name.lowercase().contains(needle) || e.parentPath.lowercase().contains(needle)
     val shownFixed = fixed.filter(::matches)
     val shownPinned = categories.filter { it.pinned == true && matches(it) }
     val shownOthers = categories.filter { it.pinned != true && matches(it) }

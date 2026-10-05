@@ -589,6 +589,8 @@ fun CategoriesScreen(vm: SubscriptionsViewModel, onBack: () -> Unit, initialOrde
     val structure by vm.structure.collectAsStateWithLifecycle()
     // Two views of the same categories: the hierarchy (rename, add, delete) and the order of the tabs (pins, drag).
     var orderMode by rememberSaveable { mutableStateOf(initialOrder) }
+    var displaySettingsFor by rememberSaveable { mutableStateOf<String?>(null) }
+    val globalLayout by vm.globalLayout.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var creatingUnder by remember { mutableStateOf<String?>(null) }
     var creating by remember { mutableStateOf(false) }
@@ -626,7 +628,7 @@ fun CategoriesScreen(vm: SubscriptionsViewModel, onBack: () -> Unit, initialOrde
             )
         }
         if (orderMode) {
-            TabOrderList(vm, onDisplaySettings = {}, modifier = Modifier.weight(1f))
+            TabOrderList(vm, onDisplaySettings = { displaySettingsFor = it }, modifier = Modifier.weight(1f))
         } else
         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
             if (structure.categories.isEmpty()) item { Text(stringResource(R.string.categories_empty), modifier = Modifier.padding(16.dp)) }
@@ -655,6 +657,23 @@ fun CategoriesScreen(vm: SubscriptionsViewModel, onBack: () -> Unit, initialOrde
             }
         }
       }
+    }
+    displaySettingsFor?.let { id ->
+        val category = structure.categories.firstOrNull { it.id == id }
+        if (category == null) {
+            displaySettingsFor = null
+        } else {
+            io.github.yuubiz.folirel.ui.home.CategoryLayoutSheet(
+                categoryName = category.display,
+                preference = structure.preferences[id],
+                global = globalLayout,
+                onList = { vm.setCategoryListLayout(id, it) },
+                onStyle = { vm.setCategoryCardStyle(id, it) },
+                onColumns = { vm.setCategoryCardColumns(id, it) },
+                onReset = { vm.resetCategoryLayout(id) },
+                onDismiss = { displaySettingsFor = null },
+            )
+        }
     }
     if (creating) {
         TextInputDialog(

@@ -148,6 +148,14 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Un
                 ) { vm.update { setTheme(it) } }
             }
             item {
+                Text(
+                    stringResource(R.string.settings_display_default_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
+            item {
                 Choice(
                     stringResource(R.string.settings_list_mode),
                     listOf(

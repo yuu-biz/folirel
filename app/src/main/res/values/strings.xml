@@ -524,4 +524,14 @@
         <item quantity="other">%d categories found</item>
     </plurals>
     <string name="category_display_settings">Display settings</string>
+    <string name="layout_inherit">Use the default (%1$s)</string>
+    <string name="layout_magazine_only">Used only in the Magazine layout. A choice made here is kept for when this category is shown as Magazine.</string>
+    <string name="layout_columns_note">A number you choose is reduced when it does not fit the window or the text size.</string>
+    <string name="category_display_of">Display of %1$s</string>
+    <string name="category_display_reset">Reset the display of this category</string>
+    <string name="category_display_reset_note">Only the layout, the arrangement and the columns go back to the defaults. Pin, order, subscriptions and read state stay.</string>
+    <string name="display_layout_category">Layout of this category</string>
+    <string name="display_layout_category_note">Applies to %1$s only. Other categories keep their own layout.</string>
+    <string name="display_layout_details">Arrangement and columns…</string>
+    <string name="settings_display_default_note">The list style, arrangement and columns below are the default for every category. A category can use its own (display panel of the home screen).</string>
 </resources>
