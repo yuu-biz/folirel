@@ -112,18 +112,20 @@ fun HomeDrawer(
                 }
             }
             item { HorizontalDivider(Modifier.padding(vertical = 4.dp)) }
-            item { DrawerItem(subscriptionsLabel(attention), false, onClick = onSubscriptions) }
+            item { DrawerItem(stringResource(R.string.nav_subscriptions), false, attention = attention, onClick = onSubscriptions) }
             item { DrawerItem(stringResource(R.string.nav_settings), false, onClick = onSettings) }
         }
     }
 }
 
+
 @Composable
-private fun DrawerItem(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun DrawerItem(label: String, selected: Boolean, modifier: Modifier = Modifier, attention: Int = 0, onClick: () -> Unit) {
     NavigationDrawerItem(
         label = { Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         selected = selected,
         onClick = onClick,
         modifier = modifier,
+        badge = if (attention > 0) ({ AttentionCount(attention) }) else null,
     )
 }

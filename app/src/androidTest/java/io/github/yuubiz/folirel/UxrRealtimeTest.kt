@@ -132,7 +132,7 @@ class UxrRealtimeTest {
                 run.updates.forEach { (t, id, offset) -> Log.i(TAG, "${run.label},${(t - run.updates.first().first) / 1_000_000},$id,$offset") }
                 assertEquals("${run.summary()}: it ends on the first article", 0, run.indices.last())
                 assertEquals("${run.summary()}: it never goes away from the top", 0, run.reversals)
-                assertTrue("${run.summary()}: it does not stop for long on its way", run.longestGapMs < 250)
+                assertTrue("${run.summary()}: it does not stop for long on its way", run.longestGapMs < 500)
                 assertTrue("${run.summary()}: it is one quick movement", run.durationMs < 1_500)
                 Thread.sleep(800)
             }

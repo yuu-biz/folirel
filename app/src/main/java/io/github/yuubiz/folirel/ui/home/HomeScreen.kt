@@ -102,6 +102,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -367,7 +369,8 @@ fun HomeScreen(
                                 DropdownMenuItem(text = { Text(stringResource(R.string.action_import_opml)) }, onClick = { overflowOpen = false; nav.importOpml() })
                                 DropdownMenuItem(text = { Text(stringResource(R.string.action_add_feed)) }, onClick = { overflowOpen = false; nav.addFeed() })
                                 DropdownMenuItem(
-                                    text = { Text(subscriptionsLabel(attention)) },
+                                    text = { Text(stringResource(R.string.nav_subscriptions)) },
+                                    trailingIcon = if (attention > 0) ({ AttentionCount(attention) }) else null,
                                     onClick = { overflowOpen = false; nav.subscriptions() },
                                     modifier = Modifier.testTag("menu_subscriptions"),
                                 )
@@ -1044,7 +1047,9 @@ private class HomeMessages(
     }
 }
 
-/** "Subscriptions", with how many feeds need a look when some do (the small warning that outlives the notices, H02). */
+/** How many feeds need a look (failed, held for HTTP, unfinished): the small warning that outlives the notices (H02), next to "Subscriptions". */
 @Composable
-internal fun subscriptionsLabel(attention: Int): String =
-    if (attention > 0) pluralStringResource(R.plurals.nav_subscriptions_attention, attention, attention) else stringResource(R.string.nav_subscriptions)
+internal fun AttentionCount(count: Int) {
+    val description = pluralStringResource(R.plurals.nav_subscriptions_attention, count, count)
+    Badge(Modifier.semantics { contentDescription = description }.testTag("attention_count")) { Text(count.toString()) }
+}

@@ -151,6 +151,7 @@ class HomeNoticeFlowTest : HomeFlowTestBase() {
         assertTrue("the held feeds are still marked on the subscriptions entry", existsAnywhere("attention_badge"))
         // The mark leads to subscription management, where the reason and what to do are.
         compose.onNodeWithTag("home_more").performClick()
+        assertTrue("the count is next to the entry", existsAnywhere("attention_count"))
         compose.onNodeWithTag("menu_subscriptions").performClick()
         assertEquals(1, subscriptionsOpened)
     }
