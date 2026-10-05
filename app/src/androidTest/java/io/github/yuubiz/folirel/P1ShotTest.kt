@@ -106,4 +106,13 @@ class P1ShotTest {
             shot("06-display-panel-font200")
         }
     }
+
+    /** The state a recording starts from: the same data, the middle category selected, the list layout. Launches nothing. */
+    @Test
+    fun stateForTheRecording() {
+        runBlocking {
+            TestData.container.settings.setListMode(ListMode.LIST)
+            TestData.container.settings.setLastScope(ArticleScope.Category(ids[7]))
+        }
+    }
 }

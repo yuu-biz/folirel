@@ -6,6 +6,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -19,6 +20,8 @@ import io.github.yuubiz.folirel.app.MainActivity
 import io.github.yuubiz.folirel.model.ArticleScope
 import io.github.yuubiz.folirel.model.ListMode
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -49,7 +52,7 @@ class P1NavTest {
     @Before
     fun seed() {
         TestData.reset()
-        // Short, long, and equal names (two children called "共通" under different parents), 30 tabs in all.
+        // Short, long, and equal names (two children called "共通" under different parents), 32 categories and the All tab.
         names = buildList {
             add("IT"); add("ss"); add("Matome2chNews"); add("非常に長いカテゴリ名を持つタブ その一")
             addAll((5..28).map { "カテゴリ ${it.toString().padStart(2, '0')}" })
@@ -274,6 +277,42 @@ class P1NavTest {
             val bar = rect("tab_indicator")
             assertEquals("underline under the chosen tab", tab.center.x, bar.center.x, 2f * density)
             assertEquals("nothing was marked read", 0, readCount())
+        } finally {
+            job.cancel()
+        }
+    }
+
+    /** P1-T02: the touch area of every tab is at least 48 dp each way, for short, long and equal names alike. */
+    @Test
+    fun everyTabHasAFortyEightDpTouchArea() {
+        launchAt(14)
+        val nodes = compose.onAllNodes(hasTestTag("tab_row_scroll")).fetchSemanticsNodes().first().children
+            .filter { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("tab_") == true }
+        assertEquals(ids.size + 2 + 1, nodes.size) // the listed paths, their two parent categories, and All
+        for (node in nodes) {
+            val tag = node.config.getOrNull(SemanticsProperties.TestTag)
+            // The size of the tab itself (tabs scrolled out of view have no visible touch bounds).
+            assertTrue("$tag is at least 48dp high (${node.size.height / density})", node.size.height >= 48f * density - 1f)
+            assertTrue("$tag is at least 48dp wide (${node.size.width / density})", node.size.width >= 48f * density - 1f)
+        }
+    }
+
+    /** P1-T29: a saved category is never replaced by another one while the order is being read: the saved scope only ever has one value. */
+    @Test
+    fun aSavedCategoryIsNeverReplacedWhileTheOrderIsLoading() {
+        val saved = scopeOf(ids[14])
+        runBlocking { TestData.container.settings.setLastScope(saved) }
+        val seen = java.util.concurrent.CopyOnWriteArrayList<ArticleScope>()
+        val job = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            TestData.container.settings.settings.map { it.lastScope }.collect { seen += it }
+        }
+        try {
+            compose.activityRule.scenario.recreate()
+            compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("tab_${saved.encode()}")).fetchSemanticsNodes().isNotEmpty() }
+            compose.waitForIdle()
+            Thread.sleep(1_500)
+            compose.onNodeWithTag("tab_${saved.encode()}").assertIsSelected()
+            assertTrue("the saved scope took other values: $seen", seen.all { it == saved })
         } finally {
             job.cancel()
         }
