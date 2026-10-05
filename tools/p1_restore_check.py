@@ -228,6 +228,15 @@ def organizer_order():
     tap(find_text(root, "Organize categories and tabs"))
     root = wait_for(lambda r: find_text(r, "Tab order (the hierarchy is not changed)"))
     ts = texts(root)
+    # A short screen shows only the first rows: read the rest after scrolling, keeping the order of first appearance.
+    for _scroll in range(4):
+        if all(n in ts for n in EXPECTED_ORDER):
+            break
+        adb("shell", "input", "swipe", "540", "1800", "540", "500", "400")
+        time.sleep(1.5)
+        for t in texts(dump()):
+            if t not in ts:
+                ts.append(t)
     names = [t for t in ts if t in EXPECTED_ORDER]
     pinned_header = ts.index("Pinned") if "Pinned" in ts else None
     others_header = ts.index("Other categories") if "Other categories" in ts else None
@@ -238,7 +247,9 @@ def organizer_order():
 
 def panel_layout(category):
     """Selects [category] in the picker if needed, opens the display panel and returns the checked rows (and the details sheet's)."""
-    root = dump()
+    root = wait_for(lambda r: subtitle_node(r) is not None, 12)  # back on the home screen (it follows the organizer or a sheet)
+    if root is None:
+        raise SystemExit("the home screen did not come back")
     if title_text(root) != category:
         tap(subtitle_node(root))
         root = wait_for(lambda r: any(n.get("text") == category for n in r.iter("node")) and find_text(r, "Search categories", exact=False) is not None)
@@ -264,9 +275,10 @@ def panel_layout(category):
         droot = wait_for(lambda r: find_text(r, f"Display of {category}") is not None)
         details = checked_rows(droot)
         # The sheet is taller than the screen: look at the rest as well.
-        adb("shell", "input", "swipe", "540", "2000", "540", "600", "400")
-        time.sleep(1)
-        details += checked_rows(dump())
+        for _scroll in range(3):  # a short screen needs more than one scroll to reach the columns
+            adb("shell", "input", "swipe", "540", "1900", "540", "700", "400")
+            time.sleep(1)
+            details += checked_rows(dump())
         back()
     back()
     return layout, details
@@ -352,8 +364,11 @@ def main():
     root = wait_for(lambda r: any(n.get("class", "").endswith("EditText") for n in r.iter("node")))
     tap([n for n in root.iter("node") if n.get("class", "").endswith("EditText")][0])
     adb("shell", "input", "text", "12")
-    time.sleep(2.5)
-    root = dump()
+    # The search action of the keyboard closes it: on API 28 uiautomator reads a stale screen while the keyboard is up.
+    adb("shell", "input", "keyevent", "66")
+    time.sleep(1.5)
+    # The list follows the typed text after a short debounce; a slower emulator needs longer.
+    root = wait_for(lambda r: bool([t for t in texts(r) if t.startswith("Epsilon 記事")]) and all("12" in t for t in texts(r) if t.startswith("Epsilon 記事")), 15) or dump()
     shown = [t for t in texts(root) if t.startswith("Epsilon 記事")]
     check("search '12' is on screen before the kill", bool(shown) and all("12" in t for t in shown), f"{shown[:3]}")
     pre_kill = pull_state("pre-kill", args.out)
