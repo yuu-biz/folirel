@@ -256,7 +256,8 @@ class P1OrgTest {
         compose.onNodeWithTag("tab_order_list").performScrollToNode(hasTestTag("tab_order_menu_$epsilon"))
         compose.onNodeWithTag("tab_order_menu_$epsilon").performClick()
         compose.onNodeWithTag("tab_order_down_$epsilon").performClick()
-        compose.waitUntil(5_000) { storedTabs().indexOf("Epsilon") == before.indexOf("Epsilon") + 1 }
+        // Theta (after Epsilon in path order) went to the front, which shifts Epsilon by one; the move down is one more.
+        compose.waitUntil(5_000) { storedTabs().indexOf("Epsilon") == before.indexOf("Epsilon") + 2 }
         compose.onNodeWithTag("tab_order_list").performScrollToNode(hasTestTag("tab_order_reset"))
         compose.onNodeWithTag("tab_order_reset").performClick()
         compose.waitUntil(5_000) { storedTabs().drop(1) == before.filter { it != "Theta" } }
