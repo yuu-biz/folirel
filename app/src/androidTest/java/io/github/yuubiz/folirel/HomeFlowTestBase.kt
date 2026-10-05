@@ -1,6 +1,15 @@
 package io.github.yuubiz.folirel
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasAnyAncestor
@@ -167,7 +176,10 @@ abstract class HomeFlowTestBase {
     }
 
     /** The real home screen on the real view model, in a ComposeView of its own (MainActivity's own content is replaced). */
-    protected fun host() {
+    protected fun host() = host(widthDp = null, fontScale = 1.0f)
+
+    /** [host] with a window width (dp; null = the screen) and a text size (the system font scale is a property of the density). */
+    protected fun host(widthDp: Int?, fontScale: Float) {
         val c = TestData.container
         compose.runOnUiThread {
             if (!::vm.isInitialized) {
@@ -176,14 +188,19 @@ abstract class HomeFlowTestBase {
             val view = ComposeView(compose.activity)
             compose.activity.setContentView(view)
             view.setContent {
-                FolirelTheme(ThemeMode.SYSTEM, 1.0f) {
-                    HomeScreen(
-                        vm = vm,
-                        imageLoader = c.imageLoader,
-                        browser = c.browser,
-                        nav = HomeNavigation(importOpml = {}, addFeed = {}, subscriptions = { subscriptionsOpened++ }, settings = {}),
-                        httpsState = c.httpsUpgrade.state,
-                    )
+                val base = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(base.density, fontScale)) {
+                    FolirelTheme(ThemeMode.SYSTEM, 1.0f) {
+                        Box(if (widthDp != null) Modifier.width(widthDp.dp).fillMaxHeight() else Modifier.fillMaxSize()) {
+                            HomeScreen(
+                                vm = vm,
+                                imageLoader = c.imageLoader,
+                                browser = c.browser,
+                                nav = HomeNavigation(importOpml = {}, addFeed = {}, subscriptions = { subscriptionsOpened++ }, settings = {}),
+                                httpsState = c.httpsUpgrade.state,
+                            )
+                        }
+                    }
                 }
             }
         }

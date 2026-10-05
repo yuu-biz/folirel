@@ -472,4 +472,11 @@
     <string name="discovery_adopt_to">新：%s</string>
     <string name="discovery_adopt_note">記事・カテゴリ・既読/保存の状態は引き継がれます。新しいアドレスの記事は自身のIDとリンクで照合するため、一部が新着として再び現れることがあります。旧アドレスを書いた古いOPMLも、このフィードに対応づけられます。</string>
     <string name="discovery_adopt_confirm">アドレスを変更</string>
+    <string name="display_title">表示と絞り込み</string>
+    <string name="display_open">表示と絞り込み</string>
+    <string name="display_range">記事の範囲</string>
+    <string name="display_sort">並び順</string>
+    <string name="display_layout">レイアウト</string>
+    <string name="display_layout_global_note">カテゴリごとの設定がないすべての画面の、既定のレイアウトを変更します。</string>
+    <string name="action_choose_category">カテゴリを選ぶ</string>
 </resources>

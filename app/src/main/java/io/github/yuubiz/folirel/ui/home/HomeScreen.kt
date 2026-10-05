@@ -1,6 +1,7 @@
 package io.github.yuubiz.folirel.ui.home
 
 import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -195,6 +196,7 @@ fun HomeScreen(
     var httpConfirmMode by rememberSaveable { mutableStateOf(BrowserMode.CUSTOM_TABS) }
     var summaryFor by remember { mutableStateOf<ArticleRow?>(null) }
     var overflowOpen by remember { mutableStateOf(false) }
+    var displayOpen by rememberSaveable { mutableStateOf(false) }
 
     val messages = HomeMessages.load()
     LaunchedEffect(vm) {
@@ -266,11 +268,15 @@ fun HomeScreen(
             )
         },
     ) {
+      BoxWithConstraints(Modifier.fillMaxSize()) {
+        // Narrow windows give the search to the overflow menu: the title (the way to the categories) and the display panel keep their room.
+        val narrow = maxWidth < NARROW_BAR_DP.dp
+        val bigText = LocalDensity.current.fontScale > 1.3f
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
             topBar = {
                 TopAppBar(
-                    expandedHeight = 56.dp,
+                    expandedHeight = if (bigText) 80.dp else 56.dp,
                     navigationIcon = {
                         if (searchActive) {
                             IconButton(onClick = { vm.setSearchActive(false) }) {
@@ -304,7 +310,7 @@ fun HomeScreen(
                                 modifier = Modifier.fillMaxWidth().testTag("search_field"),
                             )
                         } else {
-                            Text(scopeTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            ScopeTitle(scopeTitle, "${filterLabel(selection.filter)} · ${sortLabel(selection.sort)}") { scope.launch { drawerState.open() } }
                         }
                     },
                     actions = {
@@ -327,8 +333,11 @@ fun HomeScreen(
                                 )
                             }
                         }
-                        if (!searchActive) {
-                            IconButton(onClick = { vm.setSearchActive(true) }) {
+                        IconButton(onClick = { displayOpen = true }, modifier = Modifier.testTag("display_open")) {
+                            Icon(painterResource(R.drawable.ic_tune), stringResource(R.string.display_open))
+                        }
+                        if (!searchActive && !narrow) {
+                            IconButton(onClick = { vm.setSearchActive(true) }, modifier = Modifier.testTag("search_open")) {
                                 Icon(Icons.Filled.Search, stringResource(R.string.action_search))
                             }
                         }
@@ -339,25 +348,13 @@ fun HomeScreen(
                                 }
                             }
                             DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
-                                listOf(
-                                    ListMode.LIST to R.string.list_mode_list,
-                                    ListMode.COMPACT_LIST to R.string.list_mode_compact_list,
-                                    ListMode.MAGAZINE to R.string.list_mode_magazine,
-                                ).forEach { (mode, label) ->
+                                if (!searchActive && narrow) {
                                     DropdownMenuItem(
-                                        text = { Text(stringResource(label)) },
-                                        leadingIcon = {
-                                            if (settings.listMode == mode) Icon(Icons.Filled.Check, null) else Spacer(Modifier.size(24.dp))
-                                        },
-                                        onClick = { overflowOpen = false; vm.setListMode(mode) },
-                                        modifier = Modifier.testTag("menu_mode_${mode.name}"),
+                                        text = { Text(stringResource(R.string.action_search)) },
+                                        onClick = { overflowOpen = false; vm.setSearchActive(true) },
+                                        modifier = Modifier.testTag("menu_search"),
                                     )
                                 }
-                                HorizontalDivider()
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(if (selection.sort == SortOrder.NEWEST) R.string.sort_oldest else R.string.sort_newest)) },
-                                    onClick = { overflowOpen = false; vm.toggleSort() },
-                                )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.menu_mark_all_read)) },
                                     enabled = unreadInList > 0,
@@ -390,7 +387,6 @@ fun HomeScreen(
                 if (pagerMode) {
                     ScopeTabs(tabItems(structure, pages), selection.scope, pagerState, vm::selectScope) { scrollToTopTick++ }
                 }
-                FilterBar(selection, vm::selectFilter, vm::toggleSort)
                 PullToRefreshBox(
                     isRefreshing = refresh.runningFor(target) != null,
                     onRefresh = { requestRefresh() },
@@ -430,6 +426,28 @@ fun HomeScreen(
                     )
                 }
             }
+        }
+      }
+    }
+
+    if (displayOpen) {
+        DisplayPanel(
+            filter = selection.filter,
+            sort = selection.sort,
+            onFilter = vm::selectFilter,
+            onSort = vm::selectSort,
+            onDismiss = { displayOpen = false },
+        ) {
+            SectionTitle(stringResource(R.string.display_layout))
+            Choice(
+                options = listOf(ListMode.LIST, ListMode.COMPACT_LIST, ListMode.MAGAZINE),
+                selected = settings.listMode,
+                label = { listModeLabel(it) },
+                tag = { "layout_${it.name}" },
+                onSelect = vm::setListMode,
+                forceRows = true,
+            )
+            Text(stringResource(R.string.display_layout_global_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 
@@ -856,27 +874,31 @@ private fun NewArticlesBanner(count: Int, toTop: Boolean, onClick: () -> Unit, o
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/** Narrowest window (dp) that keeps search on the bar itself. */
+private const val NARROW_BAR_DP = 360
+
+/** The category name with a small line under it for what the list shows (range and order); a press opens the way to the categories. */
 @Composable
-private fun FilterBar(selection: Selection, onFilter: (ReadFilter) -> Unit, onToggleSort: () -> Unit) {
-    // Wraps instead of clipping when the text is large (200% system font).
-    FlowRow(
-        Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        itemVerticalAlignment = Alignment.CenterVertically,
+private fun ScopeTitle(title: String, subtitle: String, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .heightIn(min = 48.dp)
+            .clickable(role = Role.Button, onClickLabel = stringResource(R.string.action_choose_category), onClick = onClick)
+            .testTag("scope_title"),
+        verticalArrangement = Arrangement.Center,
     ) {
-        listOf(
-            ReadFilter.ALL to R.string.filter_all,
-            ReadFilter.UNREAD to R.string.filter_unread,
-            ReadFilter.SAVED to R.string.filter_saved,
-        ).forEach { (filter, label) ->
-            FilterChip(selected = selection.filter == filter, onClick = { onFilter(filter) }, label = { Text(stringResource(label), maxLines = 1) })
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            Icon(painterResource(R.drawable.ic_arrow_drop_down), contentDescription = null, modifier = Modifier.size(20.dp))
         }
-        Spacer(Modifier.weight(1f))
-        TextButton(onClick = onToggleSort, modifier = Modifier.testTag("sort_toggle")) {
-            Icon(painterResource(R.drawable.ic_swap_vert), contentDescription = null, modifier = Modifier.size(18.dp))
-            Text(stringResource(if (selection.sort == SortOrder.NEWEST) R.string.sort_newest else R.string.sort_oldest), maxLines = 1)
-        }
+        Text(
+            subtitle,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.testTag("scope_subtitle"),
+        )
     }
 }
 

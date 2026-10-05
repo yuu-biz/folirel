@@ -330,15 +330,15 @@ class PagerAndMagazineTest {
         assertTrue(seeded.values.flatten().none { TestData.state(it).isRead })
     }
 
-    /** N09: the Magazine layout from the menu, persisted, same article area kept; images off → no image area. */
+    /** N09: the Magazine layout from the display panel, persisted, same article area kept; images off → no image area. */
     @Test
     fun magazineLayoutIsSelectableAndPersisted() {
         launch()
         waitForTag("category_pager")
         waitInPage(ArticleScope.All, "article_list")
         inPage(ArticleScope.All, "article_list").performScrollToIndex(5)
-        compose.onNodeWithTag("home_more").performClick()
-        compose.onNodeWithTag("menu_mode_MAGAZINE").performClick()
+        compose.onNodeWithTag("display_open").performClick()
+        compose.onNodeWithTag("layout_MAGAZINE").performClick()
         compose.waitUntil(5_000) { runBlocking { TestData.container.settings.current().listMode } == ListMode.MAGAZINE }
         compose.waitForIdle()
         assertTrue(compose.onAllNodesWithTag("card_image", useUnmergedTree = true).fetchSemanticsNodes().isEmpty())

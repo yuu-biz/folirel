@@ -495,4 +495,11 @@
     <string name="discovery_adopt_to">New: %s</string>
     <string name="discovery_adopt_note">The feed keeps its articles, categories and read/saved state. Articles of the new address are matched by their own ids and links, so some may appear again as new. Older OPML files that name the old address still find this feed.</string>
     <string name="discovery_adopt_confirm">Change address</string>
+    <string name="display_title">Display and filters</string>
+    <string name="display_open">Display and filters</string>
+    <string name="display_range">Articles</string>
+    <string name="display_sort">Order</string>
+    <string name="display_layout">Layout</string>
+    <string name="display_layout_global_note">This changes the default layout for every category that has no layout of its own.</string>
+    <string name="action_choose_category">Choose category</string>
 </resources>

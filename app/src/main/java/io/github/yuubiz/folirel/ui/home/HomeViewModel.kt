@@ -240,10 +240,9 @@ class HomeViewModel(
         }
     }
 
-    fun toggleSort() {
-        val next = if (_selection.value.sort == SortOrder.NEWEST) SortOrder.OLDEST else SortOrder.NEWEST
-        updateSelection { it.copy(sort = next) }
-        viewModelScope.launch { settingsRepository.setSortOrder(next) }
+    fun selectSort(order: SortOrder) {
+        updateSelection { it.copy(sort = order) }
+        viewModelScope.launch { settingsRepository.setSortOrder(order) }
     }
 
     /** "Open" in the http:// dialog with the box ticked. Cancelling never calls this, so nothing is saved then. */
