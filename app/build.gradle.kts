@@ -13,8 +13,8 @@ android {
         applicationId = "io.github.yuubiz.folirel"
         minSdk = 28
         targetSdk = 37
-        versionCode = 8
-        versionName = "0.4.1"
+        versionCode = 9
+        versionName = "0.4.2"
         // Shown in Settings > About so a build can be traced to its source ("-dirty" = uncommitted changes).
         val gitCommit = try {
             providers.exec { commandLine("git", "describe", "--always", "--dirty", "--abbrev=7", "--match=no-such-tag") }.standardOutput.asText.get().trim()
