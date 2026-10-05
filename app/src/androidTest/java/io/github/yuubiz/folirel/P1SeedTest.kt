@@ -17,6 +17,12 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class P1SeedTest {
+    /** Skipped in an ordinary run (one method fetches public feeds): only `-e p1evidence true` runs these helpers. */
+    @org.junit.Before
+    fun onlyWhenAsked() {
+        org.junit.Assume.assumeTrue("evidence helper (pass -e p1evidence true)", androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("p1evidence") == "true")
+    }
+
     @Test
     fun seedForTheUpgradeCheck() = runBlocking<Unit> {
         TestData.reset()

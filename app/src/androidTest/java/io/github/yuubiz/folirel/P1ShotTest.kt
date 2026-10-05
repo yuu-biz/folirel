@@ -24,7 +24,7 @@ import java.io.FileOutputStream
 /**
  * Screenshots of the home screen for the before/after comparison (P1 report): the same data, the same device, the same window.
  * Not an assertion test: it writes PNG files to `/sdcard/Android/media/<package>/p1shots/<label>/` and logs `P1SHOT` lines.
- * The label comes from the instrumentation argument `shotLabel` (default "after"). Only tags that exist in both versions are used,
+ * Skipped in an ordinary run: pass `-e p1evidence true`. The label comes from the instrumentation argument `shotLabel` (default "after"). Only tags that exist in both versions are used,
  * the panel and the picker are pictured only where they exist.
  */
 @RunWith(AndroidJUnit4::class)
@@ -40,6 +40,7 @@ class P1ShotTest {
 
     @Before
     fun seed() {
+        org.junit.Assume.assumeTrue("evidence helper (pass -e p1evidence true)", InstrumentationRegistry.getArguments().getString("p1evidence") == "true")
         TestData.reset(showImages = false)
         val names = listOf("IT", "ニュース", "Matome2chNews", "非常に長いカテゴリ名を持つタブ", "開発", "カテゴリ 05", "カテゴリ 06", "カテゴリ 07", "カテゴリ 08", "デザイン", "音楽", "写真")
         val byPath = TestData.seedPaths(names.map { listOf(it) }, perCategory = 12)
@@ -50,7 +51,7 @@ class P1ShotTest {
     @After
     fun tearDown() {
         scenario?.close()
-        shell("settings put system font_scale 1.0")
+        if (InstrumentationRegistry.getArguments().getString("p1evidence") == "true") shell("settings put system font_scale 1.0")
     }
 
     private fun shell(command: String) {
