@@ -36,8 +36,8 @@ object TestData {
         c.settings.setTextScale(1.0f)
         try {
             c.settings.setPalette(io.github.yuubiz.folirel.data.preferences.ColorPalette.CLASSIC)
-        } catch (_: NoSuchMethodError) {
-            // The upgrade checks prepare their state in an older release through this helper; a release before 0.7.0 has no colour set.
+        } catch (_: LinkageError) {
+            // The upgrade checks prepare their state in an older release through this helper; a release before 0.7.0 has no colour set (NoClassDefFoundError or NoSuchMethodError, both LinkageError).
         }
         c.settings.setTheme(io.github.yuubiz.folirel.data.preferences.ThemeMode.SYSTEM)
         c.settings.setBrowserMode(io.github.yuubiz.folirel.data.preferences.BrowserMode.CUSTOM_TABS)
