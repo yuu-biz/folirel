@@ -19,11 +19,32 @@ import kotlinx.coroutines.flow.map
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+/**
+ * The colour set, independent from [ThemeMode] (light/dark). [CLASSIC] is the blue set every version up to 0.6.0 used and the
+ * default, so an update never changes how an existing install looks. [DYNAMIC] needs Android 12 (API 31); where it is not
+ * available the app shows [CLASSIC] (see [effective]) and keeps the stored choice untouched.
+ */
+enum class ColorPalette {
+    CLASSIC, LEAF, SAND, VIOLET, DYNAMIC;
+
+    /** The palette that is drawn: the stored one, except that Dynamic on a system without it is Classic. */
+    fun effective(sdkInt: Int): ColorPalette = if (this == DYNAMIC && sdkInt < DYNAMIC_MIN_SDK) CLASSIC else this
+
+    companion object {
+        /** Material dynamic colour (dynamicLightColorScheme) exists from Android 12. */
+        const val DYNAMIC_MIN_SDK = 31
+
+        fun isAvailable(palette: ColorPalette, sdkInt: Int): Boolean = palette != DYNAMIC || sdkInt >= DYNAMIC_MIN_SDK
+    }
+}
+
 enum class BrowserMode { CUSTOM_TABS, EXTERNAL }
 
 /** Display/update preferences and the last selection. Reading state and subscriptions live in Room only. */
 data class AppSettings(
     val theme: ThemeMode = ThemeMode.SYSTEM,
+    /** Colour set; absent in a store written before 0.7.0, which reads as [ColorPalette.CLASSIC] (no visual change on update). */
+    val palette: ColorPalette = ColorPalette.CLASSIC,
     val listMode: ListMode = ListMode.LIST,
     val textScale: Float = 1.0f,
     /** Columns of the Magazine layout: 0 = automatic by width and text size, otherwise 1..3 (reduced when they do not fit). */
@@ -61,7 +82,22 @@ data class AppSettings(
     val imageCacheMb: Int = 128,
 ) {
     companion object {
-        val TEXT_SCALES = listOf(0.9f, 1.0f, 1.15f, 1.3f)
+        /** Text size, in percent: 90..130 in steps of 5. The four values older versions offered (90, 100, 115, 130) are on this grid. */
+        const val TEXT_SCALE_MIN_PERCENT = 90
+        const val TEXT_SCALE_MAX_PERCENT = 130
+        const val TEXT_SCALE_STEP_PERCENT = 5
+
+        /** The stored factor for [percent] (115 -> 1.15f, the same float the older constants had). */
+        fun textScaleOf(percent: Int): Float = percent / 100f
+
+        fun textScalePercent(scale: Float): Int = Math.round(scale * 100f)
+
+        /** A stored factor is valid when it is exactly on the grid; anything else (hand-edited, from a later version) is the default. */
+        fun isTextScale(scale: Float): Boolean {
+            val percent = textScalePercent(scale)
+            return percent in TEXT_SCALE_MIN_PERCENT..TEXT_SCALE_MAX_PERCENT &&
+                (percent - TEXT_SCALE_MIN_PERCENT) % TEXT_SCALE_STEP_PERCENT == 0 && textScaleOf(percent) == scale
+        }
         val REFRESH_INTERVALS_MINUTES = listOf(0, 15, 30, 60, 120, 360, 720, 1440)
         val RETENTION_LIMITS = listOf(0, 1_000, 3_000, 5_000, 10_000, 30_000)
         val IMAGE_CACHE_MB = listOf(64, 128, 256, 512)
@@ -72,6 +108,7 @@ data class AppSettings(
 class SettingsRepository(private val store: DataStore<Preferences>) {
     private object Keys {
         val theme = stringPreferencesKey("theme")
+        val palette = stringPreferencesKey("color_palette")
         val listMode = stringPreferencesKey("list_layout")
         val textScale = floatPreferencesKey("text_scale")
         val cardColumns = intPreferencesKey("card_columns")
@@ -97,8 +134,9 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val defaults = AppSettings()
         AppSettings(
             theme = enumOr(p[Keys.theme], defaults.theme),
+            palette = enumOr(p[Keys.palette], defaults.palette),
             listMode = enumOr(p[Keys.listMode], defaults.listMode),
-            textScale = p[Keys.textScale]?.takeIf { it in AppSettings.TEXT_SCALES } ?: defaults.textScale,
+            textScale = p[Keys.textScale]?.takeIf { AppSettings.isTextScale(it) } ?: defaults.textScale,
             cardStyle = enumOr(p[Keys.cardStyle], defaults.cardStyle),
             cardColumns = p[Keys.cardColumns]?.takeIf { it in AppSettings.CARD_COLUMNS } ?: defaults.cardColumns,
             showImages = p[Keys.showImages] ?: defaults.showImages,
@@ -126,6 +164,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun current(): AppSettings = settings.first()
 
     suspend fun setTheme(value: ThemeMode) = store.edit { it[Keys.theme] = value.name }
+    suspend fun setPalette(value: ColorPalette) = store.edit { it[Keys.palette] = value.name }
     suspend fun setListMode(value: ListMode) = store.edit { it[Keys.listMode] = value.name }
     suspend fun setTextScale(value: Float) = store.edit { it[Keys.textScale] = value }
     suspend fun setCardColumns(value: Int) = store.edit { it[Keys.cardColumns] = value }

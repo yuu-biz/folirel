@@ -35,6 +35,7 @@ import io.github.yuubiz.folirel.ui.home.HomeViewModel
 import io.github.yuubiz.folirel.ui.home.ProvideFeedIcons
 import io.github.yuubiz.folirel.ui.onboarding.OnboardingNext
 import io.github.yuubiz.folirel.ui.onboarding.OnboardingScreen
+import io.github.yuubiz.folirel.ui.settings.SettingsPage
 import io.github.yuubiz.folirel.ui.settings.SettingsScreen
 import io.github.yuubiz.folirel.ui.settings.SettingsViewModel
 import io.github.yuubiz.folirel.ui.subscriptions.AddFeedDialog
@@ -61,7 +62,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings by container.settings.settings.collectAsStateWithLifecycle(initialValue = null as AppSettings?)
             val current = settings ?: return@setContent // render nothing until preferences are loaded
-            FolirelTheme(current.theme, current.textScale) {
+            FolirelTheme(current.theme, current.textScale, current.palette) {
                 val iconStore = remember { FeedIconStore { feedId -> container.feedIcons.png(feedId) } }
                 val iconVersions = remember { flow { emit(container.subscriptions.ensureLocalAccount()) }.flatMapLatest { container.feedIcons.observeVersions(it) } }
                 ProvideFeedIcons(iconStore, iconVersions, enabled = current.showImages) {
@@ -165,7 +166,7 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
                         importOpml = pickOpml,
                         addFeed = { addFeedOpen = true },
                         subscriptions = { push(ROUTE_SUBSCRIPTIONS) },
-                        settings = { push(ROUTE_SETTINGS) },
+                        settings = { push(SettingsPage.TOP_ROUTE) },
                         organizeTabs = { push(ROUTE_TAB_ORDER) },
                     ),
                 )
@@ -193,7 +194,14 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
                 route == ROUTE_CATEGORIES -> CategoriesScreen(subscriptionsVm, onBack = ::pop)
                 route == ROUTE_TAB_ORDER -> CategoriesScreen(subscriptionsVm, onBack = ::pop, initialOrder = true)
                 route.startsWith(ROUTE_FEED_PREFIX) -> FeedDetailScreen(subscriptionsVm, route.removePrefix(ROUTE_FEED_PREFIX), onBack = ::pop)
-                route == ROUTE_SETTINGS -> SettingsScreen(settingsVm, onBack = ::pop, onExport = exportOpml, onHttpsCheck = { push(ROUTE_HTTPS) })
+                route == SettingsPage.TOP_ROUTE || SettingsPage.fromRoute(route) != null -> SettingsScreen(
+                    settingsVm,
+                    page = SettingsPage.fromRoute(route),
+                    onOpenPage = { push(it.route) },
+                    onBack = ::pop,
+                    onExport = exportOpml,
+                    onHttpsCheck = { push(ROUTE_HTTPS) },
+                )
             }
         }
         SnackbarHost(rootSnackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
@@ -214,6 +222,5 @@ private const val ROUTE_IMPORT = "import"
 private const val ROUTE_SUBSCRIPTIONS = "subscriptions"
 private const val ROUTE_CATEGORIES = "categories"
 private const val ROUTE_TAB_ORDER = "categories/order"
-private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_FEED_PREFIX = "feed/"
 private const val ROUTE_HTTPS = "https"

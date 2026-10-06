@@ -49,9 +49,10 @@ app/src/main/java/io/github/yuubiz/folirel/
                           icon and discovery coordinators
   ui/home/                Article lists, drawer, tabs, search
   ui/subscriptions/       OPML import, subscription management, categories, feed detail
-  ui/settings/            Settings
+  ui/settings/            Settings: top page and its pages (appearance, default layout, opening, refresh and network, storage, about)
+  ui/common/              Controls shared by Settings and the home screen: layout picker, choice, selection dialog row, switch row, slider row
   ui/onboarding/          First-run screen
-  ui/theme/
+  ui/theme/               Colour sets (Palettes) and the theme; light/dark and the colour set are independent
   browser/                BrowserLauncher
 ```
 

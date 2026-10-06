@@ -78,7 +78,7 @@ Read, unread and saved are changed only by explicit actions. Refreshing never ov
 - **Go to a category**: press the category name at the top (with the small arrow). Choose a category from the list, or type part of a name or of its parent's name to search. The pin button on each row pins it to the front of the tabs.
 - **Display and filters**: the button next to search opens **Display and filters**: **All** / **Unread** / **Saved**, **Newest first** / **Oldest first**, and the layout. A small line under the category name shows the current range and order.
 - **Search**: the magnifier icon searches titles, summaries and sources of articles already on the device, within the current scope. It never contacts the network.
-- **List style**: in **Display and filters** (for the category you are looking at, or for everything when you are on All) or in Settings (the default for all categories), choose one of three layouts:
+- **List style**: in **Display and filters** (for the category you are looking at, or for everything when you are on All) or in Settings (the default for all categories), choose one of five layouts:
   - **List**: one column with headline, summary and thumbnail.
   - **Compact list**: one dense line per article.
   - **Magazine**: cards of mixed sizes (or all the same size, see Settings) in up to three columns on wide screens.
@@ -131,27 +131,30 @@ Open **Subscriptions** from the navigation menu.
 
 ## Settings
 
-| Section | Option | Choices / notes |
+Settings opens on a short list of six pages; each row shows the values it holds now. Open a page to change them; the back button returns to the list.
+
+| Page | Option | Choices / notes |
 |---|---|---|
-| Display | Theme | System default, Light, Dark |
-| Display | List style | List, Compact list, Magazine |
-| Display | Magazine arrangement | Mixed sizes, like a magazine page; Same size for every card |
-| Display | Most columns in Magazine layout | Automatic, 1, 2 or 3 columns. If the chosen number would make headlines too narrow (small window, large text), fewer columns are used; text is never shrunk to keep columns |
-| Display | Text size | ×0.9, ×1.0, ×1.15, ×1.3 |
-| Display | Show thumbnails and source icons | On by default. When off, no thumbnails or source icons are downloaded or shown. Icons are looked up once per feed from the feed or its own site, never from a third-party service |
-| Opening articles | Open articles in | In-app browser tab (Custom Tabs), External browser |
+| Appearance | Light or dark | System, Light, Dark |
+| Appearance | Color | Classic (the blue used so far, default), Leaf, Sand, Violet, Dynamic (takes colors from your wallpaper; Android 12 and later, shown as unavailable on older versions). Light/dark and color are separate. Photos and icons are never tinted |
+| Appearance | Text size | A slider from 90% to 130% in steps of 5%, with **Reset to 100%**. The preview above it follows the slider; the size is saved when you let go. It multiplies the system font size |
+| Default layout | Layout | List, Compact list, Magazine, Masonry, Bento, shown as small pictures. This is the default for every category; a category can use its own |
+| Default layout | Magazine arrangement | Mixed, Even. Shown only for Magazine |
+| Default layout | Max columns | Automatic, 1, 2 or 3 columns, for Magazine, Masonry and Bento. If the chosen number would make headlines too narrow (small window, large text), fewer columns are used; text is never shrunk to keep columns |
+| Default layout | Show thumbnails and source icons | On by default. When off, no thumbnails or source icons are downloaded or shown. Icons are looked up once per feed from the feed or its own site, never from a third-party service |
+| Opening articles | Open articles in | Custom Tabs, External browser |
 | Opening articles | Confirm before opening http:// articles | On by default |
-| Updates | Automatic update | Off, every 15 / 30 minutes, 1 / 2 (default) / 6 / 12 / 24 hours |
-| Updates | Update when the app opens | On by default; at most every 30 minutes |
-| Updates | Automatic updates on unmetered networks only | On by default |
-| Updates | Confirm before updating on a metered network | On by default |
-| Updates | Allow unencrypted HTTP feeds and images | Off by default. A shortcut to **Check HTTPS support of HTTP feeds** appears when HTTP feeds exist |
-| Data | Articles to keep on the device | No limit (default), or about 1,000 / 3,000 / 5,000 / 10,000 / 30,000. See below |
-| Data | Image cache size | 64, 128 (default), 256 or 512 MB; applies at the next app start. **Clear image cache** removes cached thumbnails only |
-| Data | Export OPML | Subscriptions and categories only |
+| Refresh & network | Automatic update | Off, every 15 / 30 minutes, 1 / 2 (default) / 6 / 12 / 24 hours |
+| Refresh & network | Update when the app opens | On by default; at most every 30 minutes |
+| Refresh & network | Automatic updates on unmetered networks only | On by default |
+| Refresh & network | Confirm before updating on a metered network | On by default |
+| Refresh & network | Allow unencrypted HTTP feeds and images | Off by default. A shortcut to **Check HTTPS support of HTTP feeds** is on the same page |
+| Storage & data | Articles to keep on the device | No limit (default), or about 1,000 / 3,000 / 5,000 / 10,000 / 30,000. See below |
+| Storage & data | Image cache size | 64, 128 (default), 256 or 512 MB; applies at the next app start. **Clear image cache** removes cached thumbnails only |
+| Storage & data | Export OPML | Subscriptions and categories only |
 | About | Version, build, licence summary | The version line shows the version, version code and build identifier |
 
-The Data section also shows the number of articles stored and the database size, and warns when the database is larger than 100 MB.
+The Storage & data page also shows the number of articles stored and the database size, and warns when the database is larger than 100 MB.
 
 **Articles to keep on the device** is not a limit on fetching: every article a feed returns is stored. If you choose a number, Folirel shows how many old, read, unsaved articles would be removed and asks for confirmation. After that the same cleanup runs after updates. Unread and saved articles are never removed. Removed articles that a feed delivers again do not return as unread.
 

@@ -144,6 +144,8 @@ import io.github.yuubiz.folirel.model.ArticleScope
 import io.github.yuubiz.folirel.model.CardLayoutStyle
 import io.github.yuubiz.folirel.model.CategoryDisplay
 import io.github.yuubiz.folirel.model.ResolvedLayout
+import io.github.yuubiz.folirel.ui.common.LayoutPicker
+import io.github.yuubiz.folirel.ui.common.SectionTitle
 import io.github.yuubiz.folirel.model.FetchError
 import io.github.yuubiz.folirel.model.ListMode
 import io.github.yuubiz.folirel.model.ReadFilter
@@ -295,7 +297,7 @@ fun HomeScreen(
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_close_search))
                             }
                         } else {
-                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            IconButton(onClick = { scope.launch { drawerState.open() } }, modifier = Modifier.testTag("drawer_open")) {
                                 Icon(Icons.Filled.Menu, stringResource(R.string.action_open_drawer))
                             }
                         }
@@ -476,13 +478,11 @@ fun HomeScreen(
                 // A category: the choice is this category's own, and "use the default" is a choice of its own.
                 val own = structure.preferences[shownCategory.id]
                 SectionTitle(stringResource(R.string.display_layout_category))
-                Choice(
-                    options = listOf<Pick<ListMode>>(Pick.Inherit) + ListMode.entries.map { Pick.Value(it) },
-                    selected = own?.listLayout?.let { Pick.Value(it) } ?: Pick.Inherit,
-                    label = { if (it is Pick.Value) listModeLabel(it.value) else stringResource(R.string.layout_inherit, listModeLabel(settings.listMode)) },
-                    tag = { if (it is Pick.Value) "layout_${it.value.name}" else "layout_INHERIT" },
-                    onSelect = { vm.setLayout(selection.scope, (it as? Pick.Value)?.value) },
-                    forceRows = true,
+                LayoutPicker(
+                    selected = own?.listLayout,
+                    onSelect = { vm.setLayout(selection.scope, it) },
+                    inheritLabel = stringResource(R.string.layout_inherit, listModeLabel(settings.listMode)),
+                    tagPrefix = "layout_",
                 )
                 Text(
                     stringResource(R.string.display_layout_category_note, shownCategory.display),
@@ -494,13 +494,10 @@ fun HomeScreen(
                 }
             } else {
                 SectionTitle(stringResource(R.string.display_layout))
-                Choice(
-                    options = ListMode.entries,
+                LayoutPicker(
                     selected = settings.listMode,
-                    label = { listModeLabel(it) },
-                    tag = { "layout_${it.name}" },
-                    onSelect = { vm.setLayout(selection.scope, it) },
-                    forceRows = true,
+                    onSelect = { it?.let { mode -> vm.setLayout(selection.scope, mode) } },
+                    tagPrefix = "layout_",
                 )
                 Text(stringResource(R.string.display_layout_global_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

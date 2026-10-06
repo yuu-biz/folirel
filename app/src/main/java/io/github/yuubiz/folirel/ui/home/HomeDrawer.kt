@@ -134,7 +134,7 @@ fun HomeDrawer(
             }
             item { HorizontalDivider(Modifier.padding(vertical = 4.dp)) }
             item { DrawerItem(stringResource(R.string.nav_subscriptions), false, attention = attention, onClick = onSubscriptions) }
-            item { DrawerItem(stringResource(R.string.nav_settings), false, onClick = onSettings) }
+            item { DrawerItem(stringResource(R.string.nav_settings), false, Modifier.testTag("drawer_item_settings"), onClick = onSettings) }
         }
     }
 }

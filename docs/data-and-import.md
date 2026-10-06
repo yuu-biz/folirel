@@ -289,11 +289,12 @@ reader's own choices would have to include this table (and the DataStore keys be
 
 | Key | Meaning | Default |
 |---|---|---|
-| `theme` | `SYSTEM`, `LIGHT`, `DARK` | `SYSTEM` |
+| `theme` | Light or dark: `SYSTEM`, `LIGHT`, `DARK` | `SYSTEM` |
+| `color_palette` | Colour set: `CLASSIC`, `LEAF`, `SAND`, `VIOLET`, `DYNAMIC` (an unknown name reads as `CLASSIC`; `DYNAMIC` before Android 12 is stored as chosen and drawn as Classic). Added in 0.7.0; a store without it reads as `CLASSIC`, so an update changes nothing visible and no migration is needed. | `CLASSIC` |
 | `list_layout` | `LIST`, `COMPACT_LIST`, `MAGAZINE`, `MASONRY`, `BENTO`; the default of every category that has no override | `LIST` |
 | `card_columns` | Maximum Magazine columns: 0 = automatic, 1 to 3 | 0 |
 | `card_style` | Magazine arrangement: `MIXED` or `EVEN` | `MIXED` |
-| `text_scale` | 0.9, 1.0, 1.15, 1.3 | 1.0 |
+| `text_scale` | 0.90 to 1.30 in steps of 0.05 (the slider; the four older values are on the grid; any other value reads as 1.0) | 1.0 |
 | `show_images` | Thumbnails and source icons | on |
 | `browser_mode` | `CUSTOM_TABS` or `EXTERNAL` | `CUSTOM_TABS` |
 | `refresh_interval_minutes` | 0 (off), 15, 30, 60, 120, 360, 720, 1440 | 120 |
@@ -301,6 +302,7 @@ reader's own choices would have to include this table (and the DataStore keys be
 | `unmetered_only` | Automatic refresh and icon lookups only on unmetered networks | on |
 | `allow_http` | Fetch `http://` feeds and images | off |
 | `confirm_http_open` | Ask before opening an `http://` article | on |
+| `confirm_metered_refresh` | Ask before a manual update on a metered network | on |
 | `retention_limit` | 0 (no limit), 1,000 to 30,000 | 0 |
 | `image_cache_mb` | Thumbnail disk cache: 64, 128, 256, 512 (applied at next start) | 128 |
 | `onboarding_done` | First-run screen completed | off |
