@@ -34,7 +34,6 @@
     <string name="category_rename">Rename</string>
     <string name="date_unknown">Date unknown</string>
     <string name="drawer_categories">Categories</string>
-    <string name="drawer_saved">Saved articles</string>
     <string name="empty_articles">No articles yet. Pull down to refresh.</string>
     <string name="empty_fetching">Fetching feeds…</string>
     <string name="empty_no_subscriptions">No subscriptions yet. Import an OPML file or add a feed URL.</string>

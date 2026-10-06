@@ -291,7 +291,11 @@ class HomeViewModel(
         selectScope(_returnScope.value ?: ArticleScope.All)
     }
 
-    /** Scope change keeps the current filter (docs/product-and-ux.md S10). */
+    /**
+     * Where to look: the one thing the drawer, the pane, the tabs, the picker and "show articles from this source" change. The read
+     * filter, period, search and order stay exactly as they are (docs/product-and-ux.md S10), and "All" is only the scope that has no
+     * restriction: it never resets a filter. What to show is changed by [selectFilter], [selectPeriod], [selectSort] and the search.
+     */
     fun selectScope(scope: ArticleScope) {
         if (scope !is ArticleScope.Feed) setReturnScope(null)
         updateSelection { it.copy(scope = scope) }
@@ -301,15 +305,6 @@ class HomeViewModel(
     fun selectFilter(filter: ReadFilter) {
         updateSelection { it.copy(filter = filter) }
         viewModelScope.launch { settingsRepository.setLastFilter(filter) }
-    }
-
-    /** Drawer "Saved articles": whole scope + saved filter. */
-    fun showSaved() {
-        updateSelection { it.copy(scope = ArticleScope.All, filter = ReadFilter.SAVED) }
-        viewModelScope.launch {
-            settingsRepository.setLastScope(ArticleScope.All)
-            settingsRepository.setLastFilter(ReadFilter.SAVED)
-        }
     }
 
     fun selectSort(order: SortOrder) {

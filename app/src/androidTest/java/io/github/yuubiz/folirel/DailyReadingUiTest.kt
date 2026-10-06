@@ -3,6 +3,7 @@ package io.github.yuubiz.folirel
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -105,5 +106,25 @@ class DailyReadingUiTest : HomeFlowTestBase() {
         until(5_000) { !runBlocking { TestData.container.settings.current().hiddenKeywordsEnabled } }
         compose.onAllNodes(hasTestTag("hidden_keyword_remove"), useUnmergedTree = true)[0].performClick()
         until(5_000) { runBlocking { TestData.container.settings.current().hiddenKeywords }.isEmpty() }
+    }
+
+    /** Navigation chooses where to look only: neither the drawer nor the pane has a "saved articles" shortcut (the Saved filter is in the display panel). */
+    @Test
+    fun theNavigationHasNoSavedShortcutAndAllArticlesKeepsTheFilter() {
+        firstFetchThenShow()
+        compose.onNodeWithTag("display_open").performClick()
+        until(5_000) { existsAnywhere("display_panel") }
+        compose.onNodeWithTag("filter_SAVED").performClick()
+        until(5_000) { vm.selection.value.filter == io.github.yuubiz.folirel.model.ReadFilter.SAVED }
+        androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        until(5_000) { !existsAnywhere("display_panel") }
+        compose.onNodeWithTag("drawer_open").performClick()
+        until(5_000) { existsAnywhere("drawer_item_all") }
+        assertTrue(compose.onAllNodesWithText("Saved articles").fetchSemanticsNodes().isEmpty())
+        assertTrue(compose.onAllNodesWithText("保存した記事").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithTag("drawer_item_all").performClick()
+        compose.waitForIdle()
+        assertEquals(io.github.yuubiz.folirel.model.ReadFilter.SAVED, vm.selection.value.filter)
+        assertEquals(ArticleScope.All, vm.selection.value.scope)
     }
 }

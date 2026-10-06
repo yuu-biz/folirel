@@ -37,7 +37,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.yuubiz.folirel.R
 import io.github.yuubiz.folirel.model.ArticleScope
-import io.github.yuubiz.folirel.model.ReadFilter
 import io.github.yuubiz.folirel.model.Structure
 
 /** The modal drawer of a narrow window. Its content is [HomeNavigationContent], the same the persistent pane shows. */
@@ -47,12 +46,11 @@ fun HomeDrawer(
     selection: Selection,
     attention: Int,
     onSelect: (ArticleScope) -> Unit,
-    onSaved: () -> Unit,
     onSubscriptions: () -> Unit,
     onSettings: () -> Unit,
 ) {
     ModalDrawerSheet(Modifier.widthIn(max = 320.dp).testTag("home_drawer")) {
-        HomeNavigationContent(structure, selection, attention, onSelect, onSaved, onSubscriptions, onSettings)
+        HomeNavigationContent(structure, selection, attention, onSelect, onSubscriptions, onSettings)
     }
 }
 
@@ -64,7 +62,6 @@ fun HomeNavigationPane(
     selection: Selection,
     attention: Int,
     onSelect: (ArticleScope) -> Unit,
-    onSaved: () -> Unit,
     onSubscriptions: () -> Unit,
     onSettings: () -> Unit,
 ) {
@@ -74,16 +71,16 @@ fun HomeNavigationPane(
     ) {
         // The app draws edge to edge: keep the pane's entries out of the status bar, the navigation bar and a cutout at the left.
         Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Bottom + WindowInsetsSides.Start))) {
-            HomeNavigationContent(structure, selection, attention, onSelect, onSaved, onSubscriptions, onSettings)
+            HomeNavigationContent(structure, selection, attention, onSelect, onSubscriptions, onSettings)
         }
     }
 }
 
 /**
- * All, Saved, the pinned shortcuts, the categories, their feeds, then Subscriptions and Settings. The categories come in the
+ * All, the pinned shortcuts, the categories, their feeds, then Subscriptions and Settings. The categories come in the
  * order of the tabs ([Structure.tabOrdered]): the one order that tabs, pager, picker, organizer, drawer and pane share, so there is
  * no sort of its own here. In that order a child can stand before its parent, so a category is named by its own name with its
- * parent path under it (as in the picker), not by an indent. Choosing something only reports it; closing a drawer is the caller's.
+ * parent path under it (as in the picker), not by an indent. Choosing something only reports it; closing a drawer is the caller's. It chooses WHERE to look (the scope) and nothing else: the read filter, period, search, hidden keywords and order belong to the display panel and are never touched from here.
  */
 @Composable
 internal fun HomeNavigationContent(
@@ -91,7 +88,6 @@ internal fun HomeNavigationContent(
     selection: Selection,
     attention: Int,
     onSelect: (ArticleScope) -> Unit,
-    onSaved: () -> Unit,
     onSubscriptions: () -> Unit,
     onSettings: () -> Unit,
 ) {
@@ -105,12 +101,9 @@ internal fun HomeNavigationContent(
             )
         }
         item {
-            NavItem(stringResource(R.string.scope_all), selection.scope == ArticleScope.All && selection.filter != ReadFilter.SAVED, Modifier.testTag("drawer_item_all")) {
+            NavItem(stringResource(R.string.scope_all), selection.scope == ArticleScope.All, Modifier.testTag("drawer_item_all")) {
                 onSelect(ArticleScope.All)
             }
-        }
-        item {
-            NavItem(stringResource(R.string.drawer_saved), selection.scope == ArticleScope.All && selection.filter == ReadFilter.SAVED, onClick = onSaved)
         }
         if (structure.hasUncategorized) {
             item {

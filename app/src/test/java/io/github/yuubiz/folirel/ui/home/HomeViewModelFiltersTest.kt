@@ -225,7 +225,7 @@ class HomeViewModelFiltersTest {
         val saved = env.articles.rows(io.github.yuubiz.folirel.model.ArticleQuerySpec(account, ArticleScope.All, ReadFilter.ALL, io.github.yuubiz.folirel.model.SortOrder.NEWEST)).first { it.title == "Fresh basics" }
         env.articles.setSaved(saved.id, true)
         titles()
-        vm.showSaved()
+        vm.selectFilter(ReadFilter.SAVED)
         waitFor { vm.selection.value.filter == ReadFilter.SAVED }
         vm.showFeed(feedId)
         waitFor { vm.selection.value.scope == ArticleScope.Feed(feedId) }
@@ -246,5 +246,43 @@ class HomeViewModelFiltersTest {
         vm.showFeed(feedId)
         vm.selectScope(ArticleScope.Uncategorized)
         assertNull(vm.returnScope.value)
+    }
+
+    /**
+     * Navigation and filtering are separate: every way of changing the scope (drawer, pane, tabs, picker and "this source" all end in
+     * [HomeViewModel.selectScope] or [HomeViewModel.showFeed]) keeps the read filter, period, search, hidden keywords and order, and
+     * "All articles" does not reset any of them. Changing a filter never moves the scope.
+     */
+    @Test
+    fun changingTheScopeKeepsEveryFilterAndChangingAFilterKeepsTheScope() = runBlocking<Unit> {
+        assertTrue(vm.addHiddenKeyword("zzz") is HiddenKeywords.AddResult.Added)
+        vm.selectFilter(ReadFilter.SAVED)
+        vm.selectPeriod(PeriodFilter.DAYS_7)
+        vm.selectSort(io.github.yuubiz.folirel.model.SortOrder.OLDEST)
+        vm.setSearchText("basics")
+        main.scheduler.advanceTimeBy(HomeViewModel.SEARCH_DEBOUNCE_MS + 1)
+        waitFor { vm.selection.value.search == "basics" }
+        val filters = vm.selection.value.copy(scope = ArticleScope.All)
+        fun assertFiltersKept() = assertEquals(filters, vm.selection.value.copy(scope = ArticleScope.All))
+
+        for (scope in listOf(ArticleScope.Uncategorized, ArticleScope.Category("none"), ArticleScope.Feed(feedId), ArticleScope.All)) {
+            vm.selectScope(scope)
+            assertEquals(scope, vm.selection.value.scope)
+            assertFiltersKept()
+        }
+        vm.showFeed(feedId)
+        assertFiltersKept()
+        vm.leaveFeed()
+        assertEquals(ArticleScope.All, vm.selection.value.scope)
+        assertFiltersKept()
+        // "All articles" on top of Saved + 7 days + search + order: still Saved, 7 days, the search and the order; the keywords stay too.
+        assertEquals(ReadFilter.SAVED, vm.selection.value.filter)
+        assertEquals(listOf("zzz"), runBlocking { settings.current().activeHiddenKeywords })
+        // The other direction: a filter change leaves the scope where it is.
+        vm.selectScope(ArticleScope.Uncategorized)
+        vm.selectFilter(ReadFilter.UNREAD)
+        vm.selectPeriod(PeriodFilter.ALL)
+        vm.selectSort(io.github.yuubiz.folirel.model.SortOrder.NEWEST)
+        assertEquals(ArticleScope.Uncategorized, vm.selection.value.scope)
     }
 }

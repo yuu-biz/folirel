@@ -454,3 +454,12 @@ a movable clock). `DailyReadingUiTest` drives the menu, the panel and the sheet 
 | P3A-T32, T33 | The banner counts announced articles the list shows (`newArticlesIn`): a hidden arrival makes no banner and stays pending; a looser filter counts it. | `DailyReadingFiltersTest` (the function; the banner composable itself is not run in JVM tests) |
 | P3A-T34 | A store written by 0.8.0 reads as All, no keywords, off, and reading writes nothing. | `PeriodAndKeywordSettingTest` |
 | P3A-T35 | Keyword, search and cutoff are bind arguments: never in the SQL text, same SQL for any text, argument count. | `DailyReadingFiltersTest` |
+
+### 4.11 Navigation and filter separation (0.9.1, P3A-F01 to P3A-F04)
+
+| ID | Scenario | Where |
+|---|---|---|
+| P3A-F01 | The drawer and the pane (one `HomeNavigationContent`) have no "Saved articles" entry; Saved is only the filter of the display panel. | Removed parameter and string (does not compile otherwise); `DailyReadingUiTest` (drawer has no such text) |
+| P3A-F02 | Changing the scope (drawer, pane, tabs, picker, a source, Back from a source) keeps the read filter, period, search, order and the hidden keywords; "All articles" resets none of them. | `HomeViewModelFiltersTest`, `DailyReadingUiTest` |
+| P3A-F03 | Changing a filter does not move the scope. | `HomeViewModelFiltersTest` |
+| P3A-F04 | A single feed opened from the Saved filter keeps the Saved filter. | `HomeViewModelFiltersTest` |

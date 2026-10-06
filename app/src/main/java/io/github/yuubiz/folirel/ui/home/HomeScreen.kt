@@ -289,10 +289,6 @@ fun HomeScreen(
                     vm.selectScope(s)
                     scope.launch { drawerState.close() }
                 },
-                onSaved = {
-                    vm.showSaved()
-                    scope.launch { drawerState.close() }
-                },
                 onSubscriptions = {
                     scope.launch { drawerState.close() }
                     nav.subscriptions()
@@ -312,7 +308,6 @@ fun HomeScreen(
               selection = selection,
               attention = attention,
               onSelect = vm::selectScope,
-              onSaved = vm::showSaved,
               onSubscriptions = nav.subscriptions,
               onSettings = nav.settings,
           )

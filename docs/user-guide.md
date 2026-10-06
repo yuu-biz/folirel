@@ -63,7 +63,7 @@ If the URL starts with `http://`, the feed is registered but not fetched until y
 | Goal | How |
 |---|---|
 | Read the original article | Tap the row. It opens in an in-app browser tab (Custom Tabs) or your external browser, depending on **Open articles in** in Settings. Opening an article never marks it as read. |
-| Save (bookmark) | Tap the bookmark icon on the row. Saved articles appear under **Saved articles** in the navigation menu, or with the **Saved** filter. |
+| Save (bookmark) | Tap the bookmark icon on the row. Saved articles are shown with the **Saved** filter in **Display and filters** (button next to search); the navigation menu only chooses where to look, so the filter stays when you change category. |
 | Mark as read or unread, share, open in external browser | Tap the row's three-dot button (**More options**), or long-press the row. Menu items: **Mark as read** / **Mark as unread**, **Save** / **Remove from saved**, **Share**, **Open in external browser**, then **Show articles from this source** (that feed as the list, nothing marked or opened; Back returns to where you were) and **Source details** (the feed's page: address, status, pause). |
 | Articles without a link | Tapping shows **Show summary**, the summary that the feed supplied. |
 | Mark many as read | More-options menu, **Mark all as read**. A dialog shows the scope, the active filter, the period, any search text, whether hidden keywords are applied and the number of unread articles that will change. Only the articles you can see in that list are included. Nothing happens until you confirm. |
@@ -73,7 +73,7 @@ Read, unread and saved are changed only by explicit actions. Refreshing never ov
 
 ### Moving around
 
-- **Navigation menu**: open it with the menu button at the top left (**Open navigation**). It contains All articles, Saved articles, Uncategorized, your Categories (expandable), Subscriptions and Settings.
+- **Navigation menu**: open it with the menu button at the top left (**Open navigation**). It chooses where to look and contains All articles, Uncategorized, your Categories (expandable), Subscriptions and Settings.
 - **Tabs and swiping**: tabs at the top show **All**, **Uncategorized**, your pinned categories and your other categories. Swipe the list left or right to move between them; the tab row moves with your finger, and the order stops at both ends and does not wrap around. Each tab remembers its scroll position. You can also slide the tab row itself to look for a tab; that does not change the category.
 - **Go to a category**: press the category name at the top (with the small arrow). Choose a category from the list, or type part of a name or of its parent's name to search. The pin button on each row pins it to the front of the tabs.
 - **Display and filters**: the button next to search opens **Display and filters**: **All** / **Unread** / **Saved**, the **Period** (**All**, **24 hours**, **3 days**, **7 days**, **30 days**, counted back from now; nothing is deleted), **Hidden keywords**, **Newest first** / **Oldest first**, and the layout. A small line under the category name shows the current range, period and order.

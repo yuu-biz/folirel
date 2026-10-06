@@ -33,7 +33,6 @@
     <string name="category_rename">名前を変更</string>
     <string name="date_unknown">日時不明</string>
     <string name="drawer_categories">カテゴリ</string>
-    <string name="drawer_saved">保存した記事</string>
     <string name="empty_articles">記事がありません。下に引いて更新してください。</string>
     <string name="empty_fetching">フィードを取得中…</string>
     <string name="empty_no_subscriptions">購読がありません。OPMLを読み込むか、フィードURLを追加してください。</string>
