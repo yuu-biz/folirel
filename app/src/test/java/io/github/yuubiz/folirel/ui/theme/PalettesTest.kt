@@ -120,4 +120,45 @@ class PalettesTest {
             assertEquals(s.surface, s.background)
         }
     }
+
+    /** The surface of a colour set has a visible hue (0.9.2): the old surfaces were within a few steps of grey. */
+    @Test
+    fun surfacesOfTheColourSetsAreVisiblyTinted() {
+        for (p in fixedPalettes - ColorPalette.CLASSIC) for (dark in listOf(false, true)) {
+            val c = Palettes.fixedScheme(p, dark).surface
+            val spread = maxOf(c.red, c.green, c.blue) - minOf(c.red, c.green, c.blue)
+            assertTrue("$p dark=$dark surface spread $spread", spread * 255f >= 10f)
+        }
+    }
+
+    /** An elevated card (surfaceContainerLow) can be told from the list background it lies on, without a border. */
+    @Test
+    fun cardsStandOutFromTheBackgroundInTheColourSets() {
+        for (p in fixedPalettes - ColorPalette.CLASSIC) for (dark in listOf(false, true)) {
+            val s = Palettes.fixedScheme(p, dark)
+            val ratio = contrast(s.surfaceContainerLow, s.surface)
+            assertTrue("$p dark=$dark card/background $ratio", ratio >= 1.04f)
+        }
+    }
+
+    /** Top bars and the tab strip are drawn in primaryContainer in the colour sets: their text, icons and underline stay readable. */
+    @Test
+    fun barsInTheColourSetsStayReadable() {
+        for (p in fixedPalettes - ColorPalette.CLASSIC) for (dark in listOf(false, true)) {
+            val s = Palettes.fixedScheme(p, dark)
+            val name = "$p dark=$dark"
+            assertTrue("$name title", contrast(s.onPrimaryContainer, s.primaryContainer) >= 4.5f)
+            assertTrue("$name small icons (onSurfaceVariant)", contrast(s.onSurfaceVariant, s.primaryContainer) >= 3f)
+            assertTrue("$name bar against the page", contrast(s.primaryContainer, s.surface) >= 1.1f)
+        }
+    }
+
+    /** The two sets of every colour set differ from each other and from the other colour sets in the bar colour. */
+    @Test
+    fun theBarColourDiffersBetweenTheColourSets() {
+        for (dark in listOf(false, true)) {
+            val bars = (fixedPalettes - ColorPalette.CLASSIC).map { Palettes.fixedScheme(it, dark).primaryContainer }
+            assertEquals(bars.size, bars.toSet().size)
+        }
+    }
 }

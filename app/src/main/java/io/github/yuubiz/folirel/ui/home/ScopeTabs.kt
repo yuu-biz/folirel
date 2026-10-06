@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import io.github.yuubiz.folirel.ui.theme.LocalTintedBars
+import io.github.yuubiz.folirel.ui.theme.barContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateMapOf
@@ -94,7 +96,8 @@ internal fun ScopeTabs(
     val spans = remember { mutableStateMapOf<String, TitleSpan>() }
     var viewport by remember { mutableStateOf(0) }
     val follower = remember { TabFollower() }
-    val barColor = MaterialTheme.colorScheme.primary
+    // On the palette-coloured strip the underline is the strip's own text colour; on the plain surface it is the accent, as before.
+    val barColor = if (LocalTintedBars.current) barContentColor() else MaterialTheme.colorScheme.primary
     val density = LocalDensity.current
     val keys = tabs.map { it.key }
 

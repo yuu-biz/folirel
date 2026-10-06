@@ -31,6 +31,8 @@ fun FolirelTheme(themeMode: ThemeMode, textScale: Float, palette: ColorPalette =
     val context = LocalContext.current
     val drawn = palette.effective(Build.VERSION.SDK_INT)
     CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale * textScale)) {
-        MaterialTheme(colorScheme = Palettes.scheme(drawn, dark, context), typography = Typography(), content = content)
+        CompositionLocalProvider(LocalTintedBars provides (drawn != ColorPalette.CLASSIC)) {
+            MaterialTheme(colorScheme = Palettes.scheme(drawn, dark, context), typography = Typography(), content = content)
+        }
     }
 }

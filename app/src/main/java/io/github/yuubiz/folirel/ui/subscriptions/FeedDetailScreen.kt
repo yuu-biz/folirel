@@ -29,6 +29,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import io.github.yuubiz.folirel.ui.theme.appBarColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,6 +72,7 @@ fun FeedDetailScreen(vm: SubscriptionsViewModel, feedId: String, onBack: () -> U
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = appBarColors(),
                 expandedHeight = 56.dp,
                 title = { Text(feed?.name ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back)) } },

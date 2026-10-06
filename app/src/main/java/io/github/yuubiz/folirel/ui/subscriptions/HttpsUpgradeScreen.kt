@@ -24,6 +24,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import io.github.yuubiz.folirel.ui.theme.appBarColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -51,6 +52,7 @@ fun HttpsUpgradeScreen(vm: SubscriptionsViewModel, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = appBarColors(),
                 expandedHeight = 56.dp,
                 title = { Text(stringResource(R.string.https_check_title)) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back)) } },

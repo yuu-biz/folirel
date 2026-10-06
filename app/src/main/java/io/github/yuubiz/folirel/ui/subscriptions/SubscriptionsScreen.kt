@@ -51,6 +51,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import io.github.yuubiz.folirel.ui.theme.appBarColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -181,6 +182,7 @@ fun SubscriptionsScreen(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
+                colors = appBarColors(),
                 expandedHeight = 56.dp,
                 title = { Text(if (selecting) pluralStringResource(R.plurals.selected_count, selectedIds.size, selectedIds.size) else stringResource(R.string.nav_subscriptions)) },
                 navigationIcon = {
@@ -601,6 +603,7 @@ fun CategoriesScreen(vm: SubscriptionsViewModel, onBack: () -> Unit, initialOrde
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
+                colors = appBarColors(),
                 expandedHeight = 56.dp,
                 title = { Text(stringResource(R.string.categories_title)) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back)) } },

@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import io.github.yuubiz.folirel.ui.theme.appBarColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -40,6 +41,7 @@ fun ImportScreen(vm: ImportViewModel, onPickAgain: () -> Unit, onClose: () -> Un
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = appBarColors(),
                 expandedHeight = 56.dp,
                 title = { Text(stringResource(R.string.import_title)) },
                 navigationIcon = {

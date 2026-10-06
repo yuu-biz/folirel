@@ -79,6 +79,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
+import io.github.yuubiz.folirel.ui.theme.LocalTintedBars
+import io.github.yuubiz.folirel.ui.theme.appBarColors
+import io.github.yuubiz.folirel.ui.theme.barContainerColor
+import io.github.yuubiz.folirel.ui.theme.barContentColor
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberDrawerState
 import android.os.SystemClock
@@ -321,6 +325,7 @@ fun HomeScreen(
             snackbarHost = { SnackbarHost(snackbar) },
             topBar = {
                 TopAppBar(
+                    colors = appBarColors(),
                     expandedHeight = if (bigText) 80.dp else 56.dp,
                     navigationIcon = {
                         if (searchActive) {
@@ -443,7 +448,9 @@ fun HomeScreen(
                 // it is never silently replaced by another category.
                 val pagerMode = pages.contains(selection.scope) && structure.subscribedFeeds.isNotEmpty()
                 if (pagerMode) {
-                    ScopeTabs(tabItems(structure, pages), selection.scope, pagerState, vm::selectScope) { scrollToTopTick++ }
+                    val tabs: @Composable () -> Unit = { ScopeTabs(tabItems(structure, pages), selection.scope, pagerState, vm::selectScope) { scrollToTopTick++ } }
+                    // The strip is the bar's colour in a colour set; Classic keeps drawing it on the plain background.
+                    if (LocalTintedBars.current) Surface(color = barContainerColor(), contentColor = barContentColor()) { tabs() } else tabs()
                 }
                 PullToRefreshBox(
                     isRefreshing = refresh.runningFor(target) != null,
