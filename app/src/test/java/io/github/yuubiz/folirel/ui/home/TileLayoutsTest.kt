@@ -32,13 +32,42 @@ class TileLayoutsTest {
 
     @Test
     fun bentoBlocksFillTheirColumnsWithoutGapsAndKeepTheOrder() {
-        for (columns in 1..3) {
+        for (fromEnd in listOf(false, true)) for (columns in 1..3) {
             for (n in listOf(1, 2, 3, 4, 5, 7, 40, 301)) {
-                val blocks = BentoPlan.blocks(ids(n), columns)
+                val blocks = BentoPlan.blocks(ids(n), columns, fromEnd)
                 // Every article once, in order.
                 assertEquals((0 until n).toList(), blocks.flatMap { b -> b.tiles.map { it.article }.sorted() })
                 for (b in blocks) assertGapFree(b, columns)
+                // The first article of a block is its top left tile.
+                for (b in blocks) b.tiles.minBy { it.article }.let { assertTrue("$b", it.row == 0 && it.col == 0) }
             }
+        }
+    }
+
+    /** Where every article sits: its block counted from the stable end, and its place and shape inside the block. */
+    private fun places(blocks: List<BentoBlock>, ids: List<String>, fromEnd: Boolean): Map<String, List<Any>> {
+        val ordered = if (fromEnd) blocks.asReversed() else blocks
+        return ordered.flatMapIndexed { b, block -> block.tiles.map { ids[it.article] to listOf(b, it.col, it.row, it.shape) } }.toMap()
+    }
+
+    @Test
+    fun newArticlesAtTheNewestEndChangeOnlyTheBlockThere() {
+        val old = ids(120)
+        for (columns in 2..3) for (added in 1..7) {
+            val fresh = List(added) { "fresh-$it" }
+            // Newest first: new articles come before the old ones.
+            val before = places(BentoPlan.blocks(old, columns, fromEnd = true), old, true)
+            val withNew = fresh + old
+            val after = places(BentoPlan.blocks(withNew, columns, fromEnd = true), withNew, true)
+            val moved = old.filter { before[it] != after[it] }
+            // Only articles of the old top block (the one left over at the newest end) may change.
+            assertTrue("$columns columns, $added new: ${moved.size} old articles moved", moved.size <= 4 && moved.all { old.indexOf(it) < 4 })
+            // Oldest first: new articles come after the old ones.
+            val beforeAsc = places(BentoPlan.blocks(old, columns), old, false)
+            val asc = old + fresh
+            val afterAsc = places(BentoPlan.blocks(asc, columns), asc, false)
+            val movedAsc = old.filter { beforeAsc[it] != afterAsc[it] }
+            assertTrue("oldest first, $columns columns, $added new: $movedAsc", movedAsc.size <= 4 && movedAsc.all { old.indexOf(it) >= old.size - 4 })
         }
     }
 

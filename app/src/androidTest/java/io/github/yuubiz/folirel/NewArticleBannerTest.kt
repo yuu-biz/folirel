@@ -197,9 +197,9 @@ class NewArticleBannerTest {
     }
 
     /** Articles arriving at the head while the reader is further down never move the list; the notice only announces them. */
-    private fun headArrival(mode: ListMode) {
+    private fun headArrival(mode: ListMode, scrollTo: Int = 40) {
         h.show(mode, (0 until 80).map { h.variedRow(it) })
-        compose.onNodeWithTag("article_list").performScrollToIndex(40)
+        compose.onNodeWithTag("article_list").performScrollToIndex(scrollTo)
         compose.waitForIdle()
         // The article the reader has at the top of the screen: the first one that is really in view (a composed neighbour is not).
         val reading = (30..50).map { "a$it" }.first { id -> isInView(id) }
@@ -215,6 +215,10 @@ class NewArticleBannerTest {
 
     @Test fun articlesArrivingAtTheHeadKeepTheReadingPlaceInTheMagazineLayout() = headArrival(ListMode.MAGAZINE)
     @Test fun articlesArrivingAtTheHeadKeepTheReadingPlaceInTheCompactListLayout() = headArrival(ListMode.COMPACT_LIST)
+    @Test fun articlesArrivingAtTheHeadKeepTheReadingPlaceInTheMasonryLayout() = headArrival(ListMode.MASONRY)
+
+    /** Bento's column holds blocks of a few articles, so block 16 is around article 40. */
+    @Test fun articlesArrivingAtTheHeadKeepTheReadingPlaceInTheBentoLayout() = headArrival(ListMode.BENTO, scrollTo = 16)
 
     /** The notice and its label are in the system language of the device: both texts exist (a missing translation fails lint, this reads them). */
     @Test

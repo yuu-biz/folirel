@@ -45,8 +45,11 @@ internal data class BentoBlock(val tiles: List<BentoTile>, val rows: Int) {
 
 /**
  * Bento layout: tiles of four shapes (small, wide, tall, big) packed into blocks that fill the columns without gaps, like a tiled
- * page. The pattern of a block is chosen from the id of its first article (a fixed hash), so the same articles always make the same
- * blocks, whatever is drawn or redrawn; articles stay in their order (left to right, top to bottom inside a block). Pure, testable.
+ * page. Articles stay in their order (left to right, top to bottom inside a block). Packing starts at the end of the list that does
+ * not grow: new articles arrive at the newest end, so with newest first the blocks are packed from the bottom up (each block turned
+ * half a circle so its reading order still runs down the page). The pattern of a block is chosen from the id of the article it
+ * starts with (a fixed hash), so new arrivals change only the block at the newest end and every block under it keeps its tiles.
+ * Pure, testable.
  *
  * Two columns: a tall tile with two small ones beside it (left or right), a wide tile, two small tiles, or a wide tile over two
  * small ones. Three columns: those shapes on three columns plus a big tile with two small ones beside it. One column: wide tiles only.
@@ -84,7 +87,22 @@ internal object BentoPlan {
         else -> p(1, 1, t(0, 0, if (columns >= 2) BentoShape.WIDE else BentoShape.SMALL))
     }
 
-    fun blocks(ids: List<String>, columns: Int): List<BentoBlock> {
+    /** [fromEnd]: pack from the last article (the list is newest first and grows at its start). */
+    fun blocks(ids: List<String>, columns: Int, fromEnd: Boolean = false): List<BentoBlock> {
+        if (!fromEnd) return pack(ids, columns)
+        val n = ids.size
+        val count = columns.coerceIn(1, CardGridLayout.MAX_COLUMNS)
+        return pack(ids.asReversed(), columns).asReversed().map { block ->
+            BentoBlock(
+                block.tiles.map { t ->
+                    BentoTile(n - 1 - t.article, count - t.col - t.shape.colSpan, block.rows - t.row - t.shape.rowSpan, t.shape)
+                }.sortedBy { it.article },
+                block.rows,
+            )
+        }
+    }
+
+    private fun pack(ids: List<String>, columns: Int): List<BentoBlock> {
         val count = columns.coerceIn(1, CardGridLayout.MAX_COLUMNS)
         val out = ArrayList<BentoBlock>()
         var i = 0

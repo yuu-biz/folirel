@@ -743,7 +743,7 @@ private fun ArticleListBody(
     // Masonry and Bento: their own columns (two on a phone), and Bento's blocks of tiles (a position is an article; the column
     // shows blocks).
     val tileColumns = CardGridLayout.columns(widthDp, LocalDensity.current.fontScale, cardColumns, CardGridLayout.TILE_AUTO_MIN_CARD_DP).count
-    val bentoBlocks = if (mode == ListMode.BENTO) remember(items, tileColumns) { BentoPlan.blocks(items.map { it.id }, tileColumns) } else null
+    val bentoBlocks = if (mode == ListMode.BENTO) remember(items, tileColumns, newestFirst) { BentoPlan.blocks(items.map { it.id }, tileColumns, fromEnd = newestFirst) } else null
     val blockOf = remember(bentoBlocks) { bentoBlocks?.let { BentoPlan.blockOfArticle(it, items.size) } ?: IntArray(0) }
     val firstArticleOf = remember(bentoBlocks) { bentoBlocks?.let { b -> IntArray(b.size) { b[it].first } } ?: IntArray(0) }
     // Restore from this list's own anchor (article id + offset); if it is gone, use the nearest remaining article.

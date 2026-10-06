@@ -80,7 +80,7 @@ class TileLayoutTest {
         val width = compose.onNodeWithTag("article_list").fetchSemanticsNode().size.width
         val cellW = BentoPlan.cellWidthDp(m.dp(width.toFloat()), 2)
         val cellH = BentoPlan.cellHeightDp(cellW, 21f)
-        val blocks = BentoPlan.blocks(items.map { it.id }, 2)
+        val blocks = BentoPlan.blocks(items.map { it.id }, 2, fromEnd = true) // the host lists newest first
         for (block in blocks.take(3)) for (tile in block.tiles) {
             val r = cards["md${tile.article}"] ?: continue
             val w = tile.shape.colSpan * cellW + (tile.shape.colSpan - 1) * CardGridLayout.GAP_DP
@@ -108,6 +108,39 @@ class TileLayoutTest {
         val widths = cards.values.map { m.dp(it.width).toInt() / 4 }.toSet()
         assertEquals("one column: $widths", 1, widths.size)
         for ((id, card) in cards.filterValues { it.bottom < listHeight }) for (s in m.partsOf(id, "card_summary")) assertTrue("$id", s.bottom <= card.bottom - 44f * m.density)
+    }
+
+    /**
+     * New articles at the head (newest first). Bento: every tile on screen stays where it was, with the same size (blocks are packed
+     * from the oldest article). Masonry: the article being read stays in view; the lanes under it may be dealt again (each card goes
+     * under the shortest lane counted from the first article), as Magazine rows are.
+     */
+    @Test
+    fun tilesOnScreenStayPutWhenArticlesArriveAtTheHead() {
+        val pictures = h.makeImages()
+        for (mode in listOf(ListMode.MASONRY, ListMode.BENTO)) {
+            h.listKey = "arrive-$mode"
+            h.show(mode, (0 until 120).map { h.variedRow(it, pictures) }, showImages = true)
+            compose.onNodeWithTag("article_list").performScrollToIndex(if (mode == ListMode.BENTO) 20 else 50)
+            settle()
+            val before = h.sample()
+            for (added in 1..3) {
+                val arrived = (-added downTo -added).map { h.variedRow(it, pictures) }
+                h.items = arrived + h.items
+                h.newIds = h.newIds + arrived.map { it.id }
+                settle()
+            }
+            val after = h.sample()
+            val seen = before.tops.keys.filter { before.tops.getValue(it) in 0f..before.listHeight - before.heights.getValue(it) }
+            assertTrue("$mode: cards were in view", seen.size >= 3)
+            val reading = seen.minBy { before.tops.getValue(it) }
+            assertTrue("$mode: still reading $reading", (after.tops[reading] ?: -999f) in -1f..after.listHeight)
+            if (mode == ListMode.MASONRY) continue
+            for (id in seen) {
+                assertEquals("$mode: $id stays at its place", before.tops.getValue(id), after.tops[id] ?: -999f, 2f)
+                assertEquals("$mode: $id keeps its size", before.heights.getValue(id), after.heights[id] ?: -999f, 2f)
+            }
+        }
     }
 
     /** The way back to the top and the reading place across layouts, through the list's own controls. */
