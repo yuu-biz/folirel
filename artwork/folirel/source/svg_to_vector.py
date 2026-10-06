@@ -77,8 +77,11 @@ def convert(svg_path):
     return (
         '<?xml version="1.0" encoding="utf-8"?>\n'
         f"<!-- Generated from artwork/folirel/{svg_path.name} by artwork/folirel/source/svg_to_vector.py; do not edit by hand.\n"
-        "     Brand colours are fixed here on purpose: they never follow the user's colour set. -->\n"
+        "     Brand colours are fixed here on purpose: they never follow the user's colour set.\n"
+        "     VectorPath is ignored: the outlined lettering is long, and the picture is drawn once on the About page. -->\n"
         '<vector xmlns:android="http://schemas.android.com/apk/res/android"\n'
+        '    xmlns:tools="http://schemas.android.com/tools"\n'
+        '    tools:ignore="VectorPath"\n'
         f'    android:width="{fmt(width * DP_PER_UNIT)}dp"\n'
         f'    android:height="{fmt(height * DP_PER_UNIT)}dp"\n'
         f'    android:viewportWidth="{fmt(width)}"\n'

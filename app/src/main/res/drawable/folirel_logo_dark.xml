@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Generated from artwork/folirel/folirel-logo-dark.svg by artwork/folirel/source/svg_to_vector.py; do not edit by hand.
-     Brand colours are fixed here on purpose: they never follow the user's colour set. -->
+     Brand colours are fixed here on purpose: they never follow the user's colour set.
+     VectorPath is ignored: the outlined lettering is long, and the picture is drawn once on the About page. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="VectorPath"
     android:width="104.1dp"
     android:height="36.5dp"
     android:viewportWidth="1041"
