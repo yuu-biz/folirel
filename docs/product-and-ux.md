@@ -109,7 +109,7 @@ List:     articles of the current scope and filter
 Layout rules:
 
 - The header is two rows: the toolbar (56 dp, or 80 dp when the text is above 130 %) and the tab row (48 dp), about 104 dp at normal text size, not counting the system bars. There is no row of filter chips, no permanent large heading, no promo card and no bottom navigation bar. On a short screen the header never takes half the height. Nothing is shrunk to reach these numbers: touch targets stay 48 dp, and at large text or a narrow window the header grows instead.
-- The toolbar title is the name of the category on screen with a small down arrow. Pressing it opens the category picker (S10b). Under the name a small line says what the list shows (range and order, "Unread . Oldest first"), so the state is never guessed from an icon. The button to its right opens the display panel (S10a).
+- The toolbar title is the name of the category on screen with a small down arrow. Pressing it opens the category picker (S10b). Under the name a small line says what the list shows (range, period when one is set, and order: "Unread . 7 days . Oldest first"), so the state is never guessed from an icon. The button to its right opens the display panel (S10a).
 - In a window narrower than 360 dp the search icon moves into the overflow menu; the title, the display button and the menu stay on the bar.
 - Nothing about an update takes room from the list. Notices are drawn over it (outside the list's own touch area), so an article never moves when one comes or goes, and pressing one is never taken for a touch of the list:
   - *Running*: a thin progress bar at the top edge and, above the back-to-top button, what is running (`n/m`, "first fetch in progress", another update running, checking HTTPS). It stays as long as the update runs.
@@ -140,10 +140,11 @@ Unsubscribed feeds are excluded from normal lists and unread counts. Under the S
 A bottom sheet opened by one button of the toolbar. It is the one place for what the list shows:
 
 1. **Articles**: All / Unread / Saved.
-2. **Order**: Newest first / Oldest first.
-3. **Layout**: List / Compact list / Magazine. For a category the choice is that category's own, with "Use the default (…)" as the first row and a button for the arrangement and the columns (S11); for All, Uncategorized and a single feed it writes the global default, and says so.
+2. **Period**: All / 24 hours / 3 days / 7 days / 30 days (five chips in one wrapping row), then a row for the hidden keywords (S12a): "Hidden keywords: n", its switch (only when the list is not empty) and "Manage".
+3. **Order**: Newest first / Oldest first.
+4. **Layout**: List / Compact list / Magazine. For a category the choice is that category's own, with "Use the default (…)" as the first row and a button for the arrangement and the columns (S11); for All, Uncategorized and a single feed it writes the global default, and says so.
 
-A choice applies at once. Opening and closing the panel changes no setting, no position and no notice. Segmented buttons are used for the short choices when the labels fit; a narrow window, text above 115 % or long labels (the layouts) use 48 dp selectable rows. The range and the order are one shared state, not kept per category. Search is unchanged (the toolbar field, 250 ms debounce, current scope, cleared when closed); the picker has its own search text.
+A choice applies at once. Opening and closing the panel changes no setting, no position and no notice. Segmented buttons are used for the short choices when the labels fit; a narrow window, text above 115 % or long labels (the layouts) use 48 dp selectable rows. The range, the period, the hidden keywords and the order are one shared state, not kept per category (the period and the keywords are stored and survive a restart). Search is unchanged (the toolbar field, 250 ms debounce, current scope, cleared when closed); the picker has its own search text.
 
 ### S10b Category picker
 
@@ -211,20 +212,33 @@ Images come from what the feed itself provides (media extensions, enclosures, or
 |---|---|
 | Tap a row | Opens the original URL. Read and saved state are unchanged. |
 | Bookmark button | Saves or removes from saved. Does not open the article. |
-| "More" menu button or long press | Mark as read / unread, save / remove from saved, share, open in external browser. |
+| "More" menu button or long press | Mark as read / unread, save / remove from saved, share, open in external browser, then "Show articles from this source" and "Source details". |
 | Pull to refresh | Refreshes the current scope. The read filter, sort and search only narrow what is shown, never what is fetched. |
 | Toolbar title | Opens the category picker. |
-| Display button | Opens the display panel: range, order, layout. |
+| Display button | Opens the display panel: range, period, hidden keywords, order, layout. A small dot on it says that hidden keywords are hiding articles. |
 | Toolbar overflow menu | Mark all as read (current scope), refresh, organize categories and tabs, import, add feed, subscriptions, settings (and search in a narrow window). |
 | Search | Searches stored articles within the current scope and filter. |
 
 Read state is never automatic, so changing it by hand takes one menu step. Rows have no swipe gestures and there is no multi-select mode.
 
-**Mark all as read** targets the unread articles stored on the device that match the current scope, filter and search, not just the page of articles currently loaded. The set of article IDs is fixed when the confirmation opens; articles that arrive afterwards are not included. The confirmation shows the scope name, the filter, the search text (if any) and the count; with zero matches the action is disabled.
+**Mark all as read** targets the unread articles stored on the device that match the current scope, filter and search, period and hidden keywords (the set the list shows, no more and no less), not just the page of articles currently loaded. The set of article IDs is fixed when the confirmation opens; articles that arrive afterwards are not included. The confirmation shows the scope name, the filter, the period (if set), the search text (if any), a line when hidden keywords are applied, and the count; with zero matches the action is disabled.
 
 Single actions report their result in a snackbar. A change that fails to write to the database is reported and is not shown as done: the displayed state follows the database, not an optimistic guess.
 
 **Search** matches substrings of title, summary and source name. Whitespace separates terms; all terms must match (at most eight terms are used). `%`, `_` and `\` are searched as literal characters. A slow or out-of-date search response must never overwrite the result of a newer query.
+
+### S12a Source actions, period and hidden keywords (0.9.0)
+
+**From an article to its source.** The article's menu (the More button or a long press) ends, after a divider, with two items. They are the same in List, Compact list, Magazine, Masonry and Bento, and are also TalkBack custom actions. The row itself, the thumbnail and the source text stay as they were (no new tap target, no new swipe).
+
+- *Show articles from this source* selects the single-feed scope of that article's feed, in the home list that exists (no new screen). The read filter, the period, the search and the order stay as they are (scope changes keep the filter, S10), so from the Saved list the single feed shows its saved articles. It reaches an unsubscribed feed too (its articles are reached through Saved). Read and saved are not changed and the article is not opened. Back returns to the scope the source was chosen from; choosing any other scope, tab or category (picker, drawer, pane) forgets that and keeps its usual meaning, and a single feed reached from the drawer has no such Back.
+- *Source details* opens the existing feed detail screen of that feed (URL, diagnostics, pause); Back returns to the list as it was.
+
+**Period.** All, 24 hours, 3 days, 7 days or 30 days, counted back from now over `sortAt` (the time the list is ordered by): an article is inside while `sortAt` is at or after now minus the period (at the boundary it is inside). It combines (AND) with scope, read filter, search and order, and applies to the Saved list too. Nothing is deleted, marked or fetched differently. The choice is stored (default All; an install updated from 0.8.0 starts at All), is not per category and survives process recreation and restart. The cutoff is renewed when the period changes, when the app comes to the foreground, and by a one-minute tick while a period is set (seconds do not matter), so a "24 hours" list left open does not keep old articles. The period is part of the scroll-anchor key, so a position of another period is never restored.
+
+**Hidden keywords.** One global list (not per category) of up to 32 words of at most 64 characters, matched as substrings against the article title and summary (not the source name, URL or author). Text is normalized like stored articles (Unicode NFC, runs of blanks become one space); ASCII letters ignore case; Japanese is matched as a substring after normalization; `%`, `_` and `` are literal. Blank and duplicate words (ignoring ASCII case) are refused, as is a 65th character or a 33rd word, with a message. Hiding is independent of read, saved and fetch: nothing is deleted or marked, and removing a word or switching the filter off shows the articles again. The filter also applies to the Saved list and to a single feed. It is stored in the settings (the words in the order they were added, and an on/off switch); a store from 0.8.0 reads as empty and off. Adding the first word switches the filter on; with no word there is no switch. The display panel shows "Hidden keywords: n", the switch and "Manage" (a sheet to add, delete and switch); while the filter is on and has words, a dot on the display button says so.
+
+**One set of articles.** The period, the hidden keywords and the search are part of the same SQL query as the scope and the read filter (all values are bind arguments), so the list, "Mark all as read" and the new-article notice see the same articles. The notice counts only announced articles the list shows: an arrival the filter hides neither makes a banner nor is used up by answering the banner, and it counts as soon as a looser filter shows it (still unanswered). An empty list caused by a period or hidden keywords says so ("No articles match the period or the hidden keywords.").
 
 ### S20 Opening an article
 
@@ -277,7 +291,7 @@ Rules:
 
 ## 6. Position restore and new articles
 
-The scroll position of each list is kept as the identity of an anchor article plus a pixel offset, keyed by account, scope, read filter, sort order and search text. The list layout is deliberately not part of the key, so changing the layout keeps the same article in view. Positions survive returning from the browser, rotation and process recreation (through saved instance state; at most 40 lists are remembered). If the anchor article no longer exists, the nearest remaining article is used. Switching to another category and back restores each category's own place.
+The scroll position of each list is kept as the identity of an anchor article plus a pixel offset, keyed by account, scope, read filter, sort order, search text and period. The list layout is deliberately not part of the key, so changing the layout keeps the same article in view. Positions survive returning from the browser, rotation and process recreation (through saved instance state; at most 40 lists are remembered). If the anchor article no longer exists, the nearest remaining article is used. Switching to another category and back restores each category's own place.
 
 **Back to the top** (the arrow button, tapping the selected tab, the new-article banner of a newest-first list) is one movement of the list, not a series of animations: an ease-in-out of about a quarter to two thirds of a second (the time grows with the distance, at most 650 ms; none at all when the system animations are switched off). A list far from its start skips once to about two and a half screens from it and moves the rest. Every frame moves the list by the share of the distance left that the curve asks for, and the distance left is measured again every frame, so the list does not stop and start again card by card, and it lands exactly on the first article. While it moves the list keeps the articles it was moving over; articles that arrive meanwhile (a refresh delivers feed after feed) are applied when it arrives, and for four seconds afterwards articles that arrive at the head are followed instantly, so the newest one is not left above the screen. A second request while it moves joins it, also when it is a real press on the arrow or on the new-article notice (those presses are the request, not a touch of the list). Any other touch of the list (a finger put down on a card or empty space, a drag, a long press, a tap on a card or its menu) or a wheel scroll ends the movement and the following at once and nothing starts them again. Choosing another category (tab or drawer) ends them at that moment, even while the page of the category left is still shown during the slide; changing the filter or leaving the screen ends them too. The articles the movement held are released then.
 

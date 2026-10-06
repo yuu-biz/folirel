@@ -428,3 +428,29 @@ Window widths are made with `wm size` / `wm density` (density 320) from inside t
 | RSP-T38 | 200 % text: fewer columns, the pane's entries stay 48 dp tall and usable. | `ResponsiveNavTest` |
 | RSP-T39 | The pane choice and the columns survive a restart of the store and a recreate of the screen. | `ResponsiveSettingsTest`, `ResponsiveNavTest` |
 | RSP-T40 | A 0.7.2 install with data keeps its categories, order, pins, overrides, theme, read and saved states after the 0.8.0 APK is installed over it. | `tools/p2_palette_restore_check.py` (procedure in the report) |
+
+### 4.10 Phase 3A scenarios: source actions, period, hidden keywords (P3A-T01 to P3A-T35)
+
+JVM tests run the real Room query, the real settings store and the real `HomeViewModel` (Robolectric, in-memory database,
+a movable clock). `DailyReadingUiTest` drives the menu, the panel and the sheet on the real screen and needs a device.
+
+| ID | Scenario | Where |
+|---|---|---|
+| P3A-T01, T02 | Article menu: "Show articles from this source" selects the single-feed scope; "Source details" opens the feed detail of that feed. | `HomeViewModelFiltersTest` (scope, return, no state change), `DailyReadingUiTest` (menu items) |
+| P3A-T03 | Read and saved do not change by showing a source; the article is not opened. | `HomeViewModelFiltersTest`, `DailyReadingFiltersTest`, `DailyReadingUiTest` |
+| P3A-T04 | Reachable in all five layouts: one menu (`ArticleItem.moreButton`) is shared by every layout. | Code path shared; `DailyReadingUiTest` runs it in the default layout only |
+| P3A-T05 | Back from the single feed returns to the scope it was chosen from; another scope forgets it. | `HomeViewModelFiltersTest`, `DailyReadingUiTest` |
+| P3A-T06..T10 | All, 24 h, 3 d, 7 d, 30 d: the boundary is inclusive at the cutoff and excludes one minute before it. | `DailyReadingFiltersTest` |
+| P3A-T11..T14 | Period with unread, saved, search and both orders. | `DailyReadingFiltersTest` |
+| P3A-T15, T16 | The period survives process recreation (saved state) and a restart (stored setting). | `HomeViewModelFiltersTest`, `PeriodAndKeywordSettingTest` |
+| P3A-T17 | The list key (scroll anchor key) contains the period, not the cutoff. | `HomeViewModelFiltersTest` |
+| P3A-T18 | An open list renews its cutoff on foreground and on the tick. | `HomeViewModelFiltersTest` |
+| P3A-T19..T23 | Title, summary, Japanese normalization, ASCII case, `%` `_` `\` literal. | `DailyReadingFiltersTest` |
+| P3A-T24, T25 | Blank, duplicate, 32 words, 64 characters. | `HiddenKeywordsTest`, `PeriodAndKeywordSettingTest` |
+| P3A-T26, T27 | Switching off or deleting brings the articles back. | `DailyReadingFiltersTest`, `HomeViewModelFiltersTest`, `PeriodAndKeywordSettingTest` |
+| P3A-T28, T29 | Hiding changes neither read nor saved nor the stored articles. | `DailyReadingFiltersTest` |
+| P3A-T30 | Keyword with period and search. | `DailyReadingFiltersTest` |
+| P3A-T31 | The mark-all set equals the unread rows of the visible list, for every filter combination, and it leaves hidden and out-of-period articles unread. | `DailyReadingFiltersTest`, `HomeViewModelFiltersTest` |
+| P3A-T32, T33 | The banner counts announced articles the list shows (`newArticlesIn`): a hidden arrival makes no banner and stays pending; a looser filter counts it. | `DailyReadingFiltersTest` (the function; the banner composable itself is not run in JVM tests) |
+| P3A-T34 | A store written by 0.8.0 reads as All, no keywords, off, and reading writes nothing. | `PeriodAndKeywordSettingTest` |
+| P3A-T35 | Keyword, search and cutoff are bind arguments: never in the SQL text, same SQL for any text, argument count. | `DailyReadingFiltersTest` |
