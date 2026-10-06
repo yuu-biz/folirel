@@ -55,14 +55,31 @@ object CardGridLayout {
         return span * cell + GAP_DP * (span - 1)
     }
 
-    /**
-     * One image height for every tile of the page (the 16:9 height of the narrowest tile, capped), so cards of
-     * different widths in one row line up and the page keeps an even rhythm.
-     */
-    fun tileImageHeightDp(widthDp: Float, columns: Int): Float =
-        imageHeightDp(spanWidthDp(widthDp, MagazinePlan.GRID_SPANS / columns.coerceIn(1, MAX_COLUMNS)))
+    /** Width : height of the picture of a tile (a card sharing its row): flatter than 16:9, still large enough to tell articles apart. */
+    const val TILE_IMAGE_RATIO = 2.3f
 
+    /** A tile's picture is never taller than this. */
+    const val MAX_TILE_IMAGE_HEIGHT_DP = 160f
+
+    /** The picture at the left of a wide card: about this share of the card's width, within [WIDE_THUMB_MIN_DP]..[WIDE_THUMB_MAX_DP]. */
+    const val WIDE_THUMB_SHARE = 0.24f
+    const val WIDE_THUMB_MIN_DP = 88f
+    const val WIDE_THUMB_MAX_DP = 140f
+
+    /**
+     * One picture height for every tile of the page (the [TILE_IMAGE_RATIO] height of the narrowest tile, capped), so cards of
+     * different widths in one row line up and the page keeps an even rhythm. A single column keeps the 16:9 picture of a card of its own.
+     */
+    fun tileImageHeightDp(widthDp: Float, columns: Int): Float {
+        val count = columns.coerceIn(1, MAX_COLUMNS)
+        val narrowest = spanWidthDp(widthDp, MagazinePlan.GRID_SPANS / count)
+        return if (count == 1) imageHeightDp(narrowest) else min(narrowest / TILE_IMAGE_RATIO, MAX_TILE_IMAGE_HEIGHT_DP)
+    }
+
+    /** The 16:9 picture of a card of its own, capped. */
     fun imageHeightDp(cardWidthDp: Float): Float = min(cardWidthDp * 9f / 16f, MAX_IMAGE_HEIGHT_DP)
+
+    fun wideThumbnailWidthDp(cardWidthDp: Float): Float = (cardWidthDp * WIDE_THUMB_SHARE).coerceIn(WIDE_THUMB_MIN_DP, WIDE_THUMB_MAX_DP)
 
     fun isHorizontal(columns: Int, cardWidthDp: Float): Boolean = columns == 1 && cardWidthDp >= HORIZONTAL_FROM_CARD_DP
 

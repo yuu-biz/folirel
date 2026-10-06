@@ -178,8 +178,28 @@ class CardGridLayoutTest {
         assertEquals(w, 3 * CardGridLayout.spanWidthDp(w, 2) + 2 * CardGridLayout.GAP_DP + 2 * CardGridLayout.EDGE_DP, 0.01f)
         assertEquals(w, 2 * CardGridLayout.spanWidthDp(w, 3) + CardGridLayout.GAP_DP + 2 * CardGridLayout.EDGE_DP, 0.01f)
         assertEquals(w, CardGridLayout.spanWidthDp(w, 4) + CardGridLayout.spanWidthDp(w, 2) + CardGridLayout.GAP_DP + 2 * CardGridLayout.EDGE_DP, 0.01f)
-        // The image height follows the narrowest tile (a third at 733 dp is about 131 dp) and is capped.
-        assertEquals(131f, CardGridLayout.tileImageHeightDp(w, 3), 1f)
+        // The picture height follows the narrowest tile at 2.3:1 (a third at 733 dp is 233 dp wide, so about 101 dp; it was
+        // 131 dp at 16:9 before the density change) and is capped.
+        assertEquals(101f, CardGridLayout.tileImageHeightDp(w, 3), 1f)
         assertTrue(CardGridLayout.tileImageHeightDp(2000f, 1) <= CardGridLayout.MAX_IMAGE_HEIGHT_DP)
+    }
+
+    @Test
+    fun tilePicturesAreFlatterThanSixteenToNineButStillAPicture() {
+        // Two columns on a 411 dp phone: tiles of about 193 dp get about 84 dp of picture (16:9 would be about 109 dp).
+        val phone = CardGridLayout.tileImageHeightDp(411f, 2)
+        assertEquals(CardGridLayout.spanWidthDp(411f, 3) / CardGridLayout.TILE_IMAGE_RATIO, phone, 0.01f)
+        assertTrue("not a thin strip: $phone", phone >= 70f)
+        // Wide tiles are capped; a single column keeps the 16:9 picture of a card of its own.
+        assertEquals(CardGridLayout.MAX_TILE_IMAGE_HEIGHT_DP, CardGridLayout.tileImageHeightDp(3000f, 2), 0.01f)
+        assertEquals(CardGridLayout.imageHeightDp(CardGridLayout.spanWidthDp(411f, 6)), CardGridLayout.tileImageHeightDp(411f, 1), 0.01f)
+    }
+
+    @Test
+    fun theWideCardHasASmallPictureThatGrowsALittleWithTheWidth() {
+        // A full-width card on a phone (395 dp): about a quarter of it, within the size of a list thumbnail.
+        assertEquals(94.8f, CardGridLayout.wideThumbnailWidthDp(395f), 0.1f)
+        assertEquals(CardGridLayout.WIDE_THUMB_MIN_DP, CardGridLayout.wideThumbnailWidthDp(250f), 0.01f)
+        assertEquals(CardGridLayout.WIDE_THUMB_MAX_DP, CardGridLayout.wideThumbnailWidthDp(1200f), 0.01f)
     }
 }

@@ -79,7 +79,7 @@ class CardMetrics(
     val widthDp: Float,
     val wide: Boolean = false,
     val rowHasImage: Boolean = true,
-    /** The image height every tile of the page shares. */
+    /** The picture height every tile of the page shares. */
     val imageHeightDp: Float = CardGridLayout.imageHeightDp(widthDp),
 ) {
     val multiColumn: Boolean get() = span < MagazinePlan.GRID_SPANS
@@ -104,6 +104,10 @@ fun ArticleItem(
     actions: ArticleActions,
     modifier: Modifier = Modifier,
     card: CardMetrics = CardMetrics.SingleColumn,
+    /** Magazine tiles: the height of their row ([MagazineRowPlanner]); null for a card of its own (its content decides). */
+    rowHeight: Dp? = null,
+    /** Magazine: lines the summary may use (more only for a card without picture beside cards with one). */
+    summaryLines: Int = MagazineCardStyle.SUMMARY_MAX_LINES,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val saveLabel = stringResource(if (row.isSaved) R.string.action_unsave else R.string.action_save)
@@ -165,7 +169,7 @@ fun ArticleItem(
     }
 
     if (mode == ListMode.MAGAZINE) {
-        ArticleCard(row, showImages, imageLoader, nowMillis, card, bookmarkButton, moreButton, modifier, rowModifier)
+        ArticleCard(row, showImages, imageLoader, nowMillis, card, rowHeight, summaryLines, bookmarkButton, moreButton, modifier, rowModifier)
         return
     }
     Column(modifier) {
@@ -215,11 +219,12 @@ fun ArticleItem(
 }
 
 /**
- * Card (UX-GRID). Single column: image on top, headline (3 lines), summary (2 lines), source/time and actions; a
- * single very wide column puts the image on the left instead. Several columns: every card has the same height
- * (image area + a fixed text area), so rows stay even whatever the headline lengths; an article without an image
- * uses that image area for more summary text, and the thumbnail area is fixed while loading or after a failure, so
- * the list never jumps. The image height is capped ([CardGridLayout.MAX_IMAGE_HEIGHT_DP]). Images off: no image
+ * Card (UX-GRID). Picture on top (a fixed area, known before the picture arrives, so loading, failure and the cache never change
+ * the card's height), headline (up to 3 lines), the summary if it says something (up to 2 lines; [CardSummary] drops a summary
+ * that is only a "read more" label), then the source row. Nothing is reserved for text an article does not have.
+ *
+ * Tiles (several cards in a row) get [rowHeight]: the height of the tallest card of their own row ([MagazineRowPlanner]), so the
+ * cards of a row end together while a short row stays short. A wide card puts a small picture at the left. Images off: no picture
  * area and no request.
  */
 @Composable
@@ -229,77 +234,22 @@ private fun ArticleCard(
     imageLoader: ImageLoader,
     nowMillis: Long,
     metrics: CardMetrics,
+    rowHeight: Dp?,
+    summaryLines: Int,
     bookmarkButton: @Composable () -> Unit,
     moreButton: @Composable () -> Unit,
     modifier: Modifier,
     clickModifier: Modifier,
 ) {
+    val style = MagazineCardStyle
     val multi = metrics.multiColumn
     val hasImage = showImages && row.imageUrl != null
-    // One type size for all tiles (like the reference magazine page); larger only for a card of its own.
-    val titleSize = if (!multi) 18 else 16
-    val titleLine = if (!multi) 24 else 21
-    val summarySize = if (!multi) 14 else 13
-    val summaryLine = if (!multi) 20 else 18
-    // Enough of the article to tell what it is about: four lines on every card, five beside a wide card's image.
-    val baseSummaryLines = 4
-    val density = LocalDensity.current
-    val textPadding = if (multi) 10.dp else 14.dp
-    // Several columns: the text area has a fixed height of 3 title lines + 2 summary lines, plus the image height
-    // for an article that has no image (so all cards of a row are equally tall).
-    val fixedTextHeight: Dp? = if (multi) {
-        val base = with(density) { (titleLine * 3 + 4 + summaryLine * baseSummaryLines).sp.toDp() }
-        when {
-            // An article without an image in a row where its neighbours have one uses that area for more text.
-            showImages && !hasImage && metrics.rowHasImage -> base + metrics.imageHeight
-            // A row with no image at all stays compact instead of leaving a blank picture area.
-            !metrics.rowHasImage -> base + with(density) { (summaryLine * 2).sp.toDp() }
-            else -> base
-        }
-    } else null
-    val summaryLines = if (multi) {
-        val area = fixedTextHeight ?: 0.dp
-        val titleHeight = with(density) { (titleLine * 3 + 4).sp.toDp() }
-        val lineDp = with(density) { summaryLine.sp.toDp() }
-        ((area - titleHeight) / lineDp).toInt().coerceAtLeast(baseSummaryLines)
-    } else if (metrics.horizontal) 5 else baseSummaryLines
+    val styles = cardTextStyles(multi)
+    val summary = CardSummary.displayed(row.summaryText)
+    val textPadding = if (multi) style.TILE_TEXT_PADDING else style.SINGLE_TEXT_PADDING
 
-    ElevatedCard(modifier.fillMaxWidth()) {
-        val textBlock: @Composable (Modifier) -> Unit = { m ->
-            Column(m) {
-                ArticleTitle(row, fontSize = titleSize, lineHeight = titleLine, maxLines = 3)
-                if (row.summaryText.isNotBlank()) {
-                    Spacer(Modifier.padding(top = 4.dp))
-                    Text(
-                        text = row.summaryText,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = summarySize.sp, lineHeight = summaryLine.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = summaryLines,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-        if (metrics.horizontal) {
-            // Wide card: image on the left (about 40 % of the width, at most 280 dp), headline and summary on the right.
-            val imageWidth = minOf(metrics.widthDp * 0.4f, 280f).dp
-            Row(clickModifier.height(IntrinsicSize.Min)) {
-                if (hasImage) {
-                    CardImage(row.imageUrl, imageLoader, Modifier.width(imageWidth).heightIn(min = imageWidth * 9 / 16).fillMaxHeight())
-                }
-                textBlock(Modifier.weight(1f).padding(start = 14.dp, end = 14.dp, top = 12.dp))
-            }
-        } else {
-            Column(clickModifier) {
-                if (hasImage) CardImage(row.imageUrl, imageLoader, Modifier.fillMaxWidth().height(metrics.imageHeight))
-                textBlock(
-                    Modifier
-                        .padding(start = textPadding, end = textPadding, top = if (multi) 8.dp else 12.dp)
-                        .then(if (fixedTextHeight != null) Modifier.height(fixedTextHeight) else Modifier),
-                )
-            }
-        }
-        Row(Modifier.fillMaxWidth().padding(start = textPadding), verticalAlignment = Alignment.CenterVertically) {
+    val metaRow: @Composable () -> Unit = {
+        Row(Modifier.fillMaxWidth().heightIn(min = style.META_HEIGHT).padding(start = textPadding), verticalAlignment = Alignment.CenterVertically) {
             SourceMeta(row, nowMillis, Modifier.weight(1f), stacked = multi)
             if (metrics.compact) {
                 if (row.isSaved) {
@@ -315,6 +265,65 @@ private fun ArticleCard(
                 bookmarkButton()
                 moreButton()
             }
+        }
+    }
+
+    ElevatedCard(modifier.fillMaxWidth().then(if (rowHeight != null) Modifier.height(rowHeight) else Modifier)) {
+        val textBlock: @Composable (Modifier) -> Unit = { m ->
+            Column(m) {
+                Text(
+                    text = row.title.ifBlank { stringResource(R.string.untitled) },
+                    style = styles.title,
+                    fontWeight = titleWeight(row),
+                    color = if (row.isRead) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                    maxLines = style.TITLE_MAX_LINES,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (summary.isNotEmpty()) {
+                    Spacer(Modifier.height(style.SUMMARY_GAP))
+                    Text(
+                        text = summary,
+                        style = styles.summary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = summaryLines,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("card_summary"),
+                    )
+                }
+            }
+        }
+        if (metrics.horizontal) {
+            // Wide card: a small picture at the left (about a quarter of the width, within the size of a list thumbnail and a
+            // little more on a wide screen), headline and summary beside it. The picture never makes the card taller than its text needs.
+            val thumb = CardGridLayout.wideThumbnailWidthDp(metrics.widthDp).dp
+            // The source row sits beside the picture too, so the picture spans the whole card and adds no height of its own.
+            Row(clickModifier.height(IntrinsicSize.Min)) {
+                if (hasImage) {
+                    CardImage(row.imageUrl, imageLoader, Modifier.width(thumb).heightIn(min = thumb * 3 / 4).fillMaxHeight())
+                }
+                Column(Modifier.weight(1f)) {
+                    textBlock(Modifier.padding(start = textPadding, end = textPadding, top = style.SINGLE_TEXT_TOP, bottom = style.TEXT_BOTTOM))
+                    Spacer(Modifier.weight(1f))
+                    metaRow()
+                }
+            }
+        } else {
+            Column(clickModifier) {
+                if (hasImage) CardImage(row.imageUrl, imageLoader, Modifier.fillMaxWidth().height(metrics.imageHeight))
+                textBlock(
+                    Modifier.padding(
+                        start = textPadding,
+                        end = textPadding,
+                        top = if (multi) style.TILE_TEXT_TOP else style.SINGLE_TEXT_TOP,
+                        bottom = style.TEXT_BOTTOM,
+                    ),
+                )
+            }
+        }
+        if (!metrics.horizontal) {
+            // A tile shorter than its row: the free space sits above the source row, so the source rows of a row line up.
+            if (rowHeight != null) Spacer(Modifier.weight(1f))
+            metaRow()
         }
     }
 }

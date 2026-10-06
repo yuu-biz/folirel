@@ -101,8 +101,9 @@ Rules that apply to every layer:
 | `P1OrgTest` | The real app: the picker (local search by name and parent path, same category = close only), pin and unpin, drag with the handle and a cancelled drag, up/down and standard order, a pin that changes the index of the category on screen (it keeps its identity and its place), an emptied or deleted category (`P1-T14` to `P1-T21`) |
 | `P1LayoutTest` | Per-category layout: three pages with three layouts while dragged, one feed in two categories, a global change reaching only what inherits, the same article kept in view across layout changes and a recreate, the details sheet and reset, a stored column choice that does not fit (`P1-T24` to `P1-T28`) |
 | `P1OrgRaceTest` | The organizer when a write fails (a trigger in the app's own database aborts every write to `category_preferences`, so the failure comes out of SQLite through the repository and view model: the error is shown, the stored order is unchanged and the screen goes back to it; with writes working again the same drag is stored) and when the reader presses faster than the screen updates (several presses issued on the UI thread with no frame between: three "Move up", two rows moved, pins with a move, a drag right after a move; all must be applied, none undone) (`P1-T16`) |
+| `MdLayoutTest` | Magazine density (`MD-T01` to `MD-T08`) on the real article list: low cards for short headlines without summary, a "read more" summary not shown while real text is, a row as tall as its tallest card and no taller, no blank areas without pictures, card heights and the reading place unchanged while pictures load or fail, 2.3:1 tile pictures and the small wide-card picture, no overlap and 48 dp buttons at 130 % and 200 % text |
 | `P1ScaleTest` | Empty install, one category, 30 categories with 300 feeds and 5,000 articles (only the pages on screen are composed), the organizer at 200 % text (`P1-T32`, `P1-T33`) |
-| `P1ShotTest`, `P1SeedTest`, `P1RestoreSetup` | Evidence helpers that assert nothing and are skipped in an ordinary run (`-e p1evidence true` runs them). `P1ShotTest` writes screenshots of the home screen for a before/after comparison (`-e shotLabel before|after`, pictures in `/sdcard/Android/media/<package>/p1shots/`). `P1RestoreSetup` stores the order, pins and overrides that `tools/p1_restore_check.py` restarts and restores (`P1-T29`). `P1SeedTest` puts data into an installed previous release for the overwrite-install check and, in one method, fetches five public feeds (the only test code that uses the internet); run its methods one at a time with `-e class ...P1SeedTest#method` through `am instrument` so that Gradle does not uninstall the app afterwards |
+| `P1ShotTest`, `P1SeedTest`, `P1RestoreSetup`, `MdDensityShotTest` | Evidence helpers that assert nothing and are skipped in an ordinary run (`-e p1evidence true` runs them). `P1ShotTest` writes screenshots of the home screen for a before/after comparison (`-e shotLabel before|after`, pictures in `/sdcard/Android/media/<package>/p1shots/`). `MdDensityShotTest` shows the same Magazine articles, pictures, width and text size and logs the measured row heights and how many cards and headlines are on screen (`MDDENSITY`), with a screenshot per case, so it can be run before and after a change of the card geometry (`-e mdLabel before|after`). `P1RestoreSetup` stores the order, pins and overrides that `tools/p1_restore_check.py` restarts and restores (`P1-T29`). `P1SeedTest` puts data into an installed previous release for the overwrite-install check and, in one method, fetches five public feeds (the only test code that uses the internet); run its methods one at a time with `-e class ...P1SeedTest#method` through `am instrument` so that Gradle does not uninstall the app afterwards |
 | `IconDecoderTest` | Source-icon decoding on a real Android runtime: PNG, ICO with PNG entry, ICO with BMP entry, wide logo, 512 px image, non-images (`U08`) |
 | `PerformanceTest` | Synthetic 300 feeds / 5,000 articles: warm start to a visible list and local search timings (`T47`) |
 
@@ -351,7 +352,24 @@ These `S` IDs are refresh scenarios. They are not the screen IDs `S00`-`S40` of 
 | P1-T33 | At 200 % text the new controls (pin, menu, up/down) are operable and 48 dp. | `P1ScaleTest`, `P1DenseTest` |
 | P1-T34 | The 0.4.2 scenarios (back to top, one answer to the notice, the cross does not move, an old page stops, the arrow pressed repeatedly joins one movement) still hold. | `BackToTopTest`, `BackToTopInterruptTest`, `HomePagerMoveTest`, `NewArticleBannerTest`, `HomeBannerFlowTest`, `HomeNoticeFlowTest` |
 
-### 4.7 Design topics cited in source comments
+### 4.7 Magazine density (MD-T01 to MD-T12)
+
+| ID | Rule | Test |
+|---|---|---|
+| MD-T01 | Two columns with pictures, short headlines and empty summaries: no reserved text area. | `MdLayoutTest` |
+| MD-T02 | A summary that is only a "read more" label is not shown; ordinary text and text containing the words are; the data is unchanged. | `CardSummaryTest`, `MdLayoutTest` |
+| MD-T03 | A row is as tall as its tallest card; the next row is not stretched. | `MdLayoutTest` |
+| MD-T04 | Long headlines and two-line summaries keep the standard text size and end with an ellipsis. | `MdLayoutTest` (200 %), `MdDensityShotTest` (long data) |
+| MD-T05 | No pictures, pictures off, a picture on one side: no empty text area; pictures off make no picture request. | `MdLayoutTest`, `HomeFlowTest` (`T37`) |
+| MD-T06 | Pictures loading, failing or cached do not change card heights or the reading place. | `MdLayoutTest` |
+| MD-T07 | Mixed and even, 1/2/3 columns, narrow and wide: stored settings and order unchanged, tile pictures 2.3:1, a small wide-card picture. | `MdLayoutTest`, `CardGridLayoutTest`, `P1LayoutTest` |
+| MD-T08 | 200 % text and long Japanese text: the column correction applies, no overlap, 48 dp buttons. | `MdLayoutTest`, `CardGridLayoutTest` |
+| MD-T09 | Category round trips, layout changes and coming back keep the article in view. | `P1LayoutTest`, `UxNextTest`, `PagerAndMagazineTest` |
+| MD-T10 | Arrivals, back to top, repeated presses, another tab, closing the notice: the 0.4.x/0.5.x behaviour is unchanged. | `NewArticleBannerTest`, `BackToTopTest`, `BackToTopInterruptTest`, `BackToTopListTest`, `UxrScrollTraceTest`, `HomePagerMoveTest`, `P1MoveTest` |
+| MD-T11 | Installing over the previous release keeps order, pins, overrides, read/saved state and settings. | `tools/p1_restore_check.py` (manual device procedure) |
+| MD-T12 | Same articles, pictures, width, text size and position before and after: measured row heights and cards on screen. | `MdDensityShotTest` (evidence helper) |
+
+### 4.8 Design topics cited in source comments
 
 Source comments name the design topic a piece of code belongs to. They are not test IDs.
 

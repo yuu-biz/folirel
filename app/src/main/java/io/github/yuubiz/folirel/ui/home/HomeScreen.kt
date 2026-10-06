@@ -107,6 +107,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.mutableStateMapOf
@@ -847,11 +848,37 @@ internal fun ArticleList(
                     metricsBySpan.mapValues { (_, m) -> CardMetrics(m.span, m.widthDp, m.wide, rowHasImage = false, imageHeightDp = m.imageHeightDp) }
                 }
                 // Per article: does any card of its row have an image? (Rows without one do not reserve a picture area.)
-                val rowHasImage = remember(items, spans, showImages) {
-                    val starts = MagazinePlan.rowStarts(spans)
+                val starts = remember(spans) { MagazinePlan.rowStarts(spans) }
+                val rowHasImage = remember(items, starts, showImages) {
                     val rowFlags = HashMap<Int, Boolean>()
                     if (showImages) items.forEachIndexed { i, row -> if (row.imageUrl != null) rowFlags[starts[i]] = true }
                     BooleanArray(items.size) { i -> rowFlags[starts[i]] == true }
+                }
+                // The height of each row of tiles from the real text of its own cards, measured the first time the row is shown
+                // and kept while the articles, widths and text size stay the same (no full-list measuring, nothing per frame).
+                val density = LocalDensity.current
+                val measurer = rememberTextMeasurer(cacheSize = 96)
+                val tileStyles = cardTextStyles(multi = true)
+                val untitled = stringResource(R.string.untitled)
+                val rowPlans = remember(items, spans, widthDp, columns.count, showImages, density, tileStyles, tileImageHeight) { HashMap<Int, RowPlan?>() }
+                fun planOf(index: Int): RowPlan? = rowPlans.getOrPut(starts[index]) {
+                    val first = starts[index]
+                    var last = first
+                    while (last + 1 < items.size && starts[last + 1] == first) last++
+                    if ((first..last).any { spans[it] >= MagazinePlan.GRID_SPANS }) {
+                        null
+                    } else {
+                        MagazineRowPlanner.plan(
+                            cards = (first..last).map { i ->
+                                MagazineRowPlanner.Card(items[i], CardGridLayout.spanWidthDp(widthDp, spans[i]), showImages && items[i].imageUrl != null)
+                            },
+                            imageHeightDp = tileImageHeight,
+                            styles = tileStyles,
+                            untitled = untitled,
+                            measurer = measurer,
+                            density = density,
+                        )
+                    }
                 }
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(MagazinePlan.GRID_SPANS),
@@ -867,9 +894,12 @@ internal fun ArticleList(
                         span = { index, _ -> GridItemSpan(spans.getOrElse(index) { MagazinePlan.GRID_SPANS }) },
                         contentType = { index, _ -> spans.getOrElse(index) { MagazinePlan.GRID_SPANS } },
                     ) { index, row ->
+                        val plan = planOf(index)
                         ArticleItem(
                             row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"),
                             (if (rowHasImage.getOrElse(index) { true }) metricsBySpan else metricsNoImage).getValue(spans.getOrElse(index) { MagazinePlan.GRID_SPANS }),
+                            rowHeight = plan?.let { with(density) { it.heightPx.toDp() } },
+                            summaryLines = plan?.summaryLines?.getOrNull(index - starts[index]) ?: MagazineCardStyle.SUMMARY_MAX_LINES,
                         )
                     }
                 }

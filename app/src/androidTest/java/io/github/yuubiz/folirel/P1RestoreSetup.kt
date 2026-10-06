@@ -52,6 +52,10 @@ class P1RestoreSetup {
         repo.setCategoryCardStyle(account, id("Beta"), CardLayoutStyle.EVEN)
         repo.setCategoryCardColumns(account, id("Beta"), 2)
         repo.setCategoryCardColumns(account, id("Eta"), 2)
+        // Some reading state, so that an install over this release can be checked for it too.
+        val articles = byPath.values.flatMap { cat -> c.database.subscriptionDao().memberships(account).filter { it.categoryId == cat }.flatMap { m -> c.database.articleDao().articlesOfFeed(m.feedId).map { it.id } } }
+        articles.filterIndexed { i, _ -> i % 7 == 0 }.forEach { c.articles.setRead(it, true) }
+        articles.filterIndexed { i, _ -> i % 11 == 0 }.forEach { c.articles.setSaved(it, true) }
         c.settings.setLastScope(ArticleScope.Category(id("Delta")))
         val order = repo.observeStructure(account).first().tabCategories.map { it.display }
         android.util.Log.i("P1RESTORE", "order=$order")

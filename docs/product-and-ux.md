@@ -1,6 +1,6 @@
 # Product and UX
 
-This document describes what Folirel is and is not, what it is required to do (requirement IDs `R01`-`R20`), and how its screens behave (screen IDs `S00`-`S40`). It describes the app as it is at version 0.5.1. Test scenarios that exercise these requirements are catalogued in [testing.md](testing.md). Internals are described in [architecture.md](architecture.md), [data-and-import.md](data-and-import.md) and [fetch-and-security.md](fetch-and-security.md); end-user instructions are in [user-guide.md](user-guide.md).
+This document describes what Folirel is and is not, what it is required to do (requirement IDs `R01`-`R20`), and how its screens behave (screen IDs `S00`-`S40`). It describes the app as it is at version 0.5.2. Test scenarios that exercise these requirements are catalogued in [testing.md](testing.md). Internals are described in [architecture.md](architecture.md), [data-and-import.md](data-and-import.md) and [fetch-and-security.md](fetch-and-security.md); end-user instructions are in [user-guide.md](user-guide.md).
 
 ## 1. Purpose
 
@@ -165,12 +165,12 @@ There are three layouts. The names are the user-facing names and the stored valu
 | Aspect | List (default) | Compact list | Magazine |
 |---|---|---|---|
 | Shape | One column; headline and summary at the left, thumbnail at the right, meta and buttons on a row below | One row per article; thumbnail and buttons on the same row | A grid of cards of different sizes |
-| Thumbnail | 96 dp square, fixed area; omitted when images are off | 56 dp square; omitted when images are off | Top of the card, 16:9 (capped at 200 dp); beside the text on a wide card |
+| Thumbnail | 96 dp square, fixed area; omitted when images are off | 56 dp square; omitted when images are off | Top of a tile, 2.3:1 (capped at 160 dp); top of a card of its own, 16:9 (capped at 200 dp); a small picture at the left of a wide card |
 | Headline | 16 sp, up to 3 lines | 15 sp, up to 2 lines | Up to 3 lines: 16 sp on a tile, 18 sp on a single-column or full-width card |
-| Summary | 14 sp, up to 2 lines; omitted if empty | not shown | Tile: 13 sp, at least 4 lines (more when the article has no image); single-column or full-width card: 14 sp, 4 lines (5 beside the image of a horizontal card) |
+| Summary | 14 sp, up to 2 lines; omitted if empty | not shown | Tile: 13 sp, up to 2 lines; card of its own: 14 sp, up to 2 lines. A limit, not a reservation; omitted when empty or only a "read more" label |
 | Source and time | 12 sp, one line, ellipsized | 12 sp, one line, ellipsized | 12 sp, ellipsized |
 | Spacing | 12 dp outer, about 8 dp vertical; rules between rows | 12 dp outer, 6 dp vertical; rules between rows | 8 dp at the edges and between cards |
-| Minimum row height | 72 dp for the top block | 56 dp | fixed text area per card |
+| Minimum row height | 72 dp for the top block | 56 dp | none reserved: a card is as tall as its content, a row of tiles as tall as its tallest card |
 
 The same buttons exist on every row: a save/unsave bookmark and a "more" menu, each with a 48 dp touch area that does not overlap the thumbnail. A card narrower than 230 dp shows only the "more" menu (save is inside it) and a small bookmark mark when the article is saved.
 
@@ -178,8 +178,10 @@ The same buttons exist on every row: a save/unsave bookmark and a "more" menu, e
 
 - Each article asks for a size derived from a stable hash of its article ID, so the same article asks for the same size whatever the position, sort order or redraw. With three columns available the shares are small (one third) 40%, medium (one half) 25%, large (two thirds) 25% and full width 10%. With only two columns, halves (85%) and full-width cards; with one column, full width.
 - Rows are filled with no gaps: a card that does not fit the rest of a row takes exactly the rest, and the last row is stretched. The result is an irregular, magazine-page rhythm such as 1/3+1/3+1/3, 1/2+1/2, 2/3+1/3, 1/3+2/3 or a full-width card. Row breaks can move when the sort order or the number of fetched articles changes; an individual article's preferred size does not.
-- A full-width card puts the image at the left and the text at the right. A single column at 560 dp or wider does the same.
-- All tiles of a page share one image height (the 16:9 height of the narrowest tile, at most 200 dp) and one text size, with a fixed text area (3 headline lines, 4 summary lines), so cards in one row line up. An article without an image uses that area for more summary; a row where no article has an image reserves no picture area.
+- A full-width card of a mixed page puts a small picture at the left (about a quarter of the card's width, 88 to 140 dp) with the headline, the summary and the source row beside it; the picture never makes the card taller than its text. A single column at 560 dp or wider does the same.
+- All tiles of a page share one picture height (the 2.3:1 height of the narrowest tile, at most 160 dp) and one text size. Nothing is reserved for text an article does not have: a card is its picture, its headline (up to 3 lines), its summary only if there is one (up to 2 lines), and the source row. The cards of one row end together at the height of the tallest card of that row (measured from their real text with the same styles, widths and text size they are drawn with), so a long article does not stretch another row and a row of short articles is low; free space in a shorter card sits above its source row. A card without a picture beside cards with one uses the free height for more summary lines instead of a blank area; a row where no article has a picture reserves no picture area.
+- A summary that is only a link label ("続きを読む", "Read more", with the brackets, arrows or ellipses feeds add) or only decoration is not shown and takes no room; a sentence that merely contains such words is shown. This is display only: the stored summary and search are unchanged.
+- The picture area is fixed from the start (whether the picture is still loading, failed or comes from the cache); only an article without a picture address has no picture area. The source row keeps 48 dp touch targets.
 - An alternative setting draws every card at the same size ("Same size for every card").
 - Number of columns: automatic keeps each card at least 220 dp wide (maximum 3 columns); the user can choose up to 1, 2 or 3 columns, which may go down to 150 dp per card. Both minimums scale with the text size (the factor applies when the font scale is above 1), and columns are dropped if they would not fit. Text is never shrunk to fit. Settings shows the current number of columns and whether the choice was reduced.
 
