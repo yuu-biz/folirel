@@ -63,7 +63,7 @@ In a browser or any app, share a page or a link to **Folirel** (the share sheet 
 - Nothing is added when you share. A dialog shows what was found (title, address, number of entries, latest date); tap **Subscribe** to add it, or **Cancel** / Back to leave everything as it was. When a page offers several feeds you pick one.
 - If you already subscribe to the feed, the dialog says so and offers **Feed details**. If you unsubscribed from it earlier, it offers **Subscribe again**, and its articles, read and saved state and categories come back as they were.
 - The feed is added without a category; change that in the feed details. `http://` addresses follow the HTTP setting like everything else: while HTTP is off, Folirel says so and sends nothing.
-- If no feed is found (a plain page that declares none), Folirel says so; it does not search the web for you. Find the feed address yourself and use **Add feed URL**.
+- If the shared page (an article, say) declares no feed, Folirel looks once at the top page of the same site for the feeds it declares and says "Found on the top page of the site" for what it finds there; it never looks deeper, guesses addresses or searches the web. If there is still none, it says so; find the feed address yourself and use **Add feed URL**.
 - If you share before finishing the first-run explanation, the share waits and is handled once it is done.
 
 ## Daily use
@@ -147,7 +147,7 @@ Settings opens on a short list of six pages; each row shows the values it holds 
 | Page | Option | Choices / notes |
 |---|---|---|
 | Appearance | Light or dark | System, Light, Dark |
-| Appearance | Color | Classic (the blue used so far, default), Leaf, Sand, Violet, Dynamic (takes colors from your wallpaper; Android 12 and later, shown as unavailable on older versions). Light/dark and color are separate. Every color except Classic also colors the top bars and the tab strip, and Leaf, Sand and Violet tint the background and cards more strongly; Classic is unchanged. Photos and icons are never tinted |
+| Appearance | Color | Classic (the blue used so far, default), Leaf, Sand, Violet, Dynamic (takes colors from your wallpaper; Android 12 and later, shown as unavailable on older versions). Light/dark and color are separate. **Custom** makes a light and a dark set from one base color you choose (**Choose color**: a square and a hue slider, or a `#RRGGBB` code; **Apply** saves it, Cancel does not; **Reset to default** returns to the default teal); text and icon colors are chosen by the app so they stay readable for any base color. Every color except Classic also colors the top bars and the tab strip, and Leaf, Sand and Violet tint the background and cards more strongly; Classic is unchanged. Photos and icons are never tinted |
 | Appearance | Text size | A slider from 90% to 130% in steps of 5%, with **Reset to 100%**. The preview above it follows the slider; the size is saved when you let go. It multiplies the system font size |
 | Layout and navigation | Category navigation | Auto, Pane when possible, Drawer only. On a wide window (Auto: 840 dp or more; Pane when possible: 600 dp or more) the categories stay open in a pane at the left, and the tabs and swiping stay too; Drawer only keeps the menu button and the drawer. A narrow window always uses the drawer |
 | Layout and navigation | Layout | List, Compact list, Magazine, Masonry, Bento, shown as small pictures. This is the default for every category; a category can use its own |

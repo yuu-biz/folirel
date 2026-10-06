@@ -10,6 +10,7 @@ import io.github.yuubiz.folirel.data.repository.AddFeedResult
 import io.github.yuubiz.folirel.model.CandidateVia
 import io.github.yuubiz.folirel.model.ShareDiscovery
 import io.github.yuubiz.folirel.model.ShareProblem
+import io.github.yuubiz.folirel.model.ShareProvenance
 import io.github.yuubiz.folirel.network.AddressPolicy
 import io.github.yuubiz.folirel.testutil.TestEnv
 import io.github.yuubiz.folirel.testutil.literalUrl
@@ -21,12 +22,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -181,8 +184,10 @@ class ShareToSubscribeTest {
         routes["/"] = page(feedLink("/fake.xml"))
         routes["/fake.xml"] = html("<html><head><title>login</title></head><body>please sign in</body></html>")
         assertEquals(ShareProblem.FEEDS_UNREADABLE, problem(service.discover(url("/"))))
-        // The same when the shared address itself is an HTML page that merely looks like a feed address.
+        // An HTML page that merely looks like a feed address is a page; it has no feed, and the root fallback finds only the unreadable link.
         routes["/page.xml"] = html("<html><body>just a page</body></html>")
+        assertEquals(ShareProblem.FEEDS_UNREADABLE, problem(service.discover(url("/page.xml"))))
+        routes["/"] = html("<html><body>no links</body></html>")
         assertEquals(ShareProblem.NO_FEED, problem(service.discover(url("/page.xml"))))
     }
 
@@ -285,6 +290,188 @@ class ShareToSubscribeTest {
         assertEquals(CandidateVia.SITE_PAGE, result.candidates.single().via)
     }
 
+    // --- Same-origin root fallback (0.9.3 P1) and one fetch per address (P2) ---
+
+    private fun otherServer(vararg r: Pair<String, () -> MockResponse>): MockWebServer {
+        val map = r.toMap()
+        val s = MockWebServer()
+        s.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                calls.computeIfAbsent("other:" + request.url.encodedPath) { AtomicInteger() }.incrementAndGet()
+                return map[request.url.encodedPath]?.invoke() ?: MockResponse.Builder().code(404).build()
+            }
+        }
+        s.start(InetAddress.getByName("127.0.0.1"), 0)
+        extraServers += s
+        return s
+    }
+
+    private fun article(vararg links: String) = page(*links)
+
+    @Test
+    fun anArticleWithoutAFeedFindsTheFeedOfTheSiteRootExactlyOnce() = runBlocking<Unit> {
+        routes["/docs/a/1.html"] = html("<html><head><title>article</title></head><body>no feed link here</body></html>")
+        routes["/"] = page(feedLink("/data/rss/1.0/wf/feed.rdf", title = "Site feed"))
+        routes["/data/rss/1.0/wf/feed.rdf"] = rss("Site feed", "r1", "r2")
+        val c = found(service.discover(url("/docs/a/1.html"))).candidates.single()
+        assertEquals(url("/data/rss/1.0/wf/feed.rdf"), c.url)
+        assertEquals(ShareProvenance.SITE_ROOT, c.provenance)
+        // shared HTML 1 + root HTML 1 + the candidate 1; nothing else.
+        assertEquals(1, count("/docs/a/1.html"))
+        assertEquals(1, count("/"))
+        assertEquals(1, count("/data/rss/1.0/wf/feed.rdf"))
+        assertEquals(3, calls.values.sumOf { it.get() })
+        assertEquals(0, feedRows().size)
+    }
+
+    @Test
+    fun aValidFeedOfTheSharedPageMeansTheRootIsNotRead() = runBlocking<Unit> {
+        routes["/docs/a/1.html"] = article(feedLink("/own.xml"))
+        routes["/own.xml"] = rss("Own", "o")
+        routes["/"] = page(feedLink("/site.xml"))
+        routes["/site.xml"] = rss("Site", "s")
+        val c = found(service.discover(url("/docs/a/1.html"))).candidates.single()
+        assertEquals(ShareProvenance.SHARED_PAGE, c.provenance)
+        assertEquals(0, count("/"))
+        assertEquals(0, count("/site.xml"))
+    }
+
+    @Test
+    fun aDirectFeedNeverReadsTheRoot() = runBlocking<Unit> {
+        routes["/data/feed.rdf"] = rss("Direct", "d")
+        routes["/"] = page(feedLink("/site.xml"))
+        val c = found(service.discover(url("/data/feed.rdf"))).candidates.single()
+        assertEquals(ShareProvenance.DIRECT_FEED, c.provenance)
+        assertEquals(0, count("/"))
+    }
+
+    @Test
+    fun feedLinksOfTheSharedPageThatAreAllBrokenStillAllowTheRootFallback() = runBlocking<Unit> {
+        routes["/docs/a/1.html"] = article(feedLink("/gone.xml"), feedLink("/login.xml"))
+        routes["/login.xml"] = html("<html><body>sign in</body></html>")
+        routes["/"] = page(feedLink("/site.xml"))
+        routes["/site.xml"] = rss("Site", "s")
+        val c = found(service.discover(url("/docs/a/1.html"))).candidates.single()
+        assertEquals(url("/site.xml"), c.url)
+        assertEquals(ShareProvenance.SITE_ROOT, c.provenance)
+        assertEquals(1, count("/gone.xml"))
+        assertEquals(1, count("/login.xml"))
+    }
+
+    @Test
+    fun aSharedRootThatHasNoFeedIsReadOnceNotTwice() = runBlocking<Unit> {
+        routes["/"] = html("<html><head><title>top</title></head><body>no feed</body></html>")
+        assertEquals(ShareProblem.NO_FEED, problem(service.discover(url("/"))))
+        assertEquals(1, count("/"))
+        // The root with a query is not "the root page itself": the plain root is read once as the fallback.
+        assertEquals(ShareProblem.NO_FEED, problem(service.discover(url("/?page=2"))))
+        assertEquals(1 + 2, count("/"))
+    }
+
+    @Test
+    fun aRootThatHasNoFeedEndsTheSearchAndNothingDeeperIsTried() = runBlocking<Unit> {
+        routes["/docs/a/1.html"] = article()
+        routes["/"] = html("<html><head><title>top</title></head><body><a href=\"/feed\">feed</a><a href=\"/rss\">rss</a></body></html>")
+        assertEquals(ShareProblem.NO_FEED, problem(service.discover(url("/docs/a/1.html"))))
+        // Only the two pages; no guessed addresses (/feed, /rss, /atom.xml ...), no sitemap, no other page of the site.
+        assertEquals(setOf("/docs/a/1.html", "/"), calls.keys.toSet())
+        assertEquals(2, calls.values.sumOf { it.get() })
+    }
+
+    @Test
+    fun theRootOfAFinalPageAfterARedirectIsTheRootOfTheFinalOrigin() = runBlocking<Unit> {
+        val final = otherServer(
+            "/article" to html("<html><head><title>a</title></head><body>no feed</body></html>"),
+            "/" to page(feedLink("/f.xml")),
+            "/f.xml" to rss("Final site", "f"),
+        )
+        routes["/short"] = redirect(302, final.literalUrl("/article").toString())
+        routes["/"] = page(feedLink("/wrong.xml"))
+        val c = found(service.discover(url("/short"))).candidates.single()
+        assertEquals(final.literalUrl("/f.xml").toString(), c.url)
+        assertEquals(ShareProvenance.SITE_ROOT, c.provenance)
+        assertEquals("the root of the first origin was not read", 0, count("/"))
+        assertEquals(1, count("other:/"))
+    }
+
+    @Test
+    fun aRootThatLeadsToAnotherOriginGivesNothing() = runBlocking<Unit> {
+        val elsewhere = otherServer("/" to page(feedLink("/f.xml")), "/f.xml" to rss("Elsewhere", "e"))
+        routes["/docs/a/1.html"] = article()
+        routes["/"] = redirect(302, elsewhere.literalUrl("/").toString())
+        assertEquals(ShareProblem.NO_FEED, problem(service.discover(url("/docs/a/1.html"))))
+        assertEquals("the feed of the other origin is not looked at", 0, count("other:/f.xml"))
+    }
+
+    @Test
+    fun theRootFallbackKeepsTheHttpRule() = runBlocking<Unit> {
+        routes["/docs/a/1.html"] = article()
+        routes["/"] = page(feedLink("/site.xml"))
+        routes["/site.xml"] = rss("Site", "s")
+        env.allowHttp.set(false)
+        assertEquals(ShareProblem.HTTP_NOT_ALLOWED, problem(service.discover(url("/docs/a/1.html"))))
+        assertEquals(0, calls.values.sumOf { it.get() })
+    }
+
+    @Test
+    fun aFeedAddressedByThePageAndByTheRootIsOneCandidateAndFetchedOnce() = runBlocking<Unit> {
+        routes["/docs/a/1.html"] = article(feedLink("/broken.xml"))
+        routes["/"] = page(feedLink("/broken.xml"), feedLink("/alias.xml"), feedLink("/good.xml"))
+        routes["/alias.xml"] = redirect(301, url("/good.xml"))
+        routes["/good.xml"] = rss("Good", "g")
+        val candidates = found(service.discover(url("/docs/a/1.html"))).candidates
+        assertEquals("two links of the root end at one feed", listOf(url("/good.xml")), candidates.map { it.url })
+        assertEquals("the address the page already failed on is not asked again", 1, count("/broken.xml"))
+    }
+
+    @Test
+    fun directRssAndAtomAreFetchedOnceEach() = runBlocking<Unit> {
+        routes["/direct.xml"] = rss("Direct", "a", "b")
+        routes["/atom.xml"] = atom("Atom")
+        assertEquals(2, found(service.discover(url("/direct.xml"))).candidates.single().entryCount)
+        assertEquals(1, count("/direct.xml"))
+        assertEquals("Atom", found(service.discover(url("/atom.xml"))).candidates.single().feedTitle)
+        assertEquals(1, count("/atom.xml"))
+    }
+
+    @Test
+    fun aRedirectToAFeedIsOneChainAndNoSecondCheck() = runBlocking<Unit> {
+        routes["/old"] = redirect(301, url("/new.xml"))
+        routes["/new.xml"] = rss("Moved", "m")
+        val c = found(service.discover(url("/old"))).candidates.single()
+        assertEquals(url("/new.xml"), c.url)
+        assertEquals(1, count("/old"))
+        assertEquals(1, count("/new.xml"))
+    }
+
+    @Test
+    fun anHtmlPageWithDeclaredFeedsIsOneRequestPlusOnePerCandidate() = runBlocking<Unit> {
+        routes["/post"] = page(feedLink("/a.xml"), feedLink("/b.xml"))
+        routes["/a.xml"] = rss("A", "a")
+        routes["/b.xml"] = rss("B", "b")
+        assertEquals(2, found(service.discover(url("/post"))).candidates.size)
+        assertEquals(1, count("/post"))
+        assertEquals(1, count("/a.xml"))
+        assertEquals(1, count("/b.xml"))
+        assertEquals(0, count("/"))
+    }
+
+    @Test
+    fun aDirectFeedLargerThanAPageIsStillReadInFull() = runBlocking<Unit> {
+        // The first read is the only one, so it must not cut a feed at the page limit (512 KiB).
+        val filler = "x".repeat(150 * 1024)
+        routes["/big.xml"] = {
+            MockResponse.Builder().code(200).setHeader("Content-Type", "application/rss+xml").body(
+                "<rss version=\"2.0\"><channel><title>Big</title>" +
+                    (1..6).joinToString("") { "<item><guid>g$it</guid><title>t$it</title><description>$filler</description></item>" } +
+                    "</channel></rss>",
+            ).build()
+        }
+        val c = found(service.discover(url("/big.xml"))).candidates.single()
+        assertEquals(6, c.entryCount)
+        assertEquals(1, count("/big.xml"))
+    }
+
     // --- Subscription semantics through the real view model (T19..T24) ---
 
     private fun viewModel(): SubscriptionsViewModel {
@@ -297,20 +484,20 @@ class ShareToSubscribeTest {
         )
     }
 
-    private fun waitFor(what: String, timeoutMillis: Long = 10_000, condition: () -> Boolean) {
-        val end = System.currentTimeMillis() + timeoutMillis
-        while (!condition()) {
-            check(System.currentTimeMillis() < end) { "not reached: $what" }
-            Thread.sleep(10)
-        }
-    }
+    /** Suspends until [flow] has a value that satisfies [predicate]: driven by the state changing, with a deadline only to fail a test that would hang. */
+    private suspend fun <T> await(what: String, flow: Flow<T>, predicate: (T) -> Boolean): T =
+        withTimeoutOrNull(30_000) { flow.first(predicate) } ?: error("not reached: $what")
 
-    private fun SubscriptionsViewModel.shareAndWait(text: String): ShareState.Candidates {
+    private suspend fun SubscriptionsViewModel.shareAndWait(text: String): ShareState.Candidates {
         share.setReady(true)
         share.receive(text)
-        waitFor("candidates") { share.state.value.let { it is ShareState.Candidates || it is ShareState.Failed } }
+        await("candidates", share.state) { it is ShareState.Candidates || it is ShareState.Failed }
         return share.state.value as ShareState.Candidates
     }
+
+    /** The refresh that follows an add has finished (a finished request is recorded; nothing is recorded before one starts). */
+    private suspend fun SubscriptionsViewModel.awaitRefreshFinished() =
+        await("refresh finished", refreshState) { s -> s.requests.isNotEmpty() && s.requests.none { it.running } }
 
     @Test
     fun nothingIsRegisteredUntilTheUserConfirmsAndThenTheFeedIsAddedWithOneRefresh() = runBlocking<Unit> {
@@ -325,7 +512,7 @@ class ShareToSubscribeTest {
 
         vm.share.subscribe(shown.candidates.single())
         // T20
-        waitFor("done") { vm.share.state.value is ShareState.Done }
+        await("done", vm.share.state) { it is ShareState.Done }
         val added = (vm.share.state.value as ShareState.Done).result as AddFeedResult.Added
         val rows = feedRows()
         assertEquals(1, rows.size)
@@ -334,10 +521,10 @@ class ShareToSubscribeTest {
         assertTrue(rows.single().isSubscribed)
         val event = withTimeout(5_000) { vm.eventFlow.first() }
         assertTrue(event is SubscriptionEvent.FeedAdded && event.result is AddFeedResult.Added && !event.httpPending)
-        // T24: the add path's own refresh fetches the new feed exactly once (2 = the check + that refresh).
-        waitFor("articles stored") { runBlocking { env.db.articleDao().articlesOfFeed(added.feedId).size } == 2 }
-        waitFor("refresh finished") { !vm.refreshState.value.running }
-        Thread.sleep(300)
+        // T24: the add path's own refresh fetches the new feed exactly once (the check by discovery + that refresh), and it is the only request.
+        vm.awaitRefreshFinished()
+        assertEquals(1, vm.refreshState.value.requests.size)
+        assertEquals(2, env.db.articleDao().articlesOfFeed(added.feedId).size)
         assertEquals(2, count("/rss.xml"))
         assertEquals(1, feedRows().size)
     }
@@ -387,13 +574,13 @@ class ShareToSubscribeTest {
         assertFalse("seeing the candidate does not subscribe", feedRows().single().isSubscribed)
 
         vm.share.subscribe(c) // T22: the explicit "Subscribe again"
-        waitFor("done") { vm.share.state.value is ShareState.Done }
+        await("done", vm.share.state) { it is ShareState.Done }
         assertEquals(AddFeedResult.Resubscribed(id), (vm.share.state.value as ShareState.Done).result)
         val rows = feedRows()
         assertEquals("the same row, no copy", listOf(id), rows.map { it.id })
         assertTrue(rows.single().isSubscribed)
         assertEquals("categories are kept", setOf(category), env.db.subscriptionDao().memberships(account).filter { it.feedId == id }.map { it.categoryId }.toSet())
-        waitFor("refresh finished") { !vm.refreshState.value.running }
+        vm.awaitRefreshFinished()
     }
 
     @Test
@@ -402,14 +589,14 @@ class ShareToSubscribeTest {
         val before = feedRows()
         val vm = viewModel()
         vm.shareAndWait(url("/rss.xml"))
-        // A shared feed address is read twice while it is checked: once as a page, once by the feed fetcher.
+        // A shared feed address is read once while it is checked (P2); the bytes of that response are the candidate.
         val checked = count("/rss.xml")
-        assertEquals(2, checked)
+        assertEquals(1, checked)
         vm.share.cancel()
         assertEquals(ShareState.Idle, vm.share.state.value)
         assertEquals(before, feedRows())
-        Thread.sleep(200)
-        assertEquals("no refresh was started either", checked, count("/rss.xml"))
+        assertTrue("no refresh was started either", vm.refreshState.value.requests.isEmpty())
+        assertEquals(checked, count("/rss.xml"))
     }
 
     @Test
@@ -420,7 +607,7 @@ class ShareToSubscribeTest {
         val vm = viewModel()
         vm.share.setReady(true)
         vm.share.receive(url("/rss.xml"))
-        waitFor("problem") { vm.share.state.value is ShareState.Failed }
+        await("problem", vm.share.state) { it is ShareState.Failed }
         assertEquals(ShareProblem.HTTP_NOT_ALLOWED, (vm.share.state.value as ShareState.Failed).problem)
         assertEquals(0, feedRows().size)
         assertEquals(0, count("/rss.xml"))

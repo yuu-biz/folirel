@@ -43,7 +43,7 @@ app/src/main/java/io/github/yuubiz/folirel/
   backend/local/parser/   FeedParser, SafeXmlReader, XmlCharset, FeedDates, HtmlText, EntryKeys
   backend/local/opml/     OpmlParser, OpmlWriter
   backend/local/icon/     FeedIconResolver, IconDecoder
-  backend/local/discovery/ FeedProbe (page and feed reading shared by both searches), FeedDiscovery (in-site search for a moved feed)
+  backend/local/discovery/ FeedProbe (page and feed reading shared by both searches; one read per address, optional same-origin root fallback), FeedDiscovery (in-site search for a moved feed)
   network/                NetworkGuard, redirect handling, HttpClients, AddressPolicy, UrlNormalizer, SharedUrlExtractor, NetworkStatus
   sync/                   RefreshCoordinator, RefreshWorker/Scheduler, AutoRefreshPolicy, HTTPS-migration,
                           icon and discovery coordinators, ShareDiscoveryService (Share to Subscribe: what a shared address offers)
@@ -53,7 +53,7 @@ app/src/main/java/io/github/yuubiz/folirel/
   ui/settings/            Settings: top page and its pages (appearance, default layout, opening, refresh and network, storage, about)
   ui/common/              Controls shared by Settings and the home screen: layout picker, choice, selection dialog row, switch row, slider row
   ui/onboarding/          First-run screen
-  ui/theme/               Colour sets (Palettes) and the theme; light/dark and the colour set are independent
+  ui/theme/               Colour sets (Palettes; CustomPalette generates the Custom set from one seed colour), bar colours and the theme; light/dark and the colour set are independent
   browser/                BrowserLauncher
 ```
 

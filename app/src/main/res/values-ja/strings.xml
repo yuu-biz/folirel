@@ -559,7 +559,7 @@
     <string name="palette_dynamic_unavailable">Android 12以降</string>
     <string name="palette_dynamic_unavailable_state">このAndroidでは利用できません。Android 12以降が必要です。</string>
     <string name="palette_dynamic_fallback_note">ダイナミックが選ばれていますが、このAndroidでは表示できないためクラシックで表示しています。選択は保持されます。</string>
-    <string name="palette_note">クラシックはこれまでと同じ青系です。ダイナミックは壁紙から色を取ります（Android 12以降）。写真やアイコンに色を重ねることはありません。</string>
+    <string name="palette_note">クラシックはこれまでと同じ青系です。ダイナミックは壁紙から色を取ります（Android 12以降）。カスタムは選んだ基準色1色から明るい版と暗い版を作り、文字やアイコンの色は読みやすさを保つようアプリが決めます。写真やアイコンに色を重ねることはありません。</string>
     <string name="percent_value">%1$d%%</string>
     <string name="text_size_note">システムの文字サイズに掛け合わせます。システムで大きくした文字はそのまま大きくなります。</string>
     <string name="text_size_reset">%1$d%%に戻す</string>
@@ -601,6 +601,7 @@
     <string name="share_unsubscribed_note">以前に購読を解除したフィードです。再購読しても、記事・既読状態・カテゴリはそのまま残ります。</string>
     <string name="share_open_feed">配信元の詳細</string>
     <string name="share_latest">最新 %s</string>
+    <string name="share_from_root">サイトトップから検出（共有されたページ自体にはフィードがありません）</string>
     <string name="share_subscribing">購読しています…</string>
     <string name="share_problem_no_url">共有されたテキストにWebアドレス（http/https）が見つかりませんでした。</string>
     <string name="share_problem_too_large">共有されたテキストが大きすぎて読み取れません。</string>
@@ -614,4 +615,15 @@
     <string name="share_problem_status">サイトがエラーを返しました。</string>
     <string name="share_problem_page_large">ページが大きすぎて読み取れません。</string>
     <string name="share_problem_failed">問題が発生しました。何も変更していません。</string>
+    <string name="palette_custom">カスタム</string>
+    <string name="custom_base_color">基準色</string>
+    <string name="custom_seed_description">基準色 %s</string>
+    <string name="custom_pick">色を選ぶ</string>
+    <string name="custom_reset">既定に戻す</string>
+    <string name="custom_picker_title">基準色を選ぶ</string>
+    <string name="custom_hex_label">カラーコード（#RRGGBB）</string>
+    <string name="custom_hex_invalid">16進数6桁で入力してください（例: #009688）。</string>
+    <string name="custom_apply">適用</string>
+    <string name="custom_area_description">彩度と明るさ</string>
+    <string name="custom_hue_description">色相</string>
 </resources>

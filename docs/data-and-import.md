@@ -290,7 +290,8 @@ reader's own choices would have to include this table (and the DataStore keys be
 | Key | Meaning | Default |
 |---|---|---|
 | `theme` | Light or dark: `SYSTEM`, `LIGHT`, `DARK` | `SYSTEM` |
-| `color_palette` | Colour set: `CLASSIC`, `LEAF`, `SAND`, `VIOLET`, `DYNAMIC` (an unknown name reads as `CLASSIC`; `DYNAMIC` before Android 12 is stored as chosen and drawn as Classic). Added in 0.7.0; a store without it reads as `CLASSIC`, so an update changes nothing visible and no migration is needed. | `CLASSIC` |
+| `color_palette` | Colour set: `CLASSIC`, `LEAF`, `SAND`, `VIOLET`, `DYNAMIC`, `CUSTOM` (an unknown name reads as `CLASSIC`; `DYNAMIC` before Android 12 is stored as chosen and drawn as Classic). Added in 0.7.0; a store without it reads as `CLASSIC`, so an update changes nothing visible and no migration is needed. | `CLASSIC` |
+| `custom_seed` | Base colour of the `CUSTOM` set, an opaque ARGB integer (alpha in a stored value is ignored). Added in 0.9.3; absent reads as the default teal `#00796B`, and nothing is written by reading. Kept when another set is chosen; "Reset to default" writes the default, "Apply" in the picker writes it together with `color_palette=CUSTOM` in one step. | `#00796B` |
 | `list_layout` | `LIST`, `COMPACT_LIST`, `MAGAZINE`, `MASONRY`, `BENTO`; the default of every category that has no override | `LIST` |
 | `card_columns` | Maximum Magazine columns: 0 = automatic, 1 to 3 | 0 |
 | `card_style` | Magazine arrangement: `MIXED` or `EVEN` | `MIXED` |

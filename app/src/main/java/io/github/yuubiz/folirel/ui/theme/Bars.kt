@@ -7,6 +7,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import io.github.yuubiz.folirel.data.preferences.ColorPalette
 
 /**
  * Whether top bars and the tab strip are drawn in the palette's container colour instead of the plain surface. True for every colour
@@ -37,3 +38,6 @@ fun appBarColors(): TopAppBarColors {
         actionIconContentColor = s.onPrimaryContainer,
     )
 }
+
+/** Classic keeps plain bars; every other colour set (Dynamic and Custom included) draws them in its container colour. */
+fun usesTintedBars(palette: ColorPalette): Boolean = palette != ColorPalette.CLASSIC

@@ -25,14 +25,20 @@ fun isDarkTheme(themeMode: ThemeMode, systemDark: Boolean): Boolean = when (them
  * is drawn as Classic, the same rule the settings screen uses to say which one is selected.
  */
 @Composable
-fun FolirelTheme(themeMode: ThemeMode, textScale: Float, palette: ColorPalette = ColorPalette.CLASSIC, content: @Composable () -> Unit) {
+fun FolirelTheme(
+    themeMode: ThemeMode,
+    textScale: Float,
+    palette: ColorPalette = ColorPalette.CLASSIC,
+    customSeed: Int = CustomPalette.DEFAULT_SEED,
+    content: @Composable () -> Unit,
+) {
     val dark = isDarkTheme(themeMode, isSystemInDarkTheme())
     val density = LocalDensity.current
     val context = LocalContext.current
     val drawn = palette.effective(Build.VERSION.SDK_INT)
     CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale * textScale)) {
-        CompositionLocalProvider(LocalTintedBars provides (drawn != ColorPalette.CLASSIC)) {
-            MaterialTheme(colorScheme = Palettes.scheme(drawn, dark, context), typography = Typography(), content = content)
+        CompositionLocalProvider(LocalTintedBars provides usesTintedBars(drawn)) {
+            MaterialTheme(colorScheme = Palettes.scheme(drawn, dark, context, customSeed), typography = Typography(), content = content)
         }
     }
 }

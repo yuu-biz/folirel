@@ -34,6 +34,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +72,7 @@ internal fun paletteName(palette: ColorPalette): String = stringResource(
         ColorPalette.SAND -> R.string.palette_sand
         ColorPalette.VIOLET -> R.string.palette_violet
         ColorPalette.DYNAMIC -> R.string.palette_dynamic
+        ColorPalette.CUSTOM -> R.string.palette_custom
     },
 )
 
@@ -90,6 +92,7 @@ internal fun themeModeName(mode: ThemeMode): String = stringResource(
 @Composable
 internal fun AppearancePage(s: AppSettings, vm: SettingsViewModel, saveFailures: Int) {
     var previewPercent by remember { mutableStateOf<Int?>(null) }
+    var pickerOpen by rememberSaveable { mutableStateOf(false) }
     val storedPercent = AppSettings.textScalePercent(s.textScale)
     val sdk = Build.VERSION.SDK_INT
     val effective = s.palette.effective(sdk)
@@ -112,9 +115,18 @@ internal fun AppearancePage(s: AppSettings, vm: SettingsViewModel, saveFailures:
             effective = effective,
             dark = isDarkTheme(s.theme, isSystemInDarkTheme()),
             sdk = sdk,
+            customSeed = s.customSeed,
             onSelect = { palette -> vm.update { setPalette(palette) } },
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
+        if (effective == ColorPalette.CUSTOM) {
+            CustomColorRow(
+                seed = s.customSeed,
+                onPick = { pickerOpen = true },
+                onReset = { vm.update { resetCustomSeed() } },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
         if (s.palette != effective) SettingNote(stringResource(R.string.palette_dynamic_fallback_note), Modifier.testTag("palette_fallback_note"))
         SettingNote(stringResource(R.string.palette_note))
 
@@ -133,6 +145,16 @@ internal fun AppearancePage(s: AppSettings, vm: SettingsViewModel, saveFailures:
         )
         SettingNote(stringResource(R.string.text_size_note))
     }
+    if (pickerOpen) {
+        // The picker keeps its own draft; the settings are written once, by Apply.
+        CustomColorDialog(
+            initialSeed = s.customSeed,
+            dark = isDarkTheme(s.theme, isSystemInDarkTheme()),
+            storedPercent = storedPercent,
+            onApply = { seed -> vm.update { applyCustomPalette(seed) }; pickerOpen = false },
+            onCancel = { pickerOpen = false },
+        )
+    }
 }
 
 /**
@@ -141,7 +163,7 @@ internal fun AppearancePage(s: AppSettings, vm: SettingsViewModel, saveFailures:
  * same words the theme uses, and Dynamic is disabled with the reason said in words and in its state description.
  */
 @Composable
-internal fun PaletteChooser(effective: ColorPalette, dark: Boolean, sdk: Int, onSelect: (ColorPalette) -> Unit, modifier: Modifier = Modifier) {
+internal fun PaletteChooser(effective: ColorPalette, dark: Boolean, sdk: Int, customSeed: Int, onSelect: (ColorPalette) -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val perRow = layoutPickerPerRow(maxWidth.value, LocalDensity.current.fontScale)
@@ -151,7 +173,7 @@ internal fun PaletteChooser(effective: ColorPalette, dark: Boolean, sdk: Int, on
                     rowPalettes.forEach { palette ->
                         val available = ColorPalette.isAvailable(palette, sdk)
                         val swatches = if (available) {
-                            val scheme = Palettes.scheme(palette, dark, context)
+                            val scheme = Palettes.scheme(palette, dark, context, customSeed)
                             listOf(scheme.primary, scheme.primaryContainer, scheme.secondary, scheme.surface)
                         } else {
                             emptyList()

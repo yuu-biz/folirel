@@ -27,7 +27,10 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
  * available the app shows [CLASSIC] (see [effective]) and keeps the stored choice untouched.
  */
 enum class ColorPalette {
-    CLASSIC, LEAF, SAND, VIOLET, DYNAMIC;
+    CLASSIC, LEAF, SAND, VIOLET, DYNAMIC,
+
+    /** One base colour chosen by the user ([AppSettings.customSeed]); the light and dark schemes are made from it. */
+    CUSTOM;
 
     /** The palette that is drawn: the stored one, except that Dynamic on a system without it is Classic. */
     fun effective(sdkInt: Int): ColorPalette = if (this == DYNAMIC && sdkInt < DYNAMIC_MIN_SDK) CLASSIC else this
@@ -54,6 +57,8 @@ data class AppSettings(
     val theme: ThemeMode = ThemeMode.SYSTEM,
     /** Colour set; absent in a store written before 0.7.0, which reads as [ColorPalette.CLASSIC] (no visual change on update). */
     val palette: ColorPalette = ColorPalette.CLASSIC,
+    /** The base colour of [ColorPalette.CUSTOM], opaque ARGB. It is kept when another set is chosen. Absent in a store written before 0.9.3. */
+    val customSeed: Int = DEFAULT_CUSTOM_SEED,
     val listMode: ListMode = ListMode.LIST,
     val textScale: Float = 1.0f,
     /** Columns of the Magazine, Masonry and Bento layouts: 0 = automatic by width and text size, otherwise 1..5 (reduced when they do not fit). */
@@ -103,6 +108,12 @@ data class AppSettings(
 
     companion object {
         /** Text size, in percent: 90..130 in steps of 5. The four values older versions offered (90, 100, 115, 130) are on this grid. */
+        /** The base colour Custom starts from and "reset" returns to (a teal; opaque ARGB). */
+        const val DEFAULT_CUSTOM_SEED: Int = 0xFF00796B.toInt()
+
+        /** A stored or chosen seed with its alpha forced opaque (the colour is an RGB value). */
+        fun opaque(seed: Int): Int = seed or 0xFF000000.toInt()
+
         const val TEXT_SCALE_MIN_PERCENT = 90
         const val TEXT_SCALE_MAX_PERCENT = 130
         const val TEXT_SCALE_STEP_PERCENT = 5
@@ -130,6 +141,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     private object Keys {
         val theme = stringPreferencesKey("theme")
         val palette = stringPreferencesKey("color_palette")
+        val customSeed = intPreferencesKey("custom_seed")
         val listMode = stringPreferencesKey("list_layout")
         val textScale = floatPreferencesKey("text_scale")
         val cardColumns = intPreferencesKey("card_columns")
@@ -160,6 +172,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         AppSettings(
             theme = enumOr(p[Keys.theme], defaults.theme),
             palette = enumOr(p[Keys.palette], defaults.palette),
+            customSeed = p[Keys.customSeed]?.let { AppSettings.opaque(it) } ?: defaults.customSeed,
             listMode = enumOr(p[Keys.listMode], defaults.listMode),
             textScale = p[Keys.textScale]?.takeIf { AppSettings.isTextScale(it) } ?: defaults.textScale,
             cardStyle = enumOr(p[Keys.cardStyle], defaults.cardStyle),
@@ -194,6 +207,15 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     suspend fun setTheme(value: ThemeMode) = store.edit { it[Keys.theme] = value.name }
     suspend fun setPalette(value: ColorPalette) = store.edit { it[Keys.palette] = value.name }
+
+    /** Sets the Custom base colour and makes Custom the colour set, in one write (the picker's Apply). */
+    suspend fun applyCustomPalette(seed: Int) = store.edit {
+        it[Keys.customSeed] = AppSettings.opaque(seed)
+        it[Keys.palette] = ColorPalette.CUSTOM.name
+    }
+
+    /** Back to the default base colour; the colour set stays as it is. */
+    suspend fun resetCustomSeed() = store.edit { it[Keys.customSeed] = AppSettings.DEFAULT_CUSTOM_SEED }
     suspend fun setListMode(value: ListMode) = store.edit { it[Keys.listMode] = value.name }
     suspend fun setTextScale(value: Float) = store.edit { it[Keys.textScale] = value }
     suspend fun setCardColumns(value: Int) = store.edit { it[Keys.cardColumns] = value }

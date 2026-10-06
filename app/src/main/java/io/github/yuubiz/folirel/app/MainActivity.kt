@@ -82,7 +82,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings by container.settings.settings.collectAsStateWithLifecycle(initialValue = null as AppSettings?)
             val current = settings ?: return@setContent // render nothing until preferences are loaded
-            FolirelTheme(current.theme, current.textScale, current.palette) {
+            FolirelTheme(current.theme, current.textScale, current.palette, current.customSeed) {
                 val iconStore = remember { FeedIconStore { feedId -> container.feedIcons.png(feedId) } }
                 val iconVersions = remember { flow { emit(container.subscriptions.ensureLocalAccount()) }.flatMapLatest { container.feedIcons.observeVersions(it) } }
                 ProvideFeedIcons(iconStore, iconVersions, enabled = current.showImages) {

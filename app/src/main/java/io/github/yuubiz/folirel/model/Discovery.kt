@@ -7,6 +7,9 @@ enum class CandidateVia {
 
     /** The address the user typed or pasted, and it is a feed itself. */
     ENTERED_URL,
+
+    /** `link rel=alternate` of the root page of the site, read because the shared page itself gave no feed (Share to Subscribe only). */
+    SITE_ROOT,
 }
 
 /**

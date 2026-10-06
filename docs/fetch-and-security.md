@@ -366,6 +366,10 @@ feed-finding service. Results are facts only; the feed is registered by the add-
 confirmation (one refresh follows), and an address that already has a feed row (subscribed, or unsubscribed with its data)
 is merged into that row, never added twice. An unsubscribed feed is taken again only on an explicit "Subscribe again".
 
+**One read per address (0.9.3).** The first request to the chosen address is the only one: its limit depends on what the document turns out to be (decided from the root element once the first 64 KiB are in): an RSS/Atom/RDF document may be up to the feed limit (5 MiB, above that it fails as too large), anything else is cut at the page limit (512 KiB). When it is a feed, the bytes of that response are parsed and become the candidate, so a direct feed is one request and a redirect to a feed is one redirect chain; the result is reused within the run, not through ETag or any cache. A page costs one request plus one per declared feed (at most 8).
+
+**Same-origin root fallback (0.9.3).** Only when the shared address is an HTML page that is not the root of its site (path other than `/`, or a query) and none of the feeds it declares could be used (it declared none, or every one failed to parse), the root page `scheme://host[:port]/` of the final page's origin (after redirects) is read once, with the same client and the same rules, and the feeds it declares are checked like those of any page (at most 8, skipping addresses already tried). If the root ends on another origin, is not an HTML page, cannot be read or declares nothing usable, the search ends. A direct feed never reads the root, a page with a usable feed never reads the root, and a shared root is not read twice. No deeper page, canonical/breadcrumb/category link, sitemap, guessed address (`/feed`, `/rss`, `/atom.xml`) or external service is used. Candidates are labelled by where they were found (the address itself, the shared page, the site root); two ways to the same final address are one candidate.
+
 ## 9. HTTP to HTTPS migration
 
 For subscribed feeds still fetched over `http://`, the user can run a batch check after a single consent. For each feed

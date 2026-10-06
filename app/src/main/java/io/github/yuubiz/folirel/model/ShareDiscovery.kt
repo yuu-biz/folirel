@@ -14,6 +14,8 @@ data class ShareCandidate(
     val titleOnPage: String?,
     /** The feed the user already has for this address (subscribed or not); null when it is new. */
     val existing: ExistingFeed? = null,
+    /** Where the feed was found. */
+    val provenance: ShareProvenance = ShareProvenance.SHARED_PAGE,
 )
 
 /** A feed row that already exists for an address. Unsubscribing is soft, so the row (and its articles) outlives it. */
@@ -57,3 +59,6 @@ sealed interface ShareDiscovery {
 
     data class Failed(val problem: ShareProblem) : ShareDiscovery
 }
+
+/** Where a shared address's feed was found: the address itself, the page that was shared, or (only when that page gave none) the root of its site. */
+enum class ShareProvenance { DIRECT_FEED, SHARED_PAGE, SITE_ROOT }

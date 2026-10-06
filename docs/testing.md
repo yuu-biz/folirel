@@ -88,6 +88,7 @@ Rules that apply to every layer:
 | `HomeFlowTest` | First launch without data (`T01`), opening/scrolling/returning never marks read (`T29`), Custom Tabs path and URL-less article (`T32`), position after rotation and recreation (`T34`), layouts and images off (`T31`, `T37`) |
 | `PagerAndMagazineTest` | Category pager and tabs (`N01`, `N03`, `N24`), layouts List / Compact list / Magazine persisted (`N09`), tabs following the drag, underline position, back to top (arrow and tab re-tap) in every layout, quick successive taps, distant tabs at large text (`V31-T03`) |
 | `UxNextTest` | Position kept across layout changes (`U03`), category round trip in Magazine (`U04`), HTTP confirmation and "do not ask again" (`U06`), bulk unsubscribe and undo (`U10`, `U11`) |
+| `CustomColorUiTest` | The Custom colour row and picker: Cancel, Apply, invalid code, touching the area, Reset (needs a device; compiled only in 0.9.3). |
 | `ShareOverlayUiTest` | The Share to Subscribe dialog: Subscribe / Cancel / Feed details / Subscribe again and a problem message (needs a device; compiled only in 0.9.2). |
 | `NewArticleBannerTest` | The new-article banner on the real list composable in all three layouts and both orders: one tap answers it for every new article of the list (it goes to the top, or to the first new article when oldest first), the cross only closes it, the arrow and the second tap on the tab answer it, only the list shown is answered, articles arriving after the tap are announced as new, arrivals at the head keep the reading place (`UXR-12` to `UXR-18`) |
 | `HomeBannerFlowTest`, `HomeNoticeFlowTest` | The real thing end to end (`HomeFlowTestBase`): feeds served by a local MockWebServer, fetched by the real `LocalBackend`, saved by the real `FeedStore` into the app's Room database, driven by a real `RefreshCoordinator`, seen through the real `HomeViewModel` and drawn by the real `HomeScreen` (pager, tabs, list, banner, notices). Only the address policy differs from the app (loopback allowed in the test source set). Banner: one tap goes to the top and ends the notice, the cross, a report that lists answered articles again does not bring them back (`UXR-12`, `UXR-14`, `UXR-17`, `UXR-19`). Notices: partial failure notice and its end, no second notice after the screen is built again, a newer notice survives the older one's timer, the warning badge and offline mark stay, "Retry" and "Details", feeds the update did not reach, the notice and the banner together (`UXR-07` to `UXR-11`, `UXR-21`) |
@@ -498,3 +499,34 @@ JVM tests run the real network stack (OkHttp client with the app's address polic
 | P3B-T34 | "Add feed URL" unchanged: the dialog calls the same `addFeed` with the same message, HTTP rule and one refresh (the only change: a failing account lookup is now reported as an error message instead of escaping the coroutine). | `ShareToSubscribeTest` (the share path through the same function); no dialog test on a device |
 | P3B-T35 | The moved-feed search is unchanged on top of `FeedProbe`. | `FeedDiscoveryTest` (unchanged), `ShareToSubscribeTest.theMovedFeedSearchStillSharesTheSameCore` |
 | P3B-T36 | A cancelled share leaves feeds and settings as they were. | `ShareToSubscribeTest`, `ShareSubscriptionControllerTest` |
+
+### 4.13 0.9.3 polish: root fallback, one fetch, no fixed waits, Custom colour set (P3C-T01 to P3C-T30)
+
+The Share rows run the real network stack against a local MockWebServer and count the requests it received (`ShareToSubscribeTest`). The Custom rows are pure JVM tests of the generated schemes and of the settings store; the picker on screen is `CustomColorUiTest` (needs a device).
+
+| ID | Scenario | Where |
+|---|---|---|
+| P3C-T01 | An article with no feed: the feed of the site root is found; requests are article 1, root 1, feed 1 and nothing else. | `ShareToSubscribeTest.anArticleWithoutAFeedFindsTheFeedOfTheSiteRootExactlyOnce` |
+| P3C-T02 | An article with a valid feed: the root is not requested (also for a direct feed). | `aValidFeedOfTheSharedPageMeansTheRootIsNotRead`, `aDirectFeedNeverReadsTheRoot` |
+| P3C-T03 | Every feed link of the article fails (404, HTML): the root fallback still runs. | `feedLinksOfTheSharedPageThatAreAllBrokenStillAllowTheRootFallback` |
+| P3C-T04 | The shared URL is the root: no second root request; with a query it is not the root and the plain root is read once. | `aSharedRootThatHasNoFeedIsReadOnceNotTwice` |
+| P3C-T05 | A redirect to another origin: the root of the final page's origin is read, not that of the first. | `theRootOfAFinalPageAfterARedirectIsTheRootOfTheFinalOrigin` |
+| P3C-T06 | Policy kept: HTTP off sends nothing; a root that ends on another origin gives nothing; no guessed address or deeper page is requested. TLS, address-policy and redirect rules are the shared client's (`ShareToSubscribeTest` TLS/BLOCKED rows, `NetworkSecurityTest`). | `theRootFallbackKeepsTheHttpRule`, `aRootThatLeadsToAnotherOriginGivesNothing`, `aRootThatHasNoFeedEndsTheSearchAndNothingDeeperIsTried` |
+| P3C-T07 | The root has no feed: the search ends as "no feed". | `aRootThatHasNoFeedEndsTheSearchAndNothingDeeperIsTried` |
+| P3C-T08 | Two ways to one final address are one candidate; an address the page already failed on is not asked again. | `aFeedAddressedByThePageAndByTheRootIsOneCandidateAndFetchedOnce` |
+| P3C-T09 | A feed from the root carries the site-root provenance and the dialog says so. | `ShareToSubscribeTest` (provenance), `ShareOverlayUiTest.aFeedFoundOnTheSiteRootSaysSo` (not run) |
+| P3C-T10, T11 | Direct RSS and direct Atom: exactly one request. | `directRssAndAtomAreFetchedOnceEach`, `directRssIsACandidateWithItsFacts` |
+| P3C-T12 | Redirect to a feed: one chain, no second check; a direct feed larger than the page limit is read in full. | `aRedirectToAFeedIsOneChainAndNoSecondCheck`, `aDirectFeedLargerThanAPageIsStillReadInFull` |
+| P3C-T13 | HTML with declared feeds: 1 request plus 1 per candidate. | `anHtmlPageWithDeclaredFeedsIsOneRequestPlusOnePerCandidate` |
+| P3C-T14 | No fixed sleep or delay in the Share tests. | `NoFixedWaitsInShareTestsTest` |
+| P3C-T15 | The Share tests repeated (8 runs of 73 tests, cleaned between runs) all pass. | Run by hand (not a test); see ACCEPTANCE_RESULTS |
+| P3C-T16, T17 | `CUSTOM` and the seed persist across a restart; a store from before 0.9.3 reads as before and nothing is written by reading; alpha is ignored. | `CustomPaletteSettingTest` |
+| P3C-T18, T19 | Light and dark schemes are generated from one seed, are complete (every family differs between seeds), deterministic, and share the seed's hue. | `CustomPaletteTest` |
+| P3C-T20..T22 | Black, white, bright yellow, saturated red, dark navy and a sweep of 144 hue/strength seeds (plus greys, pure primaries): every text, icon, accent and outline pair reaches its contrast in light and dark. | `CustomPaletteTest`, `PalettesTest` (Custom at the default seed in the existing checks) |
+| P3C-T23 | Cancel applies nothing. | `CustomColorUiTest` (not run); the draft stores nothing by itself (`CustomColorDraftTest`) |
+| P3C-T24 | Apply hands out the colour once and writes seed and set in one step. | `CustomColorUiTest` (not run), `CustomPaletteSettingTest.applyWritesTheSeedAndTheSetInOneStep` |
+| P3C-T25 | An invalid code is never applicable and never changes the preview. | `CustomColorDraftTest`, `CustomPaletteTest` (parser), `CustomColorUiTest` (not run) |
+| P3C-T26 | Reset to default returns the seed only. | `CustomPaletteSettingTest.anotherSetKeepsTheSeedAndResetReturnsToTheDefault`, `CustomColorUiTest` (not run) |
+| P3C-T27 | The seed survives a restart (store); the open picker's draft survives rotation (saved state). | `CustomPaletteSettingTest`; the saver is exercised on a device only (not run) |
+| P3C-T28, T29 | Leaf, Sand, Violet keep every colour of 0.9.2 (written out); Classic is pinned exactly; the existing sets do not depend on the seed. | `ExistingPalettesUnchangedTest`, `PalettesTest.classicIsExactlyTheSetOf060` |
+| P3C-T30 | Custom draws tinted bars (every set but Classic does). | `ExistingPalettesUnchangedTest.customUsesTintedBarsAndClassicDoesNot` |

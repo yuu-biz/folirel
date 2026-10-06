@@ -11,6 +11,7 @@ import io.github.yuubiz.folirel.data.repository.AddFeedResult
 import io.github.yuubiz.folirel.model.ExistingFeed
 import io.github.yuubiz.folirel.model.ShareCandidate
 import io.github.yuubiz.folirel.model.ShareDiscovery
+import io.github.yuubiz.folirel.model.ShareProvenance
 import io.github.yuubiz.folirel.ui.share.ShareState
 import io.github.yuubiz.folirel.ui.share.ShareSubscribeOverlay
 import io.github.yuubiz.folirel.ui.share.ShareSubscriptionController
@@ -118,6 +119,16 @@ class ShareOverlayUiTest {
         compose.onNodeWithTag("share_resubscribe").performClick()
         compose.waitForIdle()
         assertEquals(listOf("https://a.example/feed.xml"), registered)
+    }
+
+    @Test
+    fun aFeedFoundOnTheSiteRootSaysSo() {
+        result = ShareDiscovery.Found(null, listOf(candidate("https://a.example/feed.xml").copy(provenance = ShareProvenance.SITE_ROOT)))
+        val c = controller()
+        show(c)
+        share(c, "https://a.example/docs/1.html")
+        compose.onNodeWithTag("share_from_root").assertIsDisplayed()
+        compose.onNodeWithTag("share_subscribe").assertIsDisplayed()
     }
 
     @Test

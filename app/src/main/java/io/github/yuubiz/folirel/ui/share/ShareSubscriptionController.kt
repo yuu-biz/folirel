@@ -52,7 +52,11 @@ class ShareSubscriptionController(
 
     private var job: Job? = null
     private var generation = 0L
-    private var ready = false
+    private val _ready = MutableStateFlow<Boolean?>(null)
+
+    /** Whether first-run setup is done, as the app last said; null until it has said anything (nothing is drawn before that). */
+    val ready: StateFlow<Boolean?> = _ready.asStateFlow()
+
     private var waiting: Pair<Long, String?>? = null
 
     /** The text another app shared. Every call is a new request, even for the same text as before. */
@@ -65,13 +69,13 @@ class ShareSubscriptionController(
 
     /** False until first-run setup is done: the shared request waits and does not skip it. */
     fun setReady(value: Boolean) {
-        ready = value
+        _ready.value = value
         drain()
     }
 
     private fun drain() {
         val (id, text) = waiting ?: return
-        if (!ready) return
+        if (_ready.value != true) return
         waiting = null
         when (val urls = SharedUrlExtractor.extract(text)) {
             SharedUrlExtractor.Result.None -> _state.value = ShareState.Failed(id, ShareProblem.NO_URL)

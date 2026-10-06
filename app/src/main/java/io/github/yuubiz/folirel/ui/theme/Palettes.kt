@@ -102,14 +102,20 @@ object Palettes {
         ColorPalette.LEAF -> if (dark) leafDark else leafLight
         ColorPalette.SAND -> if (dark) sandDark else sandLight
         ColorPalette.VIOLET -> if (dark) violetDark else violetLight
+        // Custom needs the user's seed; asked for without one it is made from the default seed.
+        ColorPalette.CUSTOM -> CustomPalette.scheme(CustomPalette.DEFAULT_SEED, dark)
     }
 
     /**
      * The scheme to draw. [palette] should already be the effective one ([ColorPalette.effective]): Dynamic is read from the system
      * wallpaper colours and exists only on Android 12 and later; asked for on an older system it is Classic.
      */
-    fun scheme(palette: ColorPalette, dark: Boolean, context: Context): ColorScheme =
-        if (palette == ColorPalette.DYNAMIC && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) dynamic(dark, context) else fixedScheme(palette, dark)
+    fun scheme(palette: ColorPalette, dark: Boolean, context: Context, customSeed: Int = CustomPalette.DEFAULT_SEED): ColorScheme =
+        when {
+            palette == ColorPalette.DYNAMIC && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> dynamic(dark, context)
+            palette == ColorPalette.CUSTOM -> CustomPalette.scheme(customSeed, dark)
+            else -> fixedScheme(palette, dark)
+        }
 
     @RequiresApi(Build.VERSION_CODES.S)
     private fun dynamic(dark: Boolean, context: Context): ColorScheme =

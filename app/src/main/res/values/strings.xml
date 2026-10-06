@@ -584,7 +584,7 @@
     <string name="palette_dynamic_unavailable">Android 12 or later</string>
     <string name="palette_dynamic_unavailable_state">Not available on this Android version. Needs Android 12 or later.</string>
     <string name="palette_dynamic_fallback_note">Dynamic is chosen, but this Android version cannot draw it, so Classic is shown. The choice is kept.</string>
-    <string name="palette_note">Classic is the blue the app has always used. Dynamic takes its colors from the wallpaper (Android 12 and later). Photos and icons are never tinted.</string>
+    <string name="palette_note">Classic is the blue the app has always used. Dynamic takes its colors from the wallpaper (Android 12 and later). Custom makes a light and a dark set from one base color you choose; text and icon colors are chosen by the app so that they stay readable. Photos and icons are never tinted.</string>
     <string name="percent_value">%1$d%%</string>
     <string name="text_size_note">Multiplied with the system font size, so a larger system size stays larger.</string>
     <string name="text_size_reset">Reset to %1$d%%</string>
@@ -626,6 +626,7 @@
     <string name="share_unsubscribed_note">You unsubscribed from this feed before. Subscribing again keeps its articles, read state and categories.</string>
     <string name="share_open_feed">Feed details</string>
     <string name="share_latest">latest %s</string>
+    <string name="share_from_root">Found on the top page of the site (the shared page itself has no feed)</string>
     <string name="share_subscribing">Subscribing…</string>
     <string name="share_problem_no_url">No web address (http or https) was found in the shared text.</string>
     <string name="share_problem_too_large">The shared text is too large to read.</string>
@@ -639,4 +640,15 @@
     <string name="share_problem_status">The site answered with an error.</string>
     <string name="share_problem_page_large">The page is too large to read.</string>
     <string name="share_problem_failed">Something went wrong. Nothing was changed.</string>
+    <string name="palette_custom">Custom</string>
+    <string name="custom_base_color">Base color</string>
+    <string name="custom_seed_description">Base color %s</string>
+    <string name="custom_pick">Choose color</string>
+    <string name="custom_reset">Reset to default</string>
+    <string name="custom_picker_title">Choose a base color</string>
+    <string name="custom_hex_label">Color code (#RRGGBB)</string>
+    <string name="custom_hex_invalid">Enter six hexadecimal digits, for example #009688.</string>
+    <string name="custom_apply">Apply</string>
+    <string name="custom_area_description">Saturation and brightness</string>
+    <string name="custom_hue_description">Hue</string>
 </resources>

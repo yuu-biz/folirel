@@ -45,33 +45,56 @@ sealed interface ResourceResult {
         }
 }
 
+
 /**
  * GET with a hard byte limit, through the app's network client (same address policy, HTTP opt-in and TLS
  * verification as feeds; every redirect hop is checked). No cookies, no JavaScript, nothing is stored here.
  */
 class SmallResourceFetcher(private val client: OkHttpClient) {
     /** [truncate]: a body above [maxBytes] is cut at the limit instead of failing (for the head of an HTML page). */
-    suspend fun get(url: String, maxBytes: Long, accept: String, truncate: Boolean = false): ResourceResult {
+    suspend fun get(url: String, maxBytes: Long, accept: String, truncate: Boolean = false): ResourceResult =
+        read(url, accept, pageMaxBytes = maxBytes, truncate = truncate, feedMaxBytes = null)
+
+    /**
+     * One read of an address that may be a page or a feed. The limit depends on what the document turns out to be, decided from its
+     * root element once the first [SNIFF_BYTES] are in: an RSS/Atom/RDF document may be [feedMaxBytes] long (above that it fails, like
+     * the feed fetcher), anything else is cut at [pageMaxBytes] like the head of a page. The caller can use the bytes of a feed as
+     * they are, so a feed address is not fetched a second time to be checked.
+     */
+    suspend fun getPageOrFeed(url: String, pageMaxBytes: Long, feedMaxBytes: Long, accept: String): ResourceResult =
+        read(url, accept, pageMaxBytes = pageMaxBytes, truncate = true, feedMaxBytes = feedMaxBytes)
+
+    private suspend fun read(url: String, accept: String, pageMaxBytes: Long, truncate: Boolean, feedMaxBytes: Long?): ResourceResult {
         val httpUrl = url.toHttpUrlOrNull() ?: return ResourceResult.Failed(ResourceResult.Kind.BLOCKED)
         val request = Request.Builder().url(httpUrl).get().header("Accept", accept).build()
         return try {
             client.newCall(request).await { response ->
                 if (response.code !in 200..299) return@await ResourceResult.Failed(ResourceResult.Kind.STATUS, response.code)
                 val body = response.body
-                if (!truncate && body.contentLength() > maxBytes) return@await ResourceResult.Failed(ResourceResult.Kind.TOO_LARGE)
+                val hardLimit = feedMaxBytes ?: pageMaxBytes
+                if ((!truncate || feedMaxBytes != null) && body.contentLength() > hardLimit) return@await ResourceResult.Failed(ResourceResult.Kind.TOO_LARGE)
                 val buffer = Buffer()
                 val source = body.source()
                 var truncated = false
+                // Until the kind of document is known the larger limit applies.
+                var limit = hardLimit
+                var kindKnown = feedMaxBytes == null
+                var isFeed = false
                 while (true) {
                     val read = source.read(buffer, 16 * 1024)
                     if (read == -1L) break
-                    if (buffer.size > maxBytes) {
-                        if (!truncate) return@await ResourceResult.Failed(ResourceResult.Kind.TOO_LARGE)
+                    if (!kindKnown && buffer.size >= SNIFF_BYTES) {
+                        isFeed = HtmlLinks.isFeedDocument(buffer.snapshot(SNIFF_BYTES.toInt()).toByteArray())
+                        limit = if (isFeed) feedMaxBytes!! else pageMaxBytes
+                        kindKnown = true
+                    }
+                    if (buffer.size > limit) {
+                        if (!truncate || isFeed) return@await ResourceResult.Failed(ResourceResult.Kind.TOO_LARGE)
                         truncated = true
                         break
                     }
                 }
-                val bytes = buffer.readByteArray(minOf(buffer.size, maxBytes))
+                val bytes = buffer.readByteArray(minOf(buffer.size, limit))
                 ResourceResult.Ok(bytes, response.request.url.toString(), body.contentType()?.toString(), truncated)
             }
         } catch (e: BlockedRequestException) {
@@ -83,5 +106,10 @@ class SmallResourceFetcher(private val client: OkHttpClient) {
         } catch (_: IOException) {
             ResourceResult.Failed(ResourceResult.Kind.NETWORK)
         }
+    }
+
+    private companion object {
+        /** How much of a document is looked at to tell a feed from a page; both limits are larger than this. */
+        const val SNIFF_BYTES = 64L * 1024
     }
 }

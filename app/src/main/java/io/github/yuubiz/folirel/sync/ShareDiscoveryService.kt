@@ -3,11 +3,13 @@ package io.github.yuubiz.folirel.sync
 import io.github.yuubiz.folirel.backend.local.ResourceResult
 import io.github.yuubiz.folirel.backend.local.discovery.FeedProbe
 import io.github.yuubiz.folirel.data.repository.SubscriptionRepository
+import io.github.yuubiz.folirel.model.CandidateVia
 import io.github.yuubiz.folirel.model.DiscoveryResult
 import io.github.yuubiz.folirel.model.ExistingFeed
 import io.github.yuubiz.folirel.model.ShareCandidate
 import io.github.yuubiz.folirel.model.ShareDiscovery
 import io.github.yuubiz.folirel.model.ShareProblem
+import io.github.yuubiz.folirel.model.ShareProvenance
 import io.github.yuubiz.folirel.model.Structure
 import io.github.yuubiz.folirel.network.UrlNormalizer
 
@@ -23,7 +25,8 @@ class ShareDiscoveryService(
 ) {
     suspend fun discover(url: String): ShareDiscovery {
         val start = UrlNormalizer.normalizedOrNull(url) ?: return ShareDiscovery.Failed(ShareProblem.INVALID_URL)
-        val probed = probe.probe(start)
+        // The root page of the site is read too (once) when the shared page itself offers no feed: an article rarely declares one.
+        val probed = probe.probe(start, siteRootFallback = true)
         when (probed.page) {
             DiscoveryResult.PageStatus.HTTP_NOT_ALLOWED -> return ShareDiscovery.Failed(ShareProblem.HTTP_NOT_ALLOWED)
             DiscoveryResult.PageStatus.UNREADABLE, DiscoveryResult.PageStatus.NO_SITE ->
@@ -43,6 +46,11 @@ class ShareDiscoveryService(
                 newestAt = f.newestAt,
                 titleOnPage = f.titleOnPage,
                 existing = known?.second?.let { ExistingFeed(it.id, Structure.displayName(it), it.isSubscribed) },
+                provenance = when (f.via) {
+                    CandidateVia.ENTERED_URL -> ShareProvenance.DIRECT_FEED
+                    CandidateVia.SITE_PAGE -> ShareProvenance.SHARED_PAGE
+                    CandidateVia.SITE_ROOT -> ShareProvenance.SITE_ROOT
+                },
             )
         }
         if (candidates.isNotEmpty()) return ShareDiscovery.Found(probed.pageUrl, candidates)

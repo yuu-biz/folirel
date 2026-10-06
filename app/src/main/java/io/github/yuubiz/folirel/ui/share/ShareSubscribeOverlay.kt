@@ -30,6 +30,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.yuubiz.folirel.R
 import io.github.yuubiz.folirel.model.ShareCandidate
 import io.github.yuubiz.folirel.model.ShareProblem
+import io.github.yuubiz.folirel.model.ShareProvenance
 import io.github.yuubiz.folirel.ui.subscriptions.formatTime
 
 /**
@@ -135,6 +136,9 @@ private fun CandidateInfo(candidate: ShareCandidate, controller: ShareSubscripti
         )
         Text(candidate.url, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis)
         candidate.siteUrl?.let { Text(it, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (candidate.provenance == ShareProvenance.SITE_ROOT) {
+            Text(stringResource(R.string.share_from_root), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.testTag("share_from_root"))
+        }
         val latest = formatTime(context, candidate.newestAt)
         Text(
             pluralStringResource(R.plurals.discovery_entries, candidate.entryCount, candidate.entryCount) +
