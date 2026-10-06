@@ -26,6 +26,11 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
@@ -490,7 +495,7 @@ fun HomeScreen(
             } else {
                 SectionTitle(stringResource(R.string.display_layout))
                 Choice(
-                    options = listOf(ListMode.LIST, ListMode.COMPACT_LIST, ListMode.MAGAZINE),
+                    options = ListMode.entries,
                     selected = settings.listMode,
                     label = { listModeLabel(it) },
                     tag = { "layout_${it.name}" },
@@ -705,14 +710,45 @@ internal fun ArticleList(
     /** The category the reader has chosen is this list's: false from the moment another one is chosen, while the pager may still show this page. */
     isSelected: Boolean = true,
 ) {
+    // The width decides the columns of the tile layouts (Masonry, Bento), whose positions depend on them.
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        ArticleListBody(
+            maxWidth.value, host, state, mode, showImages, cardColumns, cardStyle, imageLoader, actions, newIds, newestFirst, isCurrent,
+            scrollToTopTick, isSelected,
+        )
+    }
+}
+
+@Composable
+private fun ArticleListBody(
+    widthDp: Float,
+    host: ListHost,
+    state: ArticlesState,
+    mode: ListMode,
+    showImages: Boolean,
+    cardColumns: Int,
+    cardStyle: CardLayoutStyle,
+    imageLoader: ImageLoader,
+    actions: ArticleActions,
+    newIds: Set<String>,
+    newestFirst: Boolean,
+    isCurrent: Boolean,
+    scrollToTopTick: Int,
+    isSelected: Boolean,
+) {
     // While the list moves, it keeps the articles it is moving over: a refresh delivers feed after feed, and articles
     // inserted above the moving list would change its distance on every batch. They are applied when the movement ends.
     var held by remember(state.key) { mutableStateOf<List<ArticleRow>?>(null) }
     val items = held ?: state.items
-    val isMagazine = mode == ListMode.MAGAZINE
+    // Masonry and Bento: their own columns (two on a phone), and Bento's blocks of tiles (a position is an article; the column
+    // shows blocks).
+    val tileColumns = CardGridLayout.columns(widthDp, LocalDensity.current.fontScale, cardColumns, CardGridLayout.TILE_AUTO_MIN_CARD_DP).count
+    val bentoBlocks = if (mode == ListMode.BENTO) remember(items, tileColumns) { BentoPlan.blocks(items.map { it.id }, tileColumns) } else null
+    val blockOf = remember(bentoBlocks) { bentoBlocks?.let { BentoPlan.blockOfArticle(it, items.size) } ?: IntArray(0) }
+    val firstArticleOf = remember(bentoBlocks) { bentoBlocks?.let { b -> IntArray(b.size) { b[it].first } } ?: IntArray(0) }
     // Restore from this list's own anchor (article id + offset); if it is gone, use the nearest remaining article.
     // Switching list style, rotating or resizing the window keeps the same article near the top.
-    val start = remember(state.key, isMagazine) {
+    val start = remember(state.key, mode) {
         val anchor = host.anchorFor(state.key)
         val index = anchor?.let { a ->
             items.indexOfFirst { it.id == a.articleId }.takeIf { it >= 0 }
@@ -721,17 +757,19 @@ internal fun ArticleList(
         } ?: 0
         index.coerceAtLeast(0) to (if (anchor != null && items.getOrNull(index)?.id == anchor.articleId) anchor.offset else 0)
     }
-    val scroll: ScrollHandle
-    val gridState: LazyGridState?
-    val listState: LazyListState?
-    if (isMagazine) {
-        gridState = remember(state.key) { LazyGridState(start.first, start.second) }
-        listState = null
-        scroll = GridScroll(gridState)
-    } else {
-        listState = remember(state.key) { LazyListState(start.first, start.second) }
-        gridState = null
-        scroll = ListScroll(listState)
+    var gridState: LazyGridState? = null
+    var listState: LazyListState? = null
+    var staggeredState: LazyStaggeredGridState? = null
+    var blockState: LazyListState? = null
+    val scroll: ScrollHandle = when (mode) {
+        ListMode.MAGAZINE -> GridScroll(remember(state.key) { LazyGridState(start.first, start.second) }.also { gridState = it })
+        ListMode.MASONRY -> StaggeredScroll(remember(state.key) { LazyStaggeredGridState(start.first, start.second) }.also { staggeredState = it })
+        ListMode.BENTO -> BlockScroll(
+            remember(state.key) { LazyListState(blockOf.getOrElse(start.first) { 0 }, start.second) }.also { blockState = it },
+            blockOf,
+            firstArticleOf,
+        )
+        else -> ListScroll(remember(state.key) { LazyListState(start.first, start.second) }.also { listState = it })
     }
     val currentItems by rememberUpdatedState(items)
     val currentNew by rememberUpdatedState(newIds)
@@ -882,7 +920,7 @@ internal fun ArticleList(
                 }
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(MagazinePlan.GRID_SPANS),
-                    state = gridState,
+                    state = gridState!!,
                     modifier = Modifier.fillMaxSize().testTag("article_list"),
                     contentPadding = PaddingValues(start = CardGridLayout.EDGE_DP.dp, end = CardGridLayout.EDGE_DP.dp, top = 4.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(CardGridLayout.GAP_DP.dp),
@@ -904,8 +942,60 @@ internal fun ArticleList(
                     }
                 }
             }
+        } else if (staggeredState != null) {
+            // Masonry: lanes of cards; each picture has the shape its article asks for (known before it loads), text decides the rest.
+            val cardWidth = CardGridLayout.cardWidthDp(widthDp, tileColumns)
+            LazyVerticalStaggeredGrid(
+                columns = StaggeredGridCells.Fixed(tileColumns),
+                state = staggeredState!!,
+                modifier = Modifier.fillMaxSize().testTag("article_list"),
+                contentPadding = PaddingValues(start = CardGridLayout.EDGE_DP.dp, end = CardGridLayout.EDGE_DP.dp, top = 4.dp, bottom = 24.dp),
+                verticalItemSpacing = CardGridLayout.GAP_DP.dp,
+                horizontalArrangement = Arrangement.spacedBy(CardGridLayout.GAP_DP.dp),
+            ) {
+                items(items, key = { it.id }) { row ->
+                    ArticleItem(
+                        row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"),
+                        CardMetrics(
+                            span = if (tileColumns > 1) MagazinePlan.GRID_SPANS / tileColumns else MagazinePlan.GRID_SPANS,
+                            widthDp = cardWidth,
+                            imageHeightDp = MasonryPlan.pictureHeightDp(row.id, cardWidth),
+                        ),
+                        summaryLines = MasonryPlan.SUMMARY_MAX_LINES,
+                    )
+                }
+            }
+        } else if (blockState != null && bentoBlocks != null) {
+            // Bento: a column of blocks; every block fills all the columns with tiles of fixed cell sizes.
+            val gap = CardGridLayout.GAP_DP
+            val cellW = BentoPlan.cellWidthDp(widthDp, tileColumns)
+            val titleLineDp = with(LocalDensity.current) { MagazineCardStyle.TILE_TITLE_LINE_SP.sp.toDp().value }
+            val cellH = BentoPlan.cellHeightDp(cellW, titleLineDp)
+            LazyColumn(
+                state = blockState!!,
+                modifier = Modifier.fillMaxSize().testTag("article_list"),
+                contentPadding = PaddingValues(start = CardGridLayout.EDGE_DP.dp, end = CardGridLayout.EDGE_DP.dp, top = 4.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(gap.dp),
+            ) {
+                items(bentoBlocks, key = { "block-" + (items.getOrNull(it.first)?.id ?: it.first) }) { block ->
+                    Box(Modifier.fillMaxWidth().height((block.rows * cellH + (block.rows - 1) * gap).dp)) {
+                        for (tile in block.tiles) {
+                            val row = items.getOrNull(tile.article) ?: continue
+                            val w = tile.shape.colSpan * cellW + (tile.shape.colSpan - 1) * gap
+                            val h = tile.shape.rowSpan * cellH + (tile.shape.rowSpan - 1) * gap
+                            key(row.id) {
+                                ArticleItem(
+                                    row, mode, showImages, imageLoader, now, actions,
+                                    Modifier.offset(x = (tile.col * (cellW + gap)).dp, y = (tile.row * (cellH + gap)).dp).testTag("article_${row.id}"),
+                                    bento = BentoCell(tile.shape, w, h),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         } else if (listState != null) {
-            LazyColumn(state = listState, modifier = Modifier.fillMaxSize().testTag("article_list"), contentPadding = PaddingValues(bottom = 24.dp)) {
+            LazyColumn(state = listState!!, modifier = Modifier.fillMaxSize().testTag("article_list"), contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(items, key = { it.id }, contentType = { mode }) { row ->
                     ArticleItem(row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"))
                 }

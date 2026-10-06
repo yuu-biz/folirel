@@ -61,6 +61,7 @@ class MagazineHost(private val compose: HomeRule) {
         fontScale: Float = 1f,
         showImages: Boolean = true,
         listKey: String = "md",
+        mode: ListMode = ListMode.MAGAZINE,
     ) {
         val loader = ImageLoader.Builder(instrumentation.targetContext).build()
         val actions = ArticleActions({}, {}, {}, { _, _ -> }, {}, {})
@@ -75,7 +76,7 @@ class MagazineHost(private val compose: HomeRule) {
                             ArticleList(
                                 host = host,
                                 state = ArticlesState(listKey, items, loaded = true),
-                                mode = ListMode.MAGAZINE,
+                                mode = mode,
                                 showImages = showImages,
                                 cardColumns = columns,
                                 cardStyle = style,

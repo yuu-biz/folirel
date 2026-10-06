@@ -275,7 +275,7 @@ failure never changes the feed's fetch state. The lookup procedure and schedule 
 **Category preferences (`category_preferences`).** Keyed by the category's id (never by name or path), so a rename keeps
 every setting; deleting the category deletes the row; no row means all defaults. `tabOrder` is one rank among all the
 categories (null: no saved place, the path order applies and a new category follows the placed ones); `isPinned` does not
-change it, so unpinning returns the saved place. `listModeOverride` (`LIST`, `COMPACT_LIST`, `MAGAZINE`),
+change it, so unpinning returns the saved place. `listModeOverride` (`LIST`, `COMPACT_LIST`, `MAGAZINE`, `MASONRY`, `BENTO`),
 `cardStyleOverride` (`MIXED`, `EVEN`) and `cardColumnsOverride` (0 = automatic, 1 to 3) are null when inherited from the
 global settings below; an unknown stored value is read as inherited. Writes change one field at a time (a missing row is
 created with the defaults first), refuse a category of another account in the repository, and saving an order writes
@@ -290,7 +290,7 @@ reader's own choices would have to include this table (and the DataStore keys be
 | Key | Meaning | Default |
 |---|---|---|
 | `theme` | `SYSTEM`, `LIGHT`, `DARK` | `SYSTEM` |
-| `list_layout` | `LIST`, `COMPACT_LIST`, `MAGAZINE`; the default of every category that has no override | `LIST` |
+| `list_layout` | `LIST`, `COMPACT_LIST`, `MAGAZINE`, `MASONRY`, `BENTO`; the default of every category that has no override | `LIST` |
 | `card_columns` | Maximum Magazine columns: 0 = automatic, 1 to 3 | 0 |
 | `card_style` | Magazine arrangement: `MIXED` or `EVEN` | `MIXED` |
 | `text_scale` | 0.9, 1.0, 1.15, 1.3 | 1.0 |

@@ -20,7 +20,7 @@ open the original page in your browser.
   Existing read/saved state and categories are never overwritten.
 - **Direct fetching** of RSS 2.0, Atom 1.0 and RSS 1.0 feeds, with conditional requests, charset detection (including
   Shift_JIS) and per-feed diagnostics when a feed fails.
-- **Three list layouts:** List, Compact list and Magazine (mixed card sizes with thumbnails and summaries).
+- **Five list layouts:** List, Compact list, Magazine (mixed card sizes with thumbnails and summaries), Masonry (lanes of cards of different heights) and Bento (tiles of different shapes).
 - **Categories** with nesting, a navigation drawer, category tabs that follow your finger while you swipe between them, a category picker with search, pinned and re-orderable tabs, and a layout of their own per category if you want one.
 - **Explicit read state.** Articles are marked read, unread or saved only when you say so. Opening an article never
   marks it read.

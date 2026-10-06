@@ -162,6 +162,8 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Un
                         ListMode.LIST to stringResource(R.string.list_mode_list),
                         ListMode.COMPACT_LIST to stringResource(R.string.list_mode_compact_list),
                         ListMode.MAGAZINE to stringResource(R.string.list_mode_magazine),
+                        ListMode.MASONRY to stringResource(R.string.list_mode_masonry),
+                        ListMode.BENTO to stringResource(R.string.list_mode_bento),
                     ),
                     s.listMode,
                 ) { vm.update { setListMode(it) } }

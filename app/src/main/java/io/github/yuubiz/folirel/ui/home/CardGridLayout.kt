@@ -16,6 +16,9 @@ import kotlin.math.min
 object CardGridLayout {
     const val MAX_COLUMNS = 3
     const val AUTO_MIN_CARD_DP = 220f
+
+    /** Automatic columns of the Masonry and Bento layouts: small tiles are their point, so a phone gets two. */
+    const val TILE_AUTO_MIN_CARD_DP = 150f
     const val MANUAL_MIN_CARD_DP = 150f
 
     /** Space at the screen edges and between cards. Dense on purpose (the point is to see many articles). */
@@ -34,14 +37,14 @@ object CardGridLayout {
     /** [count] columns are shown; [corrected] is true when the user asked for more than fits. */
     data class Columns(val count: Int, val corrected: Boolean)
 
-    /** [preference]: 0 = auto, otherwise the wanted count (1..3). */
-    fun columns(widthDp: Float, fontScale: Float, preference: Int): Columns {
+    /** [preference]: 0 = auto, otherwise the wanted count (1..3). [autoMinCardDp]: the narrowest card the automatic choice allows. */
+    fun columns(widthDp: Float, fontScale: Float, preference: Int, autoMinCardDp: Float = AUTO_MIN_CARD_DP): Columns {
         val scale = max(1f, fontScale)
         fun fits(minCardDp: Float): Int {
             val available = widthDp - 2 * EDGE_DP
             return floor((available + GAP_DP) / (minCardDp * scale + GAP_DP)).toInt().coerceIn(1, MAX_COLUMNS)
         }
-        if (preference <= 0) return Columns(fits(AUTO_MIN_CARD_DP), corrected = false)
+        if (preference <= 0) return Columns(fits(autoMinCardDp), corrected = false)
         val wanted = preference.coerceIn(1, MAX_COLUMNS)
         val count = min(wanted, fits(MANUAL_MIN_CARD_DP))
         return Columns(count, corrected = count < wanted)

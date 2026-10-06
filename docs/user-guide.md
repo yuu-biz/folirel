@@ -82,6 +82,8 @@ Read, unread and saved are changed only by explicit actions. Refreshing never ov
   - **List**: one column with headline, summary and thumbnail.
   - **Compact list**: one dense line per article.
   - **Magazine**: cards of mixed sizes (or all the same size, see Settings) in up to three columns on wide screens.
+  - **Masonry**: cards of different heights in lanes (two on a phone), each picture in its own shape.
+  - **Bento**: tiles of different shapes (small, wide, tall, big) that fill the width without gaps.
 
 ## Categories
 

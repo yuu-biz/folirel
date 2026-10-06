@@ -36,9 +36,12 @@ enum class SortOrder { NEWEST, OLDEST }
  * - LIST: one column; title, two lines of summary, a side thumbnail, the source line and the buttons.
  * - COMPACT_LIST: one dense row per article.
  * - MAGAZINE: cards of different sizes packed into gap-free rows (see MagazinePlan, CardGridLayout).
+ * - MASONRY: lanes of cards of different heights, each card under the shortest lane (see MasonryPlan).
+ * - BENTO: tiles of four shapes (small, wide, tall, big) packed into gap-free blocks (see BentoPlan).
  *
+ * A build that does not know a stored name reads the default instead (an older version after a downgrade).
  */
-enum class ListMode { LIST, COMPACT_LIST, MAGAZINE }
+enum class ListMode { LIST, COMPACT_LIST, MAGAZINE, MASONRY, BENTO }
 
 /** How the cards of the Magazine layout are arranged (the persisted keys keep their `card_` names). */
 enum class CardLayoutStyle {

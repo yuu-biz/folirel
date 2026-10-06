@@ -50,6 +50,8 @@ internal fun listModeLabel(mode: ListMode): String = stringResource(
         ListMode.LIST -> R.string.list_mode_list
         ListMode.COMPACT_LIST -> R.string.list_mode_compact_list
         ListMode.MAGAZINE -> R.string.list_mode_magazine
+        ListMode.MASONRY -> R.string.list_mode_masonry
+        ListMode.BENTO -> R.string.list_mode_bento
     },
 )
 

@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -108,6 +109,8 @@ fun ArticleItem(
     rowHeight: Dp? = null,
     /** Magazine: lines the summary may use (more only for a card without picture beside cards with one). */
     summaryLines: Int = MagazineCardStyle.SUMMARY_MAX_LINES,
+    /** Bento: the tile's shape and size. */
+    bento: BentoCell? = null,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val saveLabel = stringResource(if (row.isSaved) R.string.action_unsave else R.string.action_save)
@@ -168,7 +171,11 @@ fun ArticleItem(
         moreButton()
     }
 
-    if (mode == ListMode.MAGAZINE) {
+    if (mode == ListMode.BENTO && bento != null) {
+        BentoCard(row, showImages, imageLoader, nowMillis, bento, bookmarkButton, moreButton, modifier, rowModifier)
+        return
+    }
+    if (mode == ListMode.MAGAZINE || mode == ListMode.MASONRY || mode == ListMode.BENTO) {
         ArticleCard(row, showImages, imageLoader, nowMillis, card, rowHeight, summaryLines, bookmarkButton, moreButton, modifier, rowModifier)
         return
     }
@@ -324,6 +331,110 @@ private fun ArticleCard(
             // A tile shorter than its row: the free space sits above the source row, so the source rows of a row line up.
             if (rowHeight != null) Spacer(Modifier.weight(1f))
             metaRow()
+        }
+    }
+}
+
+/** A tile of the Bento layout: its shape and its size in dp (fixed by the grid of cells). */
+@Immutable
+class BentoCell internal constructor(internal val shape: BentoShape, val widthDp: Float, val heightDp: Float)
+
+/**
+ * A tile of the Bento layout (fixed size, set by the cell grid). Small: a picture over the headline. Wide: the picture at the left,
+ * headline and summary beside it. Tall and big: a large picture over the headline and as much summary as fits. Line limits are
+ * worked out from the tile's height and the text size so that no line is cut; without a picture the text takes the space.
+ */
+@Composable
+private fun BentoCard(
+    row: ArticleRow,
+    showImages: Boolean,
+    imageLoader: ImageLoader,
+    nowMillis: Long,
+    cell: BentoCell,
+    bookmarkButton: @Composable () -> Unit,
+    moreButton: @Composable () -> Unit,
+    modifier: Modifier,
+    clickModifier: Modifier,
+) {
+    val style = MagazineCardStyle
+    val styles = cardTextStyles(multi = true)
+    val density = LocalDensity.current
+    val hasImage = showImages && row.imageUrl != null
+    val summary = CardSummary.displayed(row.summaryText)
+    val titleLineDp = with(density) { styles.title.lineHeight.toDp().value }
+    val summaryLineDp = with(density) { styles.summary.lineHeight.toDp().value }
+    val metaDp = style.META_HEIGHT.value
+    val padding = style.TILE_TEXT_PADDING
+    val compact = CardGridLayout.isCompact(cell.widthDp)
+    val textTop = style.TILE_TEXT_TOP.value
+    val gap = style.SUMMARY_GAP.value
+
+    /** Lines of headline and summary that fit [textDp] of height: headline first (up to 3), the rest for the summary. */
+    fun lines(textDp: Float): Pair<Int, Int> {
+        val title = (textDp / titleLineDp).toInt().coerceIn(1, style.TITLE_MAX_LINES)
+        val rest = textDp - title * titleLineDp - gap
+        val summaryLines = if (summary.isEmpty() || rest < summaryLineDp) 0 else (rest / summaryLineDp).toInt().coerceAtMost(style.SUMMARY_MAX_LINES_IN_FREE_SPACE)
+        return title to summaryLines
+    }
+
+    val text: @Composable (Modifier, Int, Int) -> Unit = { m, titleLines, summaryLines ->
+        Column(m.clipToBounds()) {
+            Text(
+                text = row.title.ifBlank { stringResource(R.string.untitled) },
+                style = styles.title,
+                fontWeight = titleWeight(row),
+                color = if (row.isRead) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                maxLines = titleLines,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (summaryLines > 0) {
+                Spacer(Modifier.height(style.SUMMARY_GAP))
+                Text(
+                    text = summary,
+                    style = styles.summary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = summaryLines,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("card_summary"),
+                )
+            }
+        }
+    }
+    val meta: @Composable () -> Unit = {
+        Row(Modifier.fillMaxWidth().height(style.META_HEIGHT).padding(start = padding), verticalAlignment = Alignment.CenterVertically) {
+            SourceMeta(row, nowMillis, Modifier.weight(1f), stacked = true)
+            if (compact) moreButton() else {
+                bookmarkButton()
+                moreButton()
+            }
+        }
+    }
+    ElevatedCard(modifier.size(cell.widthDp.dp, cell.heightDp.dp)) {
+        when (cell.shape) {
+            BentoShape.WIDE, BentoShape.FULL -> {
+                val picture = if (hasImage) minOf(cell.widthDp * 0.4f, cell.heightDp * 1.2f) else 0f
+                Row(clickModifier.fillMaxHeight()) {
+                    if (hasImage) CardImage(row.imageUrl, imageLoader, Modifier.width(picture.dp).fillMaxHeight())
+                    Column(Modifier.weight(1f).fillMaxHeight()) {
+                        val (t, s) = lines(cell.heightDp - textTop - style.TEXT_BOTTOM.value - metaDp)
+                        text(Modifier.weight(1f).padding(start = padding, end = padding, top = style.TILE_TEXT_TOP), t, s)
+                        meta()
+                    }
+                }
+            }
+            else -> {
+                val picture = when {
+                    !hasImage -> 0f
+                    cell.shape == BentoShape.SMALL -> cell.widthDp / CardGridLayout.TILE_IMAGE_RATIO
+                    else -> cell.heightDp * 0.5f
+                }
+                Column(clickModifier.weight(1f)) {
+                    if (hasImage) CardImage(row.imageUrl, imageLoader, Modifier.fillMaxWidth().height(picture.dp))
+                    val (t, s) = lines(cell.heightDp - picture - textTop - style.TEXT_BOTTOM.value - metaDp)
+                    text(Modifier.weight(1f).padding(start = padding, end = padding, top = style.TILE_TEXT_TOP), t, s)
+                }
+                meta()
+            }
         }
     }
 }

@@ -63,7 +63,9 @@ internal fun CategoryLayoutSheet(
     val stylePick: Pick<CardLayoutStyle> = preference?.cardStyle?.let { Pick.Value(it) } ?: Pick.Inherit
     val columnsPick: Pick<Int> = preference?.cardColumns?.let { Pick.Value(it) } ?: Pick.Inherit
     val effectiveMode = preference?.listLayout ?: global.listMode
+    // The arrangement is the Magazine layout's; the columns are used by every card grid (Magazine, Masonry, Bento).
     val magazine = effectiveMode == ListMode.MAGAZINE
+    val grid = effectiveMode == ListMode.MAGAZINE || effectiveMode == ListMode.MASONRY || effectiveMode == ListMode.BENTO
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -92,14 +94,14 @@ internal fun CategoryLayoutSheet(
                 forceRows = true,
             )
             SectionTitle(stringResource(R.string.settings_card_columns))
-            if (!magazine) Note(stringResource(R.string.layout_magazine_only))
+            if (!grid) Note(stringResource(R.string.layout_grid_only))
             Choice(
                 options = listOf<Pick<Int>>(Pick.Inherit) + listOf(0, 1, 2, 3).map { Pick.Value(it) },
                 selected = columnsPick,
                 label = { if (it is Pick.Value) cardColumnsLabel(it.value) else inheritLabel(cardColumnsLabel(global.cardColumns)) },
                 tag = { if (it is Pick.Value) "cl_cols_${it.value}" else "cl_cols_INHERIT" },
                 onSelect = { onColumns((it as? Pick.Value)?.value) },
-                enabled = magazine,
+                enabled = grid,
                 forceRows = true,
             )
             Note(stringResource(R.string.layout_columns_note))

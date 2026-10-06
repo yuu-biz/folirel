@@ -378,7 +378,7 @@
     <string name="settings_card_style">Magazine arrangement</string>
     <string name="card_style_mixed">Mixed sizes, like a magazine page</string>
     <string name="card_style_even">Same size for every card</string>
-    <string name="settings_card_columns">Most columns in Magazine layout</string>
+    <string name="settings_card_columns">Most columns (Magazine, Masonry, Bento)</string>
     <string name="card_columns_auto">Automatic (by screen width and text size)</string>
     <plurals name="card_columns_n">
         <item quantity="one">%1$d column</item>
@@ -534,4 +534,7 @@
     <string name="display_layout_category_note">Applies to %1$s only. Other categories keep their own layout.</string>
     <string name="display_layout_details">Arrangement and columns…</string>
     <string name="settings_display_default_note">The list style, arrangement and columns below are the default for every category. A category can use its own (display panel of the home screen).</string>
+    <string name="list_mode_masonry">Masonry</string>
+    <string name="list_mode_bento">Bento</string>
+    <string name="layout_grid_only">Used only in the Magazine, Masonry and Bento layouts. A choice made here is kept for them.</string>
 </resources>

@@ -4,6 +4,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.gestures.ScrollScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -16,7 +17,7 @@ import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
-/** Scroll position of the article list, the same operations for the List/Compact list column and the Magazine grid. */
+/** Scroll position of the article list, the same operations for the List/Compact list column, the Magazine grid, the Masonry lanes and the Bento blocks (positions are article indexes). */
 internal interface ScrollHandle {
     /** The underlying Compose state object; effects restart when it changes. */
     val owner: Any
@@ -85,6 +86,67 @@ internal class GridScroll(private val s: LazyGridState) : ScrollHandle {
     }
 
     override suspend fun scrollTo(index: Int) = s.scrollToItem(index)
+    override suspend fun scroll(block: suspend ScrollScope.() -> Unit) = s.scroll(block = block)
+}
+
+internal class StaggeredScroll(private val s: LazyStaggeredGridState) : ScrollHandle {
+    override val owner: Any get() = s
+    override val firstIndex: Int get() = s.firstVisibleItemIndex
+    override val firstOffset: Int get() = s.firstVisibleItemScrollOffset
+    override val viewportPx: Int get() = s.layoutInfo.viewportSize.height
+
+    /** Px one card takes with its gap, and lanes, as seen on the screen now. */
+    private fun shape(): Pair<Float, Float> {
+        val items = s.layoutInfo.visibleItemsInfo
+        if (items.isEmpty()) return 0f to 1f
+        val lanes = items.map { it.lane }.toSet().size.coerceAtLeast(1)
+        val pitch = items.sumOf { it.size.height + s.layoutInfo.mainAxisItemSpacing }.toFloat() / items.size
+        return pitch to lanes.toFloat()
+    }
+
+    override fun distanceToStart(): Float {
+        if (firstIndex == 0) return firstOffset.toFloat()
+        val (pitch, lanes) = shape()
+        return firstOffset + firstIndex / lanes * pitch
+    }
+
+    override fun indexAt(px: Float): Int {
+        val (pitch, lanes) = shape()
+        return if (pitch <= 0f) 0 else ceil(px / pitch * lanes).toInt().coerceAtLeast(0)
+    }
+
+    override suspend fun scrollTo(index: Int) = s.scrollToItem(index)
+    override suspend fun scroll(block: suspend ScrollScope.() -> Unit) = s.scroll(block = block)
+}
+
+/**
+ * The Bento layout is a column of blocks (each block holds a few articles). Positions are kept and asked for by article, so this
+ * turns a block of the column into its first article and an article into its block.
+ */
+internal class BlockScroll(
+    private val s: LazyListState,
+    private val blockOf: IntArray,
+    private val firstArticleOf: IntArray,
+) : ScrollHandle {
+    override val owner: Any get() = s
+    override val firstIndex: Int get() = firstArticleOf.getOrElse(s.firstVisibleItemIndex) { 0 }
+    override val firstOffset: Int get() = s.firstVisibleItemScrollOffset
+    override val viewportPx: Int get() = s.layoutInfo.viewportSize.height
+
+    private fun averageBlockPx(): Float {
+        val items = s.layoutInfo.visibleItemsInfo
+        return if (items.isEmpty()) 0f else items.sumOf { it.size + s.layoutInfo.mainAxisItemSpacing }.toFloat() / items.size
+    }
+
+    override fun distanceToStart(): Float = s.firstVisibleItemScrollOffset + s.firstVisibleItemIndex * averageBlockPx()
+
+    override fun indexAt(px: Float): Int {
+        val avg = averageBlockPx()
+        val block = if (avg <= 0f) 0 else ceil(px / avg).toInt().coerceIn(0, (firstArticleOf.size - 1).coerceAtLeast(0))
+        return firstArticleOf.getOrElse(block) { 0 }
+    }
+
+    override suspend fun scrollTo(index: Int) = s.scrollToItem(blockOf.getOrElse(index) { 0 })
     override suspend fun scroll(block: suspend ScrollScope.() -> Unit) = s.scroll(block = block)
 }
 
