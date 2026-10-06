@@ -14,7 +14,9 @@ import io.github.yuubiz.folirel.model.ArticleRow
 import io.github.yuubiz.folirel.model.ArticleScope
 import io.github.yuubiz.folirel.model.CardLayoutStyle
 import io.github.yuubiz.folirel.model.FeedListFilter
+import io.github.yuubiz.folirel.model.HiddenKeywords
 import io.github.yuubiz.folirel.model.ListMode
+import io.github.yuubiz.folirel.model.PeriodFilter
 import io.github.yuubiz.folirel.model.ReadFilter
 import io.github.yuubiz.folirel.model.SortOrder
 import io.github.yuubiz.folirel.model.Structure
@@ -25,11 +27,13 @@ import java.time.Clock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -74,6 +78,19 @@ class HomeViewModel(
 
     private val _selection = MutableStateFlow(Selection())
     val selection: StateFlow<Selection> = _selection.asStateFlow()
+
+    /**
+     * The moment the period filter counts back from. It is renewed when the period changes, when the app comes to the foreground
+     * ([refreshPeriodClock]) and every [PERIOD_TICK_MS] while a period is set, so a "24 hours" list that stays open lets old
+     * articles go. Seconds do not matter, hence the coarse tick. The clock is the injected one (tests move it).
+     */
+    private val periodNow = MutableStateFlow(clock.millis())
+
+    /** The hidden keywords in effect (empty while the filter is off); null until the settings are read, so no list is drawn unfiltered first. */
+    private val hiddenKeywords: StateFlow<List<String>?> = settingsRepository.settings
+        .map<AppSettings, List<String>?> { it.activeHiddenKeywords }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Raw text of the search field (updates immediately); the query applies after a 250 ms debounce. */
     private val _searchText = MutableStateFlow(savedState.get<String>(KEY_SEARCH).orEmpty())
@@ -144,8 +161,9 @@ class HomeViewModel(
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     fun pageList(scope: ArticleScope): StateFlow<ArticlesState> = pageLists.getOrPut(scope) {
-        combine(accountId.filterNotNull(), _selection, structure, _selectionReady) { account, selection, structure, ready ->
-            if (!ready || !structure.loaded) null else specFor(account, selection.copy(scope = scope), structure)
+        // The time and the hidden keywords are inputs of the query like the selection: a change of either re-queries (and only then).
+        combine(accountId.filterNotNull(), _selection, structure, _selectionReady, combine(periodNow, hiddenKeywords) { now, hidden -> now to hidden }) { account, selection, structure, ready, (now, hidden) ->
+            if (!ready || !structure.loaded || hidden == null) null else specFor(account, selection.copy(scope = scope), structure, now, hidden)
         }
             .distinctUntilChanged()
             .flatMapLatest { spec ->
@@ -167,13 +185,25 @@ class HomeViewModel(
                     filter = savedState.get<String>(KEY_FILTER)?.let { ReadFilter.valueOf(it) } ?: ReadFilter.ALL,
                     sort = savedState.get<String>(KEY_SORT)?.let { SortOrder.valueOf(it) } ?: SortOrder.NEWEST,
                     search = savedState.get<String>(KEY_SEARCH).orEmpty(),
+                    period = restoredPeriod() ?: settingsRepository.settings.first().periodFilter,
                 )
             } else {
                 val s = settingsRepository.settings.first()
-                Selection(scope = s.lastScope, filter = s.lastFilter, sort = s.sortOrder)
+                Selection(scope = s.lastScope, filter = s.lastFilter, sort = s.sortOrder, period = restoredPeriod() ?: s.periodFilter)
             }
             _selection.value = initial
+            periodNow.value = clock.millis()
             _selectionReady.value = true
+        }
+        viewModelScope.launch {
+            // While a period is set the cutoff moves with the clock; with no period nothing changes, so nothing is re-queried.
+            _selection.map { it.period }.distinctUntilChanged().collectLatest { period ->
+                if (period == PeriodFilter.ALL) return@collectLatest
+                while (true) {
+                    delay(PERIOD_TICK_MS)
+                    periodNow.value = clock.millis()
+                }
+            }
         }
         @OptIn(FlowPreview::class)
         viewModelScope.launch {
@@ -204,17 +234,30 @@ class HomeViewModel(
         }
     }
 
-    private fun specFor(account: String, selection: Selection, structure: Structure): ArticleQuerySpec {
+    /** The list, the mark-all-as-read set and the notice all come from this one spec, so they cannot disagree about what is shown. */
+    private fun specFor(
+        account: String,
+        selection: Selection,
+        structure: Structure,
+        now: Long = periodNow.value,
+        hidden: List<String> = hiddenKeywords.value.orEmpty(),
+    ): ArticleQuerySpec {
         val categoryIds = (selection.scope as? ArticleScope.Category)?.let { structure.categoryIdsFor(it.categoryId) }.orEmpty()
-        return ArticleQuerySpec(account, selection.scope, selection.filter, selection.sort, selection.search, categoryIds)
+        return ArticleQuerySpec(
+            account, selection.scope, selection.filter, selection.sort, selection.search, categoryIds,
+            period = selection.period, periodCutoff = selection.period.cutoff(now), hiddenKeywords = hidden,
+        )
     }
+
+    private fun restoredPeriod(): PeriodFilter? =
+        savedState.get<String>(KEY_PERIOD)?.let { name -> PeriodFilter.entries.firstOrNull { it.name == name } }
 
     /**
      * Position key. List mode is deliberately not part of it: switching Magazine/List keeps the
      * same first visible article instead of starting a separate position.
      */
     private fun listKey(spec: ArticleQuerySpec): String =
-        listOf(spec.accountId, spec.scope.encode(), spec.filter.name, spec.sort.name, spec.search).joinToString("|")
+        listOf(spec.accountId, spec.scope.encode(), spec.filter.name, spec.sort.name, spec.search, spec.period.name).joinToString("|")
 
     private fun updateSelection(transform: (Selection) -> Selection) {
         val updated = transform(_selection.value)
@@ -223,10 +266,34 @@ class HomeViewModel(
         savedState[KEY_FILTER] = updated.filter.name
         savedState[KEY_SORT] = updated.sort.name
         savedState[KEY_SEARCH] = updated.search
+        savedState[KEY_PERIOD] = updated.period.name
+    }
+
+    /** Where "this source" was chosen from, so Back can return there (null when the single feed was reached another way). */
+    private val _returnScope = MutableStateFlow(savedState.get<String>(KEY_RETURN_SCOPE)?.let { ArticleScope.decode(it) })
+    val returnScope: StateFlow<ArticleScope?> = _returnScope.asStateFlow()
+
+    private fun setReturnScope(scope: ArticleScope?) {
+        _returnScope.value = scope
+        savedState[KEY_RETURN_SCOPE] = scope?.encode()
+    }
+
+    /** "Show articles from this source" in an article menu: the one feed as a scope. Read, saved and the filter stay as they are. */
+    fun showFeed(feedId: String) {
+        val current = _selection.value.scope
+        if (current == ArticleScope.Feed(feedId)) return
+        if (current !is ArticleScope.Feed) setReturnScope(current)
+        selectScope(ArticleScope.Feed(feedId))
+    }
+
+    /** Back from a single feed to the scope it was opened from. */
+    fun leaveFeed() {
+        selectScope(_returnScope.value ?: ArticleScope.All)
     }
 
     /** Scope change keeps the current filter (docs/product-and-ux.md S10). */
     fun selectScope(scope: ArticleScope) {
+        if (scope !is ArticleScope.Feed) setReturnScope(null)
         updateSelection { it.copy(scope = scope) }
         viewModelScope.launch { settingsRepository.setLastScope(scope) }
     }
@@ -248,6 +315,30 @@ class HomeViewModel(
     fun selectSort(order: SortOrder) {
         updateSelection { it.copy(sort = order) }
         viewModelScope.launch { settingsRepository.setSortOrder(order) }
+    }
+
+    /** A display condition only: no article is deleted, marked or fetched differently. The cutoff is renewed at once. */
+    fun selectPeriod(period: PeriodFilter) {
+        periodNow.value = clock.millis()
+        updateSelection { it.copy(period = period) }
+        settingWrite { settingsRepository.setPeriodFilter(period) }
+    }
+
+    /** The app came to the foreground: the period counts back from now again. */
+    fun refreshPeriodClock() {
+        periodNow.value = clock.millis()
+    }
+
+    fun setHiddenKeywordsEnabled(enabled: Boolean) {
+        settingWrite { settingsRepository.setHiddenKeywordsEnabled(enabled) }
+    }
+
+    /** Returns what happened so the sheet can say why a keyword was not added. */
+    suspend fun addHiddenKeyword(raw: String): HiddenKeywords.AddResult =
+        runCatching { settingsRepository.addHiddenKeyword(raw) }.getOrElse { events.send(HomeEvent.Message(HomeEvent.Message.Kind.UPDATE_FAILED)); HiddenKeywords.AddResult.Blank }
+
+    fun removeHiddenKeyword(keyword: String) {
+        settingWrite { settingsRepository.removeHiddenKeyword(keyword) }
     }
 
     /** A setting the reader chose: when it cannot be stored the stored value stays and the reader is told (no retry). */
@@ -340,8 +431,9 @@ class HomeViewModel(
     suspend fun prepareMarkAllRead(scopeTitle: String): MarkAllReadRequest? {
         val account = accountId.value ?: return null
         val selection = _selection.value
-        val ids = articles.unreadIdsSnapshot(specFor(account, selection, structure.value))
-        return MarkAllReadRequest(ids, scopeTitle, selection.filter, selection.search)
+        val spec = specFor(account, selection, structure.value, hidden = hiddenKeywords.value ?: return null)
+        val ids = articles.unreadIdsSnapshot(spec)
+        return MarkAllReadRequest(ids, scopeTitle, selection.filter, selection.search, selection.period, hiddenKeywordsActive = spec.hiddenKeywords.isNotEmpty())
     }
 
     fun confirmMarkAllRead(request: MarkAllReadRequest) = viewModelScope.launch {
@@ -394,12 +486,17 @@ class HomeViewModel(
     companion object {
         const val SEARCH_DEBOUNCE_MS = 250L
 
+        /** How often a set period renews its cutoff. */
+        const val PERIOD_TICK_MS = 60_000L
+
         /** How long the vm keeps a notice at most; the screen hides it earlier (see HomeNotices). */
         const val NOTICE_KEEP_MS = 30_000L
         private const val KEY_SCOPE = "scope"
         private const val KEY_FILTER = "filter"
         private const val KEY_SORT = "sort"
         private const val KEY_SEARCH = "search"
+        private const val KEY_PERIOD = "period"
+        private const val KEY_RETURN_SCOPE = "return_scope"
         private const val KEY_SEARCH_ACTIVE = "search_active"
         private const val KEY_ANCHORS = "anchors"
         private const val ANCHOR_SEPARATOR = "\u0001"

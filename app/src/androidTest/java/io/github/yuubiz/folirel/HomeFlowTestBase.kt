@@ -92,6 +92,7 @@ abstract class HomeFlowTestBase {
     protected val allowHttp = java.util.concurrent.atomic.AtomicBoolean(true)
     protected val network = kotlinx.coroutines.flow.MutableStateFlow(NetworkState(connected = true, metered = false))
     protected var subscriptionsOpened = 0
+    protected val feedDetailsOpened = mutableListOf<String>()
 
     protected lateinit var coordinator: RefreshCoordinator
     protected lateinit var vm: HomeViewModel
@@ -196,7 +197,7 @@ abstract class HomeFlowTestBase {
                                 vm = vm,
                                 imageLoader = c.imageLoader,
                                 browser = c.browser,
-                                nav = HomeNavigation(importOpml = {}, addFeed = {}, subscriptions = { subscriptionsOpened++ }, settings = {}),
+                                nav = HomeNavigation(importOpml = {}, addFeed = {}, subscriptions = { subscriptionsOpened++ }, settings = {}, feedDetail = { feedDetailsOpened += it }),
                                 httpsState = c.httpsUpgrade.state,
                             )
                         }

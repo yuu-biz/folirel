@@ -67,6 +67,10 @@ class ArticleActions(
     val setRead: (ArticleRow, Boolean) -> Unit,
     val share: (ArticleRow) -> Unit,
     val showSummary: (ArticleRow) -> Unit,
+    /** "Show articles from this source": the feed as the list scope. Changes no article state. */
+    val showFeed: (ArticleRow) -> Unit = {},
+    /** "Source details": the existing feed detail screen. */
+    val feedDetails: (ArticleRow) -> Unit = {},
 )
 
 /**
@@ -118,6 +122,8 @@ fun ArticleItem(
     val saveLabel = stringResource(if (row.isSaved) R.string.action_unsave else R.string.action_save)
     val readLabel = stringResource(if (row.isRead) R.string.action_mark_unread else R.string.action_mark_read)
     val shareLabel = stringResource(R.string.action_share)
+    val showFeedLabel = stringResource(R.string.action_show_feed_articles)
+    val feedDetailsLabel = stringResource(R.string.action_feed_details)
     val openLabel = stringResource(R.string.action_open_article)
     val menuLabel = stringResource(R.string.action_more)
     val rowModifier = Modifier
@@ -133,6 +139,8 @@ fun ArticleItem(
                 CustomAccessibilityAction(saveLabel) { actions.toggleSaved(row); true },
                 CustomAccessibilityAction(readLabel) { actions.setRead(row, !row.isRead); true },
                 CustomAccessibilityAction(shareLabel) { actions.share(row); true },
+                CustomAccessibilityAction(showFeedLabel) { actions.showFeed(row); true },
+                CustomAccessibilityAction(feedDetailsLabel) { actions.feedDetails(row); true },
             )
         }
     val bookmarkButton: @Composable () -> Unit = {
@@ -158,6 +166,17 @@ fun ArticleItem(
                     text = { Text(stringResource(R.string.action_open_external)) },
                     enabled = row.linkUrl != null,
                     onClick = { menuOpen = false; actions.openExternal(row) },
+                )
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text(showFeedLabel) },
+                    onClick = { menuOpen = false; actions.showFeed(row) },
+                    modifier = Modifier.testTag("menu_show_feed"),
+                )
+                DropdownMenuItem(
+                    text = { Text(feedDetailsLabel) },
+                    onClick = { menuOpen = false; actions.feedDetails(row) },
+                    modifier = Modifier.testTag("menu_feed_details"),
                 )
                 if (row.linkUrl == null) {
                     DropdownMenuItem(

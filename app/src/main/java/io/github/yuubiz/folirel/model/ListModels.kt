@@ -31,6 +31,21 @@ enum class ReadFilter { ALL, UNREAD, SAVED }
 enum class SortOrder { NEWEST, OLDEST }
 
 /**
+ * How far back the list reaches, by [ArticleRow.sortAt]. A display condition only: it never deletes, marks or fetches anything.
+ * [name] is what is stored (key `period_filter`); a build that does not know a stored name reads [ALL].
+ */
+enum class PeriodFilter(val hours: Long) {
+    ALL(0), HOURS_24(24), DAYS_3(72), DAYS_7(168), DAYS_30(720);
+
+    /** Oldest `sortAt` (inclusive) that is still inside the period at [nowMillis]; null for [ALL]. */
+    fun cutoff(nowMillis: Long): Long? = if (this == ALL) null else nowMillis - hours * MILLIS_PER_HOUR
+
+    private companion object {
+        const val MILLIS_PER_HOUR = 3_600_000L
+    }
+}
+
+/**
  * How the article list is laid out. The names are the user-facing concepts (Settings and menu: List, Compact list,
  * Magazine); [name] is what is stored in the settings (key `list_layout`).
  * - LIST: one column; title, two lines of summary, a side thumbnail, the source line and the buttons.
@@ -60,4 +75,9 @@ data class ArticleQuerySpec(
     val sort: SortOrder,
     val search: String = "",
     val categoryIds: List<String> = emptyList(),
+    val period: PeriodFilter = PeriodFilter.ALL,
+    /** `sortAt` of the oldest article the period still shows; null = no limit. Computed by the caller from its clock. */
+    val periodCutoff: Long? = null,
+    /** Hidden keywords in effect (already normalized; empty when the filter is off). Matched against title and summary only. */
+    val hiddenKeywords: List<String> = emptyList(),
 )

@@ -10,7 +10,9 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.yuubiz.folirel.model.ArticleScope
 import io.github.yuubiz.folirel.model.CardLayoutStyle
+import io.github.yuubiz.folirel.model.HiddenKeywords
 import io.github.yuubiz.folirel.model.ListMode
+import io.github.yuubiz.folirel.model.PeriodFilter
 import io.github.yuubiz.folirel.model.ReadFilter
 import io.github.yuubiz.folirel.model.SortOrder
 import kotlinx.coroutines.flow.Flow
@@ -83,6 +85,12 @@ data class AppSettings(
     val lastScope: ArticleScope = ArticleScope.All,
     val lastFilter: ReadFilter = ReadFilter.ALL,
     val sortOrder: SortOrder = SortOrder.NEWEST,
+    /** How far back the home list reaches; kept across categories and restarts. A store written before 0.9.0 reads as [PeriodFilter.ALL]. */
+    val periodFilter: PeriodFilter = PeriodFilter.ALL,
+    /** Global hidden keywords, in the order the reader added them (title and summary are matched). Empty before 0.9.0. */
+    val hiddenKeywords: List<String> = emptyList(),
+    /** The hidden-keyword filter is on. Off by default; it only has an effect while [hiddenKeywords] is not empty (see [activeHiddenKeywords]). */
+    val hiddenKeywordsEnabled: Boolean = false,
     /** Last refresh attempt of any kind (docs/fetch-and-security.md §5: the startup rule is based on the last attempt). */
     val lastRefreshAttemptAt: Long = 0,
     /** Articles to keep on the device (0 = no limit). Unread and saved articles are never removed. */
@@ -90,6 +98,9 @@ data class AppSettings(
     /** Thumbnail disk cache size; applied at the next app start. */
     val imageCacheMb: Int = 128,
 ) {
+    /** The keywords the list query applies: none while the filter is off. */
+    val activeHiddenKeywords: List<String> get() = if (hiddenKeywordsEnabled) hiddenKeywords else emptyList()
+
     companion object {
         /** Text size, in percent: 90..130 in steps of 5. The four values older versions offered (90, 100, 115, 130) are on this grid. */
         const val TEXT_SCALE_MIN_PERCENT = 90
@@ -138,6 +149,9 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val lastScope = stringPreferencesKey("last_scope")
         val lastFilter = stringPreferencesKey("last_filter")
         val sortOrder = stringPreferencesKey("sort_order")
+        val periodFilter = stringPreferencesKey("period_filter")
+        val hiddenKeywords = stringPreferencesKey("hidden_keywords")
+        val hiddenKeywordsEnabled = booleanPreferencesKey("hidden_keywords_enabled")
         val lastAttempt = longPreferencesKey("last_refresh_attempt")
     }
 
@@ -164,6 +178,9 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             lastScope = ArticleScope.decode(p[Keys.lastScope]),
             lastFilter = enumOr(p[Keys.lastFilter], defaults.lastFilter),
             sortOrder = enumOr(p[Keys.sortOrder], defaults.sortOrder),
+            periodFilter = enumOr(p[Keys.periodFilter], defaults.periodFilter),
+            hiddenKeywords = HiddenKeywords.decode(p[Keys.hiddenKeywords]),
+            hiddenKeywordsEnabled = p[Keys.hiddenKeywordsEnabled] ?: defaults.hiddenKeywordsEnabled,
             lastRefreshAttemptAt = p[Keys.lastAttempt] ?: 0,
             retentionLimit = p[Keys.retentionLimit]?.takeIf { it in AppSettings.RETENTION_LIMITS } ?: defaults.retentionLimit,
             imageCacheMb = p[Keys.imageCacheMb]?.takeIf { it in AppSettings.IMAGE_CACHE_MB } ?: defaults.imageCacheMb,
@@ -196,6 +213,29 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setLastScope(value: ArticleScope) = store.edit { it[Keys.lastScope] = value.encode() }
     suspend fun setLastFilter(value: ReadFilter) = store.edit { it[Keys.lastFilter] = value.name }
     suspend fun setSortOrder(value: SortOrder) = store.edit { it[Keys.sortOrder] = value.name }
+    suspend fun setPeriodFilter(value: PeriodFilter) = store.edit { it[Keys.periodFilter] = value.name }
+    suspend fun setHiddenKeywordsEnabled(value: Boolean) = store.edit { it[Keys.hiddenKeywordsEnabled] = value }
+
+    /**
+     * Adds a hidden keyword (one write, so the list and the switch change together). The first keyword of an empty list also turns the
+     * filter on: a switch for a list with nothing in it would mean nothing. The list is read inside the write, so two quick adds both land.
+     */
+    suspend fun addHiddenKeyword(raw: String): HiddenKeywords.AddResult {
+        var result: HiddenKeywords.AddResult = HiddenKeywords.AddResult.Blank
+        store.edit { p ->
+            val current = HiddenKeywords.decode(p[Keys.hiddenKeywords])
+            result = HiddenKeywords.add(current, raw)
+            (result as? HiddenKeywords.AddResult.Added)?.let { added ->
+                p[Keys.hiddenKeywords] = HiddenKeywords.encode(added.list)
+                if (current.isEmpty()) p[Keys.hiddenKeywordsEnabled] = true
+            }
+        }
+        return result
+    }
+
+    suspend fun removeHiddenKeyword(keyword: String) = store.edit { p ->
+        p[Keys.hiddenKeywords] = HiddenKeywords.encode(HiddenKeywords.remove(HiddenKeywords.decode(p[Keys.hiddenKeywords]), keyword))
+    }
     suspend fun setLastRefreshAttempt(at: Long) = store.edit { it[Keys.lastAttempt] = at }
 
     private inline fun <reified E : Enum<E>> enumOr(value: String?, default: E): E =

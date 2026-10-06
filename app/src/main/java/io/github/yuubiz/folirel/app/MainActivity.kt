@@ -168,6 +168,7 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
                         subscriptions = { push(ROUTE_SUBSCRIPTIONS) },
                         settings = { push(SettingsPage.TOP_ROUTE) },
                         organizeTabs = { push(ROUTE_TAB_ORDER) },
+                        feedDetail = { push(ROUTE_FEED_PREFIX + it) },
                     ),
                 )
                 route == ROUTE_IMPORT -> ImportScreen(

@@ -15,7 +15,9 @@ import java.time.Clock
 
 /**
  * Builds list queries from constants only; every user-provided value (ids, search terms) is a bind argument.
- * Search is a LIKE substring match (works for Japanese) with `%`, `_` and `\` escaped.
+ * Search and hidden keywords are LIKE substring matches (work for Japanese) with `%`, `_` and `\` escaped. The period and the
+ * hidden keywords are part of the same WHERE as scope, read filter and search, so the list, "mark all as read" and the count
+ * always see one set of articles.
  */
 object ArticleQuery {
     /** Characters of the summary loaded for list rows (two lines at most are shown). */
@@ -77,6 +79,17 @@ object ArticleQuery {
             ReadFilter.SAVED -> clauses += "s.isSaved = 1"
         }
         if (onlyUnread && spec.filter != ReadFilter.UNREAD) clauses += "s.isRead = 0"
+        spec.periodCutoff?.let {
+            clauses += "a.sortAt >= ?"
+            args += it
+        }
+        // Hidden keywords only hide: they never touch read/saved state. Title and summary only (not source, URL or author).
+        for (keyword in spec.hiddenKeywords) {
+            clauses += "NOT (a.title LIKE ? ESCAPE '\\' OR a.summaryText LIKE ? ESCAPE '\\')"
+            val pattern = "%" + escapeLike(keyword) + "%"
+            args += pattern
+            args += pattern
+        }
         for (term in searchTerms(spec.search)) {
             clauses += "(a.title LIKE ? ESCAPE '\\' OR a.summaryText LIKE ? ESCAPE '\\' OR COALESCE(f.userTitle, f.feedTitle, '') LIKE ? ESCAPE '\\')"
             val pattern = "%" + escapeLike(term) + "%"

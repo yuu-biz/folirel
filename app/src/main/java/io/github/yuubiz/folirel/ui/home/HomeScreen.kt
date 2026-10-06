@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
@@ -132,6 +133,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.ImageLoader
 import io.github.yuubiz.folirel.R
@@ -149,6 +152,7 @@ import io.github.yuubiz.folirel.ui.common.LayoutPicker
 import io.github.yuubiz.folirel.ui.common.SectionTitle
 import io.github.yuubiz.folirel.model.FetchError
 import io.github.yuubiz.folirel.model.ListMode
+import io.github.yuubiz.folirel.model.PeriodFilter
 import io.github.yuubiz.folirel.model.ReadFilter
 import io.github.yuubiz.folirel.model.SortOrder
 import io.github.yuubiz.folirel.model.Structure
@@ -165,6 +169,8 @@ class HomeNavigation(
     val settings: () -> Unit,
     /** "Organize categories and tabs": the order and the pins of the tabs. */
     val organizeTabs: () -> Unit = {},
+    /** "Source details" in an article menu: the feed detail screen of that feed id. */
+    val feedDetail: (String) -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -211,9 +217,15 @@ fun HomeScreen(
     var summaryFor by remember { mutableStateOf<ArticleRow?>(null) }
     var overflowOpen by remember { mutableStateOf(false) }
     var displayOpen by rememberSaveable { mutableStateOf(false) }
+    var hiddenOpen by rememberSaveable { mutableStateOf(false) }
     var pickerOpen by rememberSaveable { mutableStateOf(false) }
 
     val messages = HomeMessages.load()
+    // The period counts back from now again when the app comes back (a "24 hours" list left open overnight must not keep old articles).
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { vm.refreshPeriodClock() }
+    // A single source opened from an article menu goes back to where it was opened from.
+    val returnScope by vm.returnScope.collectAsStateWithLifecycle()
+    BackHandler(enabled = selection.scope is ArticleScope.Feed && returnScope != null) { vm.leaveFeed() }
     LaunchedEffect(vm) {
         vm.eventFlow.collect { event ->
             val text = when (event) {
@@ -244,6 +256,8 @@ fun HomeScreen(
         setRead = { row, read -> vm.setRead(row, read) },
         share = { row -> context.startActivity(browser.shareIntent(row.title, row.linkUrl)) },
         showSummary = { summaryFor = it },
+        showFeed = { vm.showFeed(it.feedId) },
+        feedDetails = { nav.feedDetail(it.feedId) },
     )
 
     fun requestRefresh() {
@@ -347,7 +361,7 @@ fun HomeScreen(
                                 modifier = Modifier.fillMaxWidth().testTag("search_field"),
                             )
                         } else {
-                            ScopeTitle(scopeTitle, "${filterLabel(selection.filter)} · ${sortLabel(selection.sort)}") { pickerOpen = true }
+                            ScopeTitle(scopeTitle, listOfNotNull(filterLabel(selection.filter), periodLabel(selection.period).takeIf { selection.period != PeriodFilter.ALL }, sortLabel(selection.sort)).joinToString(" · ")) { pickerOpen = true }
                         }
                     },
                     actions = {
@@ -371,7 +385,14 @@ fun HomeScreen(
                             }
                         }
                         IconButton(onClick = { displayOpen = true }, modifier = Modifier.testTag("display_open")) {
-                            Icon(painterResource(R.drawable.ic_tune), stringResource(R.string.display_open))
+                            // A small dot while the hidden keywords are hiding articles, so the list that looks short is explained without words on the bar.
+                            val hiding = settings.activeHiddenKeywords.isNotEmpty()
+                            BadgedBox(badge = { if (hiding) Badge(Modifier.testTag("hidden_keywords_badge")) }) {
+                                Icon(
+                                    painterResource(R.drawable.ic_tune),
+                                    if (hiding) stringResource(R.string.display_open) + ", " + stringResource(R.string.hidden_keywords_active) else stringResource(R.string.display_open),
+                                )
+                            }
                         }
                         if (!searchActive && !narrow) {
                             IconButton(onClick = { vm.setSearchActive(true) }, modifier = Modifier.testTag("search_open")) {
@@ -495,8 +516,14 @@ fun HomeScreen(
         DisplayPanel(
             filter = selection.filter,
             sort = selection.sort,
+            period = selection.period,
+            hiddenCount = settings.hiddenKeywords.size,
+            hiddenEnabled = settings.hiddenKeywordsEnabled,
             onFilter = vm::selectFilter,
             onSort = vm::selectSort,
+            onPeriod = vm::selectPeriod,
+            onHiddenEnabled = vm::setHiddenKeywordsEnabled,
+            onManageHidden = { hiddenOpen = true },
             onDismiss = { displayOpen = false },
         ) {
             if (shownCategory != null) {
@@ -527,6 +554,16 @@ fun HomeScreen(
                 Text(stringResource(R.string.display_layout_global_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+    }
+    if (hiddenOpen) {
+        HiddenKeywordsSheet(
+            keywords = settings.hiddenKeywords,
+            enabled = settings.hiddenKeywordsEnabled,
+            onEnabled = vm::setHiddenKeywordsEnabled,
+            onAdd = vm::addHiddenKeyword,
+            onRemove = vm::removeHiddenKeyword,
+            onDismiss = { hiddenOpen = false },
+        )
     }
     if (layoutDetails && shownCategory != null) {
         CategoryLayoutSheet(
@@ -718,7 +755,7 @@ private fun ScopePage(
     Box(Modifier.fillMaxSize().testTag("page_${pageScope.encode()}")) {
         when {
             !list.loaded -> Unit
-            list.items.isEmpty() -> EmptyList(selection, refreshing, offline, onRefresh)
+            list.items.isEmpty() -> EmptyList(selection, settings.activeHiddenKeywords.isNotEmpty(), refreshing, offline, onRefresh)
             else -> ArticleList(
                 host = vm,
                 state = list,
@@ -847,7 +884,7 @@ private fun ArticleListBody(
      * article read.
      */
     fun answerNotice() {
-        host.acknowledgeNew(currentItems.filter { it.id in currentNew }.map { it.id })
+        host.acknowledgeNew(newArticlesIn(currentItems, currentNew))
     }
 
     /** One movement back to the start of the list. A second request while it runs joins it instead of starting it over. */
@@ -899,7 +936,7 @@ private fun ArticleListBody(
     // Far enough down that the way back is long; the button is for that case only.
     val farDown by remember(scroll.owner) { derivedStateOf { currentScroll.firstIndex > SCROLL_TOP_BUTTON_AFTER } }
     // The banner counts only the new articles this list shows.
-    val newCount = remember(items, newIds) { items.count { it.id in newIds } }
+    val newCount = remember(items, newIds) { newArticlesIn(items, newIds).size }
     val now = remember(items) { System.currentTimeMillis() }
     // Where the buttons that ask for a movement are (in this box): a press on them is the request itself, not a touch of the list.
     val controls = remember { ControlBounds() }
@@ -1155,9 +1192,11 @@ private fun NoSubscriptions(onImport: () -> Unit, onAdd: () -> Unit) {
 }
 
 @Composable
-private fun EmptyList(selection: Selection, refreshing: Boolean, offline: Boolean, onRefresh: () -> Unit) {
+private fun EmptyList(selection: Selection, hiddenActive: Boolean, refreshing: Boolean, offline: Boolean, onRefresh: () -> Unit) {
     val message = when {
         selection.search.isNotEmpty() -> stringResource(R.string.empty_search, selection.search)
+        // A period or hidden keywords can be what empties the list: say so instead of "no articles".
+        selection.period != PeriodFilter.ALL || hiddenActive -> stringResource(R.string.empty_filtered)
         selection.filter == ReadFilter.UNREAD -> stringResource(R.string.empty_unread)
         selection.filter == ReadFilter.SAVED -> stringResource(R.string.empty_saved)
         refreshing -> stringResource(R.string.empty_fetching)
@@ -1199,6 +1238,8 @@ private fun MarkAllReadDialog(request: MarkAllReadRequest, onConfirm: () -> Unit
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(stringResource(R.string.mark_all_scope, request.scopeTitle))
                 Text(stringResource(R.string.mark_all_filter, filterLabel))
+                if (request.period != PeriodFilter.ALL) Text(stringResource(R.string.mark_all_period, periodLabel(request.period)))
+                if (request.hiddenKeywordsActive) Text(stringResource(R.string.mark_all_hidden))
                 if (request.search.isNotEmpty()) Text(stringResource(R.string.mark_all_search, request.search))
                 Text(
                     if (request.ids.isEmpty()) stringResource(R.string.mark_all_none)

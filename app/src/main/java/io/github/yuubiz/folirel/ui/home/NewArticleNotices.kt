@@ -1,5 +1,6 @@
 package io.github.yuubiz.folirel.ui.home
 
+import io.github.yuubiz.folirel.model.ArticleRow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,3 +38,11 @@ internal class NewArticleNotices(private val maxPending: Int = 5_000, private va
         _pending.update { current -> if (ids.none { it in current }) current else current - ids.toSet() }
     }
 }
+
+/**
+ * The announced articles a list actually shows: what its banner counts and what answering it acknowledges. A list built with the
+ * current period, hidden keywords, search and read filter never contains the articles those leave out, so an announcement for
+ * them neither appears here nor is used up; it stays pending and counts as soon as a looser filter shows them.
+ */
+internal fun newArticlesIn(items: List<ArticleRow>, pending: Set<String>): List<String> =
+    if (pending.isEmpty()) emptyList() else items.filter { it.id in pending }.map { it.id }
