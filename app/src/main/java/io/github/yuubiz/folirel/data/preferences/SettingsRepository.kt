@@ -40,6 +40,13 @@ enum class ColorPalette {
 
 enum class BrowserMode { CUSTOM_TABS, EXTERNAL }
 
+/**
+ * How the category navigation is shown on a wide window: [AUTO] a persistent pane on an expanded window (>= 840 dp) and the drawer
+ * below that, [PANE] a pane as soon as the window is medium (>= 600 dp) and the articles keep a readable width, [DRAWER] always the
+ * modal drawer. A compact window (< 600 dp) always has the drawer. Default [AUTO], also for a store written before 0.8.0.
+ */
+enum class CategoryNavigation { AUTO, PANE, DRAWER }
+
 /** Display/update preferences and the last selection. Reading state and subscriptions live in Room only. */
 data class AppSettings(
     val theme: ThemeMode = ThemeMode.SYSTEM,
@@ -47,11 +54,13 @@ data class AppSettings(
     val palette: ColorPalette = ColorPalette.CLASSIC,
     val listMode: ListMode = ListMode.LIST,
     val textScale: Float = 1.0f,
-    /** Columns of the Magazine layout: 0 = automatic by width and text size, otherwise 1..3 (reduced when they do not fit). */
+    /** Columns of the Magazine, Masonry and Bento layouts: 0 = automatic by width and text size, otherwise 1..5 (reduced when they do not fit). */
     val cardColumns: Int = 0,
     /** Mixed sizes (magazine page) or one size for every card. */
     val cardStyle: CardLayoutStyle = CardLayoutStyle.MIXED,
     val showImages: Boolean = true,
+    /** Category navigation of a wide window (pane or drawer); a compact window has the drawer whatever this says. */
+    val categoryNavigation: CategoryNavigation = CategoryNavigation.AUTO,
     val browserMode: BrowserMode = BrowserMode.CUSTOM_TABS,
     /** Periodic update interval in minutes; 0 = off. Default 2 hours. */
     val refreshIntervalMinutes: Int = 120,
@@ -101,7 +110,8 @@ data class AppSettings(
         val REFRESH_INTERVALS_MINUTES = listOf(0, 15, 30, 60, 120, 360, 720, 1440)
         val RETENTION_LIMITS = listOf(0, 1_000, 3_000, 5_000, 10_000, 30_000)
         val IMAGE_CACHE_MB = listOf(64, 128, 256, 512)
-        val CARD_COLUMNS = listOf(0, 1, 2, 3)
+        /** 0 = automatic, otherwise the most columns wanted. Shared by the global setting, the category override and their validation. */
+        val CARD_COLUMNS = listOf(0, 1, 2, 3, 4, 5)
     }
 }
 
@@ -114,6 +124,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val cardColumns = intPreferencesKey("card_columns")
         val cardStyle = stringPreferencesKey("card_style")
         val showImages = booleanPreferencesKey("show_images")
+        val categoryNavigation = stringPreferencesKey("category_navigation")
         val browserMode = stringPreferencesKey("browser_mode")
         val refreshMinutes = intPreferencesKey("refresh_interval_minutes")
         val startupRefresh = booleanPreferencesKey("startup_refresh")
@@ -140,6 +151,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             cardStyle = enumOr(p[Keys.cardStyle], defaults.cardStyle),
             cardColumns = p[Keys.cardColumns]?.takeIf { it in AppSettings.CARD_COLUMNS } ?: defaults.cardColumns,
             showImages = p[Keys.showImages] ?: defaults.showImages,
+            categoryNavigation = enumOr(p[Keys.categoryNavigation], defaults.categoryNavigation),
             browserMode = enumOr(p[Keys.browserMode], defaults.browserMode),
             refreshIntervalMinutes = intervalMinutes(p),
             // Until the user chooses, startup refresh follows the automatic-update switch.
@@ -170,6 +182,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setCardColumns(value: Int) = store.edit { it[Keys.cardColumns] = value }
     suspend fun setCardStyle(value: CardLayoutStyle) = store.edit { it[Keys.cardStyle] = value.name }
     suspend fun setShowImages(value: Boolean) = store.edit { it[Keys.showImages] = value }
+    suspend fun setCategoryNavigation(value: CategoryNavigation) = store.edit { it[Keys.categoryNavigation] = value.name }
     suspend fun setBrowserMode(value: BrowserMode) = store.edit { it[Keys.browserMode] = value.name }
     suspend fun setRefreshIntervalMinutes(minutes: Int) = store.edit { it[Keys.refreshMinutes] = minutes }
     suspend fun setStartupRefresh(value: Boolean) = store.edit { it[Keys.startupRefresh] = value }

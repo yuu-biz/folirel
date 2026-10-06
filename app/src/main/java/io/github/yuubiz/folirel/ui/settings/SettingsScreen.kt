@@ -166,6 +166,7 @@ private fun SettingsTop(s: AppSettings, onOpenPage: (SettingsPage) -> Unit) {
         stringResource(R.string.percent_value, AppSettings.textScalePercent(s.textScale)),
     ).joinToString(dash)
     val layout = buildList {
+        add(categoryNavigationName(s.categoryNavigation))
         add(listModeName(s.listMode))
         if (s.listMode == ListMode.MAGAZINE) add(cardStyleName(s.cardStyle))
         if (s.listMode.usesColumns()) add(columnsName(s.cardColumns))

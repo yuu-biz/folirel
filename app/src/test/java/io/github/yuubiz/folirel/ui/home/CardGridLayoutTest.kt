@@ -11,7 +11,7 @@ class CardGridLayoutTest {
     private fun auto(widthDp: Float, fontScale: Float = 1f) = CardGridLayout.columns(widthDp, fontScale, 0)
 
     @Test
-    fun autoColumnsGrowWithWidthAndNeverExceedThree() {
+    fun autoColumnsGrowWithWidthAndNeverExceedFive() {
         assertEquals(1, auto(320f).count)
         assertEquals(1, auto(360f).count) // ordinary phone
         assertEquals(1, auto(412f).count)
@@ -19,8 +19,10 @@ class CardGridLayoutTest {
         assertEquals(2, auto(600f).count)
         assertEquals(3, auto(733f).count) // wide tablet
         assertEquals(3, auto(840f).count)
-        assertEquals(3, auto(1280f).count)
-        assertEquals(3, auto(4000f).count)
+        assertEquals(4, auto(930f).count)
+        assertEquals(5, auto(1200f).count) // a large tablet, or an unfolded foldable in landscape
+        assertEquals(5, auto(1280f).count)
+        assertEquals(5, auto(4000f).count)
         // Wide never means one huge column.
         assertTrue(auto(840f).count > 1)
         assertFalse(auto(840f).corrected)
@@ -32,6 +34,10 @@ class CardGridLayoutTest {
         assertEquals(2, auto(733f, 1.3f).count)
         assertEquals(1, auto(733f, 2.0f).count)
         assertEquals(1, auto(480f, 2.0f).count)
+        // Wide windows too (RSP-T12): 200 % text takes columns away instead of shrinking the text.
+        assertEquals(5, auto(1200f, 1.0f).count)
+        assertEquals(4, auto(1200f, 1.3f).count)
+        assertEquals(2, auto(1200f, 2.0f).count)
         // Below 1.0 does not squeeze more columns in.
         assertEquals(auto(733f, 1.0f).count, auto(733f, 0.8f).count)
     }
@@ -53,13 +59,28 @@ class CardGridLayoutTest {
         assertEquals(CardGridLayout.Columns(3, corrected = false), CardGridLayout.columns(733f, 1f, 3))
         assertEquals(CardGridLayout.Columns(1, corrected = false), CardGridLayout.columns(733f, 1f, 1))
         // Out-of-range values are clamped, never crash.
-        assertEquals(3, CardGridLayout.columns(1000f, 1f, 9).count)
+        assertEquals(5, CardGridLayout.columns(1000f, 1f, 9).count)
         assertEquals(1, CardGridLayout.columns(1000f, 1f, 1).count)
+    }
+
+    /** RSP-T10 / T11: a requested 4 or 5 is reduced on a narrow window and comes back when the window grows (the stored choice is never touched). */
+    @Test
+    fun fourAndFiveColumnsAreReducedWhereTheyDoNotFitAndComeBackWhenTheWindowGrows() {
+        assertEquals(CardGridLayout.Columns(5, corrected = false), CardGridLayout.columns(1200f, 1f, 5))
+        assertEquals(CardGridLayout.Columns(5, corrected = false), CardGridLayout.columns(840f, 1f, 5))
+        // Folded: the same wish on a phone is reduced to what fits...
+        assertEquals(CardGridLayout.Columns(2, corrected = true), CardGridLayout.columns(411f, 1f, 4))
+        assertEquals(CardGridLayout.Columns(2, corrected = true), CardGridLayout.columns(411f, 1f, 5))
+        assertEquals(CardGridLayout.Columns(4, corrected = true), CardGridLayout.columns(733f, 1f, 5))
+        // ...and unfolded again it is 4 (or 5), because only the width changed.
+        assertEquals(CardGridLayout.Columns(4, corrected = false), CardGridLayout.columns(840f, 1f, 4))
+        // 200 % text: five do not fit even on a wide window.
+        assertEquals(CardGridLayout.Columns(3, corrected = true), CardGridLayout.columns(1200f, 2f, 5))
     }
 
     @Test
     fun cardWidthAndImageHeightAreBoundedByTheCard() {
-        for (columns in 1..3) {
+        for (columns in 1..5) {
             val width = CardGridLayout.cardWidthDp(840f, columns)
             val total = width * columns + CardGridLayout.GAP_DP * (columns - 1) + 2 * CardGridLayout.EDGE_DP
             assertEquals(840f, total, 0.01f)

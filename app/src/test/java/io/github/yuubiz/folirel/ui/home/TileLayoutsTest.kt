@@ -32,8 +32,8 @@ class TileLayoutsTest {
 
     @Test
     fun bentoBlocksFillTheirColumnsWithoutGapsAndKeepTheOrder() {
-        for (fromEnd in listOf(false, true)) for (columns in 1..3) {
-            for (n in listOf(1, 2, 3, 4, 5, 7, 40, 301)) {
+        for (fromEnd in listOf(false, true)) for (columns in 1..5) {
+            for (n in listOf(1, 2, 3, 4, 5, 6, 7, 9, 11, 40, 301)) {
                 val blocks = BentoPlan.blocks(ids(n), columns, fromEnd)
                 // Every article once, in order.
                 assertEquals((0 until n).toList(), blocks.flatMap { b -> b.tiles.map { it.article }.sorted() })
@@ -53,7 +53,7 @@ class TileLayoutsTest {
     @Test
     fun newArticlesAtTheNewestEndChangeOnlyTheBlockThere() {
         val old = ids(120)
-        for (columns in 2..3) for (added in 1..7) {
+        for (columns in 2..5) for (added in 1..7) {
             val fresh = List(added) { "fresh-$it" }
             // Newest first: new articles come before the old ones.
             val before = places(BentoPlan.blocks(old, columns, fromEnd = true), old, true)
@@ -61,13 +61,14 @@ class TileLayoutsTest {
             val after = places(BentoPlan.blocks(withNew, columns, fromEnd = true), withNew, true)
             val moved = old.filter { before[it] != after[it] }
             // Only articles of the old top block (the one left over at the newest end) may change.
-            assertTrue("$columns columns, $added new: ${moved.size} old articles moved", moved.size <= 4 && moved.all { old.indexOf(it) < 4 })
+            val most = BentoPlan.maxPatternSize(columns) - 1
+            assertTrue("$columns columns, $added new: ${moved.size} old articles moved", moved.size <= most && moved.all { old.indexOf(it) < most })
             // Oldest first: new articles come after the old ones.
             val beforeAsc = places(BentoPlan.blocks(old, columns), old, false)
             val asc = old + fresh
             val afterAsc = places(BentoPlan.blocks(asc, columns), asc, false)
             val movedAsc = old.filter { beforeAsc[it] != afterAsc[it] }
-            assertTrue("oldest first, $columns columns, $added new: $movedAsc", movedAsc.size <= 4 && movedAsc.all { old.indexOf(it) >= old.size - 4 })
+            assertTrue("oldest first, $columns columns, $added new: $movedAsc", movedAsc.size <= most && movedAsc.all { old.indexOf(it) >= old.size - most })
         }
     }
 
@@ -82,6 +83,60 @@ class TileLayoutsTest {
         assertEquals(BentoPlan.blocks(list, 2), BentoPlan.blocks(list, 2))
         // One column: one small (full-width) tile per article.
         assertTrue(BentoPlan.blocks(list, 1).all { it.tiles.single().shape == BentoShape.SMALL && it.rows == 1 })
+    }
+
+    /** RSP-T20 / T21: four and five columns have patterns of their own, every one of which fills its columns. */
+    @Test
+    fun bentoOnFourAndFiveColumnsUsesAllShapesAndNeverLeavesAnEmptyColumn() {
+        val list = ids(600)
+        for (columns in 4..5) {
+            val blocks = BentoPlan.blocks(list, columns)
+            val shapes = blocks.flatMap { b -> b.tiles.map { it.shape } }.toSet()
+            assertTrue("$columns columns use small, wide, tall and big: $shapes", shapes.containsAll(listOf(BentoShape.SMALL, BentoShape.WIDE, BentoShape.TALL, BentoShape.BIG)))
+            // Every block covers every cell of its rows once, so no column of a block is empty (checked for both packing directions).
+            for (fromEnd in listOf(false, true)) for (b in BentoPlan.blocks(list, columns, fromEnd)) assertGapFree(b, columns)
+            assertEquals(blocks, BentoPlan.blocks(list, columns))
+            // A block never holds more articles than the pattern bound says.
+            assertTrue(blocks.all { it.tiles.size <= BentoPlan.maxPatternSize(columns) })
+            // Rows of blocks are one or two high.
+            assertTrue(blocks.all { it.rows in 1..2 })
+        }
+        assertTrue("five columns use a three-wide tile", BentoPlan.blocks(list, 5).flatMap { b -> b.tiles.map { it.shape } }.contains(BentoShape.WIDE3))
+    }
+
+    /** The end of the list: one to a few articles left over still fill every column (the last block is a shorter pattern or one full-width tile). */
+    @Test
+    fun theLastBlockOfFourAndFiveColumnsIsGapFreeForEveryNumberOfArticlesLeft() {
+        for (columns in 4..5) for (n in 1..40) for (fromEnd in listOf(false, true)) {
+            val blocks = BentoPlan.blocks(ids(n, "tail-"), columns, fromEnd)
+            for (b in blocks) assertGapFree(b, columns)
+            assertEquals((0 until n).toList(), blocks.flatMap { b -> b.tiles.map { it.article } }.sorted())
+        }
+        assertEquals(BentoShape.FULL4, BentoPlan.blocks(ids(1), 4).single().tiles.single().shape)
+        assertEquals(BentoShape.FULL5, BentoPlan.blocks(ids(1), 5).single().tiles.single().shape)
+        assertEquals(BentoShape.FULL, BentoPlan.blocks(ids(1), 3).single().tiles.single().shape)
+    }
+
+    /**
+     * RSP-T13 for Bento: one to three columns are exactly the blocks 0.7.2 drew. The strings were produced by an independent copy of
+     * the 0.7.2 packer (patterns, fall-backs and the half-turn for newest-first lists) for fourteen articles, in both packing directions.
+     */
+    @Test
+    fun oneToThreeColumnBentoBlocksAreUnchangedFrom072() {
+        val list = List(14) { "article-${it * 7919 + 13}" }
+        fun show(columns: Int, fromEnd: Boolean) = BentoPlan.blocks(list, columns, fromEnd).joinToString(" | ") { b ->
+            "${b.rows}:" + b.tiles.joinToString(",") { "${it.article}@${it.col}.${it.row}${it.shape.name[0]}" }
+        }
+        val one = (0..13).joinToString(" | ") { "1:$it@0.0S" }
+        assertEquals(one, show(1, false))
+        assertEquals(one, show(1, true))
+        assertEquals("1:0@0.0W | 1:1@0.0S,2@1.0S | 1:3@0.0S,4@1.0S | 2:5@0.0T,6@1.0S,7@1.1S | 2:8@0.0W,9@0.1S,10@1.1S | 1:11@0.0W | 1:12@0.0S,13@1.0S", show(2, false))
+        assertEquals("1:0@0.0S,1@1.0S | 1:2@0.0S,3@1.0S | 2:4@0.0T,5@1.0S,6@1.1S | 1:7@0.0W | 2:8@0.0S,9@0.1S,10@1.0T | 2:11@0.0T,12@1.0S,13@1.1S", show(2, true))
+        assertEquals("1:0@0.0W,1@2.0S | 1:2@0.0S,3@1.0W | 1:4@0.0S,5@1.0S,6@2.0S | 1:7@0.0W,8@2.0S | 1:9@0.0S,10@1.0W | 1:11@0.0W,12@2.0S | 1:13@0.0F", show(3, false))
+        assertEquals("1:0@0.0F | 2:1@0.0S,2@1.0S,3@0.1S,4@1.1S,5@2.0T | 2:6@0.0S,7@1.0S,8@0.1S,9@1.1S,10@2.0T | 2:11@0.0B,12@2.0S,13@2.1S", show(3, true))
+        assertEquals(5, BentoPlan.maxPatternSize(3))
+        assertEquals(3, BentoPlan.maxPatternSize(2))
+        assertEquals(1, BentoPlan.maxPatternSize(1))
     }
 
     @Test
@@ -106,5 +161,19 @@ class TileLayoutsTest {
         assertEquals(2, CardGridLayout.columns(411f, 1f, 0, CardGridLayout.TILE_AUTO_MIN_CARD_DP).count)
         assertEquals(1, CardGridLayout.columns(411f, 1f, 0).count) // the Magazine automatic choice is unchanged
         assertEquals(1, CardGridLayout.columns(411f, 2f, 0, CardGridLayout.TILE_AUTO_MIN_CARD_DP).count) // 200 % text: one
+    }
+
+    /** RSP-T19: Masonry and Bento use four and five lanes of a wide window. */
+    @Test
+    fun tileLayoutsUseFourAndFiveColumnsOnWideWindows() {
+        val tile = CardGridLayout.TILE_AUTO_MIN_CARD_DP
+        assertEquals(3, CardGridLayout.columns(600f, 1f, 0, tile).count)
+        assertEquals(4, CardGridLayout.columns(733f, 1f, 0, tile).count)
+        assertEquals(5, CardGridLayout.columns(1200f, 1f, 0, tile).count)
+        assertEquals(3, CardGridLayout.columns(1200f, 2f, 0, tile).count)
+        for (columns in 4..5) {
+            val cell = BentoPlan.cellWidthDp(1200f, columns)
+            assertEquals(1200f, cell * columns + CardGridLayout.GAP_DP * (columns - 1) + 2 * CardGridLayout.EDGE_DP, 0.01f)
+        }
     }
 }

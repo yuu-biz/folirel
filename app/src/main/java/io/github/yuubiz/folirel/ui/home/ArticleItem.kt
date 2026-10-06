@@ -75,15 +75,17 @@ class ArticleActions(
  */
 @Immutable
 class CardMetrics(
-    /** Sixths of the row this card spans (2 = a third, 3 = a half, 4 = two thirds, 6 = full width). */
+    /** Units of the row this card spans: sixths up to three columns (2 = a third, 3 = a half, 4 = two thirds, 6 = full width), see [gridSpans]. */
     val span: Int,
     val widthDp: Float,
     val wide: Boolean = false,
     val rowHasImage: Boolean = true,
     /** The picture height every tile of the page shares. */
     val imageHeightDp: Float = CardGridLayout.imageHeightDp(widthDp),
+    /** Units in a full row (6, or the number of columns on four and five columns): a card of fewer shares its row. */
+    val gridSpans: Int = MagazinePlan.GRID_SPANS,
 ) {
-    val multiColumn: Boolean get() = span < MagazinePlan.GRID_SPANS
+    val multiColumn: Boolean get() = span < gridSpans
     val horizontal: Boolean get() = wide || (!multiColumn && CardGridLayout.isHorizontal(1, widthDp))
     val compact: Boolean get() = CardGridLayout.isCompact(widthDp)
     val imageHeight: Dp get() = imageHeightDp.dp
@@ -410,8 +412,8 @@ private fun BentoCard(
         }
     }
     ElevatedCard(modifier.size(cell.widthDp.dp, cell.heightDp.dp)) {
-        when (cell.shape) {
-            BentoShape.WIDE, BentoShape.FULL -> {
+        when {
+            cell.shape.horizontal -> {
                 val picture = if (hasImage) minOf(cell.widthDp * 0.4f, cell.heightDp * 1.2f) else 0f
                 Row(clickModifier.fillMaxHeight()) {
                     if (hasImage) CardImage(row.imageUrl, imageLoader, Modifier.width(picture.dp).fillMaxHeight())

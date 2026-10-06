@@ -30,8 +30,18 @@ internal enum class BentoShape(val colSpan: Int, val rowSpan: Int) {
     TALL(1, 2),
     BIG(2, 2),
 
+    /** Three columns of a row of four or five. */
+    WIDE3(3, 1),
+
     /** All three columns: only for a last article that is left alone on three columns, so the end of the list has no gap. */
     FULL(3, 1),
+
+    /** All the columns of four or five: only for a last article that is left alone, so the end of the list has no gap. */
+    FULL4(4, 1),
+    FULL5(5, 1);
+
+    /** Wider than tall: the picture goes at the left of the text. */
+    val horizontal: Boolean get() = colSpan > rowSpan
 }
 
 /** One article in a block: where it sits in the block's cells and how many it covers. */
@@ -53,6 +63,8 @@ internal data class BentoBlock(val tiles: List<BentoTile>, val rows: Int) {
  *
  * Two columns: a tall tile with two small ones beside it (left or right), a wide tile, two small tiles, or a wide tile over two
  * small ones. Three columns: those shapes on three columns plus a big tile with two small ones beside it. One column: wide tiles only.
+ * Four and five columns have patterns of their own (a row of small tiles, a wide tile with small ones, a big tile beside tall and
+ * small ones, ...), each of which fills every column of its rows, so a wide window has no empty column on its right.
  */
 internal object BentoPlan {
     private class Pattern(val tiles: List<Triple<Int, Int, BentoShape>>, val rows: Int, val weight: Int) {
@@ -78,8 +90,58 @@ internal object BentoPlan {
         p(1, 30, t(0, 0, BentoShape.SMALL), t(1, 0, BentoShape.SMALL), t(2, 0, BentoShape.SMALL)),
     )
 
+    // The first tile of a pattern is at its top left and the last one covers its bottom right, so a block turned half a circle (packing
+    // from the end of the list) still starts at the top left.
+    private val FOUR = listOf(
+        // A big tile with four small ones beside it.
+        p(2, 20, t(0, 0, BentoShape.BIG), t(2, 0, BentoShape.SMALL), t(3, 0, BentoShape.SMALL), t(2, 1, BentoShape.SMALL), t(3, 1, BentoShape.SMALL)),
+        // A tall tile, two small ones and two wide ones.
+        p(2, 16, t(0, 0, BentoShape.TALL), t(1, 0, BentoShape.SMALL), t(2, 0, BentoShape.WIDE), t(1, 1, BentoShape.SMALL), t(2, 1, BentoShape.WIDE)),
+        // Small tiles at the left, a big tile, a tall one at the right.
+        p(2, 14, t(0, 0, BentoShape.SMALL), t(0, 1, BentoShape.SMALL), t(1, 0, BentoShape.BIG), t(3, 0, BentoShape.TALL)),
+        p(1, 20, t(0, 0, BentoShape.SMALL), t(1, 0, BentoShape.SMALL), t(2, 0, BentoShape.SMALL), t(3, 0, BentoShape.SMALL)),
+        p(1, 12, t(0, 0, BentoShape.WIDE), t(2, 0, BentoShape.SMALL), t(3, 0, BentoShape.SMALL)),
+        p(1, 8, t(0, 0, BentoShape.SMALL), t(1, 0, BentoShape.WIDE), t(3, 0, BentoShape.SMALL)),
+        p(1, 10, t(0, 0, BentoShape.WIDE), t(2, 0, BentoShape.WIDE)),
+    )
+
+    private val FIVE = listOf(
+        p(2, 18, t(0, 0, BentoShape.BIG), t(2, 0, BentoShape.TALL), t(3, 0, BentoShape.SMALL), t(4, 0, BentoShape.SMALL), t(3, 1, BentoShape.WIDE)),
+        p(2, 16, t(0, 0, BentoShape.TALL), t(1, 0, BentoShape.SMALL), t(2, 0, BentoShape.SMALL), t(1, 1, BentoShape.SMALL), t(2, 1, BentoShape.SMALL), t(3, 0, BentoShape.BIG)),
+        p(2, 10, t(0, 0, BentoShape.WIDE3), t(3, 0, BentoShape.SMALL), t(4, 0, BentoShape.SMALL), t(0, 1, BentoShape.SMALL), t(1, 1, BentoShape.SMALL), t(2, 1, BentoShape.WIDE3)),
+        p(2, 12, t(0, 0, BentoShape.SMALL), t(0, 1, BentoShape.SMALL), t(1, 0, BentoShape.BIG), t(3, 0, BentoShape.SMALL), t(3, 1, BentoShape.SMALL), t(4, 0, BentoShape.TALL)),
+        p(1, 20, t(0, 0, BentoShape.SMALL), t(1, 0, BentoShape.SMALL), t(2, 0, BentoShape.SMALL), t(3, 0, BentoShape.SMALL), t(4, 0, BentoShape.SMALL)),
+        p(1, 14, t(0, 0, BentoShape.WIDE), t(2, 0, BentoShape.SMALL), t(3, 0, BentoShape.SMALL), t(4, 0, BentoShape.SMALL)),
+        p(1, 6, t(0, 0, BentoShape.SMALL), t(1, 0, BentoShape.SMALL), t(2, 0, BentoShape.WIDE3)),
+        p(1, 6, t(0, 0, BentoShape.WIDE), t(2, 0, BentoShape.WIDE3)),
+    )
+
+    /** The most articles one block of [columns] columns holds: a list that grows by one article changes at most one block. */
+    fun maxPatternSize(columns: Int): Int = patternsFor(columns.coerceIn(1, CardGridLayout.MAX_COLUMNS))?.maxOf { it.size } ?: 1
+
+    private fun patternsFor(count: Int): List<Pattern>? = when {
+        count >= 5 -> FIVE
+        count == 4 -> FOUR
+        count == 3 -> THREE
+        count == 2 -> TWO
+        else -> null
+    }
+
     /** Patterns that fit when fewer articles are left than a chosen pattern needs: the end of the list is still gap-free. */
     private fun fallback(columns: Int, left: Int): Pattern = when {
+        columns >= 5 -> when {
+            left >= 5 -> FIVE[4]
+            left == 4 -> FIVE[5]
+            left == 3 -> FIVE[6]
+            left == 2 -> FIVE[7]
+            else -> p(1, 1, t(0, 0, BentoShape.FULL5))
+        }
+        columns == 4 -> when {
+            left >= 4 -> FOUR[3]
+            left == 3 -> FOUR[4]
+            left == 2 -> FOUR[6]
+            else -> p(1, 1, t(0, 0, BentoShape.FULL4))
+        }
         columns >= 3 && left >= 3 -> THREE[4]
         columns >= 3 && left == 2 -> THREE[2]
         columns >= 3 -> p(1, 1, t(0, 0, BentoShape.FULL))
@@ -111,7 +173,7 @@ internal object BentoPlan {
             val pattern = when (count) {
                 1 -> p(1, 1, t(0, 0, BentoShape.SMALL))
                 else -> {
-                    val patterns = if (count >= 3) THREE else TWO
+                    val patterns = patternsFor(count)!!
                     val chosen = choose(patterns, MagazinePlan.bucket(ids[i]))
                     if (chosen.size <= left) chosen else fallback(count, left)
                 }

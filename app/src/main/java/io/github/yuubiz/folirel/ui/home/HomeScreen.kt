@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -254,12 +255,19 @@ fun HomeScreen(
     val target = HomeViewModel.refreshTargetFor(selection)
     val attention by vm.feedsNeedingAttention.collectAsStateWithLifecycle()
 
+    // The window's own width decides between the pane and the drawer (never a device name); a fold, a rotation or a split-screen
+    // resize gives a new answer, while the selection, the filter and the list positions live in the view model and stay.
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+    val navigation = NavigationLayout.resolve(maxWidth.value, LocalDensity.current.fontScale, settings.categoryNavigation)
+    val paneShown = navigation.pane
+    LaunchedEffect(paneShown) { if (paneShown) drawerState.snapTo(DrawerValue.Closed) }
     ModalNavigationDrawer(
         drawerState = drawerState,
         // A closed drawer opens from the menu button only, so horizontal swipes belong to the category pager.
-        gesturesEnabled = drawerState.isOpen,
+        gesturesEnabled = drawerState.isOpen && !paneShown,
         drawerContent = {
-            HomeDrawer(
+            // With a pane the drawer is not composed at all (its items would be there twice).
+            if (!paneShown) HomeDrawer(
                 structure = structure,
                 selection = selection,
                 attention = attention,
@@ -282,8 +290,22 @@ fun HomeScreen(
             )
         },
     ) {
-      BoxWithConstraints(Modifier.fillMaxSize()) {
+     Row(Modifier.fillMaxSize()) {
+      navigation.paneWidthDp?.let { paneWidth ->
+          HomeNavigationPane(
+              width = paneWidth.dp,
+              structure = structure,
+              selection = selection,
+              attention = attention,
+              onSelect = vm::selectScope,
+              onSaved = vm::showSaved,
+              onSubscriptions = nav.subscriptions,
+              onSettings = nav.settings,
+          )
+      }
+      BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
         // Narrow windows give the search to the overflow menu: the title (the way to the categories) and the display panel keep their room.
+        // This is the room of the content, so beside a pane it is the width left of it.
         val narrow = maxWidth < NARROW_BAR_DP.dp
         val bigText = LocalDensity.current.fontScale > 1.3f
         Scaffold(
@@ -296,7 +318,8 @@ fun HomeScreen(
                             IconButton(onClick = { vm.setSearchActive(false) }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_close_search))
                             }
-                        } else {
+                        } else if (!paneShown) {
+                            // The pane is the way to the categories there, so there is no menu button beside it.
                             IconButton(onClick = { scope.launch { drawerState.open() } }, modifier = Modifier.testTag("drawer_open")) {
                                 Icon(Icons.Filled.Menu, stringResource(R.string.action_open_drawer))
                             }
@@ -449,6 +472,8 @@ fun HomeScreen(
             }
         }
       }
+     }
+    }
     }
 
     if (pickerOpen) {
@@ -901,24 +926,26 @@ private fun ArticleListBody(
                 val columns = CardGridLayout.columns(widthDp, LocalDensity.current.fontScale, cardColumns)
                 // Every article asks for a card size by its id; cards are packed into gap-free rows (magazine style).
                 val even = cardStyle == CardLayoutStyle.EVEN
+                val gridSpans = MagazinePlan.gridSpans(columns.count)
                 val spans = remember(items, columns.count, cardStyle) {
                     MagazinePlan.spans(items.map { it.id }, columns.count, cardStyle)
                 }
                 val tileImageHeight = CardGridLayout.tileImageHeightDp(widthDp, columns.count)
                 val metricsBySpan = remember(widthDp, columns.count, cardStyle) {
-                    (1..MagazinePlan.GRID_SPANS).associateWith { span ->
+                    (1..gridSpans).associateWith { span ->
                         CardMetrics(
-                            span, CardGridLayout.spanWidthDp(widthDp, span),
-                            wide = span == MagazinePlan.GRID_SPANS && columns.count > 1 && !even,
+                            span, CardGridLayout.spanWidthDp(widthDp, span, gridSpans),
+                            wide = span == gridSpans && columns.count > 1 && !even,
                             imageHeightDp = tileImageHeight,
+                            gridSpans = gridSpans,
                         )
                     }
                 }
                 val metricsNoImage = remember(metricsBySpan) {
-                    metricsBySpan.mapValues { (_, m) -> CardMetrics(m.span, m.widthDp, m.wide, rowHasImage = false, imageHeightDp = m.imageHeightDp) }
+                    metricsBySpan.mapValues { (_, m) -> CardMetrics(m.span, m.widthDp, m.wide, rowHasImage = false, imageHeightDp = m.imageHeightDp, gridSpans = m.gridSpans) }
                 }
                 // Per article: does any card of its row have an image? (Rows without one do not reserve a picture area.)
-                val starts = remember(spans) { MagazinePlan.rowStarts(spans) }
+                val starts = remember(spans, gridSpans) { MagazinePlan.rowStarts(spans, gridSpans) }
                 val rowHasImage = remember(items, starts, showImages) {
                     val rowFlags = HashMap<Int, Boolean>()
                     if (showImages) items.forEachIndexed { i, row -> if (row.imageUrl != null) rowFlags[starts[i]] = true }
@@ -935,12 +962,12 @@ private fun ArticleListBody(
                     val first = starts[index]
                     var last = first
                     while (last + 1 < items.size && starts[last + 1] == first) last++
-                    if ((first..last).any { spans[it] >= MagazinePlan.GRID_SPANS }) {
+                    if ((first..last).any { spans[it] >= gridSpans }) {
                         null
                     } else {
                         MagazineRowPlanner.plan(
                             cards = (first..last).map { i ->
-                                MagazineRowPlanner.Card(items[i], CardGridLayout.spanWidthDp(widthDp, spans[i]), showImages && items[i].imageUrl != null)
+                                MagazineRowPlanner.Card(items[i], CardGridLayout.spanWidthDp(widthDp, spans[i], gridSpans), showImages && items[i].imageUrl != null)
                             },
                             imageHeightDp = tileImageHeight,
                             styles = tileStyles,
@@ -951,7 +978,7 @@ private fun ArticleListBody(
                     }
                 }
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(MagazinePlan.GRID_SPANS),
+                    columns = GridCells.Fixed(gridSpans),
                     state = gridState!!,
                     modifier = Modifier.fillMaxSize().testTag("article_list"),
                     contentPadding = PaddingValues(start = CardGridLayout.EDGE_DP.dp, end = CardGridLayout.EDGE_DP.dp, top = 4.dp, bottom = 24.dp),
@@ -961,13 +988,13 @@ private fun ArticleListBody(
                     itemsIndexed(
                         items,
                         key = { _, row -> row.id },
-                        span = { index, _ -> GridItemSpan(spans.getOrElse(index) { MagazinePlan.GRID_SPANS }) },
-                        contentType = { index, _ -> spans.getOrElse(index) { MagazinePlan.GRID_SPANS } },
+                        span = { index, _ -> GridItemSpan(spans.getOrElse(index) { gridSpans }) },
+                        contentType = { index, _ -> spans.getOrElse(index) { gridSpans } },
                     ) { index, row ->
                         val plan = planOf(index)
                         ArticleItem(
                             row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"),
-                            (if (rowHasImage.getOrElse(index) { true }) metricsBySpan else metricsNoImage).getValue(spans.getOrElse(index) { MagazinePlan.GRID_SPANS }),
+                            (if (rowHasImage.getOrElse(index) { true }) metricsBySpan else metricsNoImage).getValue(spans.getOrElse(index) { gridSpans }),
                             rowHeight = plan?.let { with(density) { it.heightPx.toDp() } },
                             summaryLines = plan?.summaryLines?.getOrNull(index - starts[index]) ?: MagazineCardStyle.SUMMARY_MAX_LINES,
                         )
@@ -989,9 +1016,11 @@ private fun ArticleListBody(
                     ArticleItem(
                         row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"),
                         CardMetrics(
-                            span = if (tileColumns > 1) MagazinePlan.GRID_SPANS / tileColumns else MagazinePlan.GRID_SPANS,
+                            // One lane of the tile columns is one unit of a row of [tileColumns] units.
+                            span = 1,
                             widthDp = cardWidth,
                             imageHeightDp = MasonryPlan.pictureHeightDp(row.id, cardWidth),
+                            gridSpans = tileColumns,
                         ),
                         summaryLines = MasonryPlan.SUMMARY_MAX_LINES,
                     )

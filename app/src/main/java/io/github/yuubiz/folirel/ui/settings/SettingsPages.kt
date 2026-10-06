@@ -34,6 +34,7 @@ import io.github.yuubiz.folirel.R
 import io.github.yuubiz.folirel.app.AppContainer
 import io.github.yuubiz.folirel.data.preferences.AppSettings
 import io.github.yuubiz.folirel.data.preferences.BrowserMode
+import io.github.yuubiz.folirel.data.preferences.CategoryNavigation
 import io.github.yuubiz.folirel.data.repository.RetentionPreview
 import io.github.yuubiz.folirel.model.CardLayoutStyle
 import io.github.yuubiz.folirel.ui.common.BrandLogo
@@ -51,6 +52,15 @@ internal fun cardStyleName(style: CardLayoutStyle): String =
     stringResource(if (style == CardLayoutStyle.MIXED) R.string.card_style_mixed else R.string.card_style_even)
 
 @Composable
+internal fun categoryNavigationName(mode: CategoryNavigation): String = stringResource(
+    when (mode) {
+        CategoryNavigation.AUTO -> R.string.nav_mode_auto
+        CategoryNavigation.PANE -> R.string.nav_mode_pane
+        CategoryNavigation.DRAWER -> R.string.nav_mode_drawer
+    },
+)
+
+@Composable
 internal fun columnsName(columns: Int): String =
     if (columns == 0) stringResource(R.string.card_columns_auto) else pluralStringResource(R.plurals.card_columns_n, columns, columns)
 
@@ -63,6 +73,18 @@ internal fun columnsName(columns: Int): String =
 @Composable
 internal fun LayoutPage(s: AppSettings, vm: SettingsViewModel) {
     Column(Modifier.fillMaxWidth()) {
+        GroupHeader(stringResource(R.string.settings_category_navigation))
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+            Choice(
+                options = CategoryNavigation.entries,
+                selected = s.categoryNavigation,
+                label = { categoryNavigationName(it) },
+                tag = { "settings_nav_${it.name}" },
+                onSelect = { mode -> vm.update { setCategoryNavigation(mode) } },
+            )
+        }
+        SettingNote(stringResource(R.string.settings_category_navigation_note))
+        HorizontalDivider(Modifier.padding(top = 8.dp))
         SettingNote(stringResource(R.string.settings_display_default_note), Modifier.padding(top = 8.dp))
         GroupHeader(stringResource(R.string.display_layout))
         LayoutPicker(

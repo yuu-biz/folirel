@@ -515,7 +515,12 @@
     <string name="settings_confirm_metered_note">自動更新が従量制でないネットワークを待つ設定のとき、手動で更新する前に確認します。自動更新の動作は変わりません。</string>
     <!-- Phase 2: appearance and settings pages -->
     <string name="settings_group_appearance">外観</string>
-    <string name="settings_group_layout">標準のレイアウト</string>
+    <string name="settings_group_layout">レイアウトとナビゲーション</string>
+    <string name="settings_category_navigation">カテゴリのナビゲーション</string>
+    <string name="nav_mode_auto">自動</string>
+    <string name="nav_mode_pane">可能ならペイン表示</string>
+    <string name="nav_mode_drawer">ドロワーのみ</string>
+    <string name="settings_category_navigation_note">広いウィンドウでは、カテゴリを左のペインに表示したままにできます。タブとスワイプはそのまま使えます。自動は幅840dp以上でペインを表示します。可能ならペイン表示は600dp以上で、記事の幅が十分に残る場合に表示します。ドロワーのみは常にメニューボタンから開くドロワーを使います。狭いウィンドウでは常にドロワーです。</string>
     <string name="settings_group_refresh">更新とネットワーク</string>
     <string name="settings_group_storage">保存とデータ</string>
     <string name="settings_palette">配色</string>

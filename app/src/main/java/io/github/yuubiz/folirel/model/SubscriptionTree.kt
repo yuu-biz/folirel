@@ -5,6 +5,7 @@ import io.github.yuubiz.folirel.data.db.CategoryPreferenceEntity
 import io.github.yuubiz.folirel.data.db.FeedCategoryEntity
 import io.github.yuubiz.folirel.data.db.FeedEntity
 import io.github.yuubiz.folirel.data.db.FeedFetchStateEntity
+import io.github.yuubiz.folirel.data.preferences.AppSettings
 import io.github.yuubiz.folirel.data.repository.CategoryPaths
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
@@ -136,5 +137,5 @@ private fun CategoryPreferenceEntity.toModel() = CategoryPreference(
     // An unknown stored name (a newer or older build wrote it) means "inherit": never an error, never a made-up value.
     listLayout = listModeOverride?.let { v -> ListMode.entries.firstOrNull { it.name == v } },
     cardStyle = cardStyleOverride?.let { v -> CardLayoutStyle.entries.firstOrNull { it.name == v } },
-    cardColumns = cardColumnsOverride?.takeIf { it in 0..3 },
+    cardColumns = cardColumnsOverride?.takeIf { it in AppSettings.CARD_COLUMNS },
 )

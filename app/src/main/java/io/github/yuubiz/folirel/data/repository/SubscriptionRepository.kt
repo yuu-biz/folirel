@@ -12,6 +12,7 @@ import io.github.yuubiz.folirel.data.db.FeedFetchStateEntity
 import io.github.yuubiz.folirel.data.db.FeedDiagnosticsEntity
 import io.github.yuubiz.folirel.data.db.FeedHttpsMigrationEntity
 import io.github.yuubiz.folirel.data.db.FeedUrlMoveEntity
+import io.github.yuubiz.folirel.data.preferences.AppSettings
 import io.github.yuubiz.folirel.backend.FeedResult
 import io.github.yuubiz.folirel.model.CardLayoutStyle
 import io.github.yuubiz.folirel.model.FeedDiagnostics
@@ -492,9 +493,9 @@ class SubscriptionRepository(
         true
     }
 
-    /** [columns]: null inherits, 0 is automatic, 1..3 the most columns wanted. */
+    /** [columns]: null inherits, 0 is automatic, 1..5 the most columns wanted. */
     suspend fun setCategoryCardColumns(accountId: String, categoryId: String, columns: Int?): Boolean = db.withTransaction {
-        require(columns == null || columns in 0..3) { "Columns out of range" }
+        require(columns == null || columns in AppSettings.CARD_COLUMNS) { "Columns out of range" }
         if (categoryId !in ownedCategories(accountId)) return@withTransaction false
         ensurePreference(categoryId)
         dao.setCardColumnsOverride(categoryId, columns)

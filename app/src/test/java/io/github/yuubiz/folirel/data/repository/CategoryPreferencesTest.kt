@@ -134,6 +134,28 @@ class CategoryPreferencesTest {
         assertFalse(p.overridesLayout)
     }
 
+    /** RSP-T09: a category keeps 4 or 5 columns (and the 0.7.2 values 0..3 as they were); 6 is refused and changes nothing. */
+    @Test
+    fun aCategoryKeepsFourOrFiveColumnsAndSixIsRefused() = runBlocking {
+        val account = repo.ensureLocalAccount()
+        import(account, listOf("A"))
+        val a = idOf(account, "A")
+        for (n in listOf(0, 1, 2, 3, 4, 5)) {
+            assertTrue(repo.setCategoryCardColumns(account, a, n))
+            assertEquals(n, structure(account).preferences.getValue(a).cardColumns)
+        }
+        try {
+            repo.setCategoryCardColumns(account, a, 6)
+            org.junit.Assert.fail("six columns must be refused")
+        } catch (expected: IllegalArgumentException) {
+            // refused
+        }
+        assertEquals(5, structure(account).preferences.getValue(a).cardColumns)
+        // A stored value outside 0..5 (a later version wrote it) reads as "inherit", never as an error.
+        dao.setCardColumnsOverride(a, 9)
+        assertNull(structure(account).preferences.getValue(a).cardColumns)
+    }
+
     @Test
     fun anotherAccountsCategoryIsRefused() = runBlocking {
         val account = repo.ensureLocalAccount()
