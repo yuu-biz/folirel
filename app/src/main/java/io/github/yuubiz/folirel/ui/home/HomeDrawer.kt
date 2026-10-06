@@ -1,10 +1,16 @@
 package io.github.yuubiz.folirel.ui.home
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -66,7 +72,10 @@ fun HomeNavigationPane(
         modifier = Modifier.width(width).fillMaxHeight().testTag("home_pane"),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        HomeNavigationContent(structure, selection, attention, onSelect, onSaved, onSubscriptions, onSettings)
+        // The app draws edge to edge: keep the pane's entries out of the status bar, the navigation bar and a cutout at the left.
+        Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Bottom + WindowInsetsSides.Start))) {
+            HomeNavigationContent(structure, selection, attention, onSelect, onSaved, onSubscriptions, onSettings)
+        }
     }
 }
 

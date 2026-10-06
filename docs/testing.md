@@ -394,7 +394,7 @@ Source comments name the design topic a piece of code belongs to. They are not t
 
 Scenario IDs `V3-R01`-`V3-R05` and `V31-R01`/`V31-R02` also appear in source comments next to the code that implements the rule they describe.
 
-### 4.x Phase 2.5 scenarios: adaptive layout and navigation consistency (RSP-T01 to RSP-T40)
+### 4.9 Phase 2.5 scenarios: adaptive layout and navigation consistency (RSP-T01 to RSP-T40)
 
 Window widths are made with `wm size` / `wm density` (density 320) from inside the test, so no foldable is needed; the expectations are written out in the tests, not computed by the rules they check.
 
