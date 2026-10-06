@@ -1,4 +1,9 @@
-# Folirel
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="artwork/folirel/folirel-logo-dark.svg">
+    <img src="artwork/folirel/folirel-logo.svg" alt="Folirel" height="72">
+  </picture>
+</h1>
 
 [English](README.md) | [日本語](README.ja.md)
 
@@ -7,7 +12,7 @@ Folirel は、端末だけで完結する Android 用の RSS/Atom リーダー�
 
 Feedly などから OPML ファイルで購読一覧を移し、最新記事を情報量の多い一覧で眺めて、元のページをブラウザで開けます。
 
-**Folirel（フォリレル）** は *folio* と *reader* から着想した造語です。*folio* の語源であるラテン語 *folium*（葉・紙）にちなみ、自分で選んだフィードを誌面のように眺めるRSSリーダーを表しています。
+**Folirel（フォリレル）** は *folio* と *reader* から着想した造語です。*folio* の語源であるラテン語 *folium*（葉・紙）にちなみ、自分で選んだフィードを誌面のように眺めるRSSリーダーを表しています。ロゴは2枚の葉で、大きい方の葉に紙面のような文字の行が並んでいます。
 
 > **状況:** 初期リリース（0.4.x）です。最初に想定した機能は一通り実装済みで、エミュレーターで試験しています。
 > debug 署名の APK を Releases ページで配布しています。Google Play には未掲載です。

@@ -36,6 +36,7 @@ import io.github.yuubiz.folirel.data.preferences.AppSettings
 import io.github.yuubiz.folirel.data.preferences.BrowserMode
 import io.github.yuubiz.folirel.data.repository.RetentionPreview
 import io.github.yuubiz.folirel.model.CardLayoutStyle
+import io.github.yuubiz.folirel.ui.common.BrandLogo
 import io.github.yuubiz.folirel.ui.common.Choice
 import io.github.yuubiz.folirel.ui.common.GroupHeader
 import io.github.yuubiz.folirel.ui.common.LayoutPicker
@@ -319,6 +320,8 @@ internal fun StoragePage(s: AppSettings, vm: SettingsViewModel, snackbar: Snackb
 @Composable
 internal fun AboutPage() {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        // Fixed brand picture (never tinted or taken from the colour set); small, so the version below stays in view at large text.
+        BrandLogo(Modifier.testTag("about_logo").padding(bottom = 12.dp))
         Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE, BuildConfig.GIT_COMMIT), modifier = Modifier.testTag("about_version"))
         Text(stringResource(R.string.settings_local_note), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
         Text(stringResource(R.string.settings_licenses), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))

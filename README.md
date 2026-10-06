@@ -1,4 +1,9 @@
-# Folirel
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="artwork/folirel/folirel-logo-dark.svg">
+    <img src="artwork/folirel/folirel-logo.svg" alt="Folirel" height="72">
+  </picture>
+</h1>
 
 [English](README.md) | [日本語](README.ja.md)
 
@@ -9,7 +14,7 @@ analytics, no ads.
 Move your subscriptions in from Feedly (or any reader) with an OPML file, scan a dense list of the latest articles, and
 open the original page in your browser.
 
-**Folirel** is a coined name inspired by *folio* and *reader*. The word *folio* ultimately traces back to Latin *folium*, "leaf" or "sheet," reflecting the idea of turning the feeds you choose into pages you can browse.
+**Folirel** is a coined name inspired by *folio* and *reader*. The word *folio* ultimately traces back to Latin *folium*, "leaf" or "sheet," reflecting the idea of turning the feeds you choose into pages you can browse. The logo is two leaves, the larger one carrying lines of text like a page.
 
 > **Status:** early release (0.4.x). The app is feature-complete for its first scope and is tested on emulators.
 > Debug-signed APKs are published on the Releases page; there is no Google Play listing yet.
