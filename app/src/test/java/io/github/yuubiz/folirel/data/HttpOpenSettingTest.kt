@@ -5,6 +5,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.yuubiz.folirel.data.preferences.SettingsRepository
 import io.github.yuubiz.folirel.testutil.TestEnv
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -29,7 +31,8 @@ class HttpOpenSettingTest {
         val first = SettingsRepository(PreferenceDataStoreFactory.create(scope = scope) { file })
         assertTrue(first.current().confirmHttpOpen)
         first.setConfirmHttpOpen(false)
-        scope.cancel()
+        // Wait until the store has really let go of the file: a second store on the same file fails while the first is still registered.
+        scope.coroutineContext[Job]!!.cancelAndJoin()
 
         val restartScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val second = SettingsRepository(PreferenceDataStoreFactory.create(scope = restartScope) { file })
