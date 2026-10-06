@@ -19,6 +19,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.yuubiz.folirel.R
+import io.github.yuubiz.folirel.data.preferences.AppSettings
 import io.github.yuubiz.folirel.model.CardLayoutStyle
 import io.github.yuubiz.folirel.model.CategoryPreference
 import io.github.yuubiz.folirel.model.ListMode
@@ -44,7 +45,7 @@ internal fun cardColumnsLabel(columns: Int): String =
 
 /**
  * The display of one category (P1-LAYOUT, P2-C): the three things it can override, each with "use the default" as the first choice.
- * It uses the same layout picker and the same names as Settings > Default layout. Only the settings the layout has are shown: the
+ * It uses the same layout picker and the same names as Settings > Layout and navigation. Only the settings the layout has are shown: the
  * arrangement (Mixed or Even) is Magazine's alone, the columns belong to Magazine, Masonry and Bento, and a list has neither. What
  * is hidden is kept (not erased) for when the layout changes. "Reset" puts these three back to the default and touches nothing else.
  */
@@ -96,7 +97,7 @@ internal fun CategoryLayoutSheet(
                 SelectionRow(
                     title = stringResource(R.string.settings_card_columns),
                     valueLabel = (columnsPick as? Pick.Value)?.let { cardColumnsLabel(it.value) } ?: inheritLabel(cardColumnsLabel(global.cardColumns)),
-                    options = listOf<Pick<Int>>(Pick.Inherit) + listOf(0, 1, 2, 3).map { Pick.Value(it) },
+                    options = listOf<Pick<Int>>(Pick.Inherit) + AppSettings.CARD_COLUMNS.map { Pick.Value(it) },
                     selected = columnsPick,
                     optionLabel = { if (it is Pick.Value) cardColumnsLabel(it.value) else inheritLabel(cardColumnsLabel(global.cardColumns)) },
                     onSelect = { onColumns((it as? Pick.Value)?.value) },

@@ -76,15 +76,19 @@ Opening an article goes from a UI event to `BrowserLauncher` and is independent 
 Navigation is a small string-route back stack held in `MainActivity` (routes survive process death). The home screen is
 a pager over the selectable scopes (*All*, *Uncategorized* when present, then the categories that contain feeds), in
 the same order as the tabs; only composed pages observe the database. Three list layouts exist: **List** (one column
-with summary and thumbnail), **Compact list** (one dense row per article) and **Magazine** (a 6-column grid of cards
-whose sizes are chosen from a hash of the article id, packed into gap-free rows; an "even" arrangement is an option).
+with summary and thumbnail), **Compact list** (one dense row per article) and **Magazine** (a grid of cards
+whose sizes are chosen from a hash of the article id, packed into gap-free rows; an "even" arrangement is an option;
+sixths up to three columns, one unit per column on four and five: `MagazinePlan.gridSpans`). Masonry and Bento use up to five
+columns as well (`BentoPlan` has patterns for four and five columns).
 The list position is remembered per list key (account, scope, filter, sort order, search), up to 40 keys, and the
 layout is deliberately not part of the key.
 
 The order of the pages is one function, `TabOrder.resolve` (pinned categories first, each group by the saved rank, the
 unplaced after the placed in path order); `Structure` carries it (`tabOrdered`, `tabCategories`) together with the per-category
-preferences read from `category_preferences`, so the tabs, the pager, the picker, the drawer shortcuts and the organizer
-cannot disagree. The layout of a page is `CategoryDisplay.resolve(pageScope, global, preferences)`, resolved for each page
+preferences read from `category_preferences`, so the tabs, the pager, the picker, the drawer (its category list and shortcuts), the
+persistent pane and the organizer cannot disagree. The drawer and the pane are two frames around one composable,
+`HomeNavigationContent`; `NavigationLayout.resolve(width, fontScale, CategoryNavigation)` decides between them from the
+window width. The layout of a page is `CategoryDisplay.resolve(pageScope, global, preferences)`, resolved for each page
 separately. `HomeScreen` keeps three things apart: the pager's drawn position (`currentPage + currentPageOffsetFraction`),
 the chosen category id (`HomeViewModel.selection`) and the settled page (`SettleGuard` decides what a settle means after a
 newer choice). `ScopeTabs` is a plain horizontal scroll container whose scroll is set directly by `TabFollower` for each

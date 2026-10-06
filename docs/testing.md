@@ -393,3 +393,38 @@ Source comments name the design topic a piece of code belongs to. They are not t
 | SUB-DISCOVERY | Finding where a moved feed went, on the feed's own site. |
 
 Scenario IDs `V3-R01`-`V3-R05` and `V31-R01`/`V31-R02` also appear in source comments next to the code that implements the rule they describe.
+
+### 4.x Phase 2.5 scenarios: adaptive layout and navigation consistency (RSP-T01 to RSP-T40)
+
+Window widths are made with `wm size` / `wm density` (density 320) from inside the test, so no foldable is needed; the expectations are written out in the tests, not computed by the rules they check.
+
+| ID | Rule | Test |
+|---|---|---|
+| RSP-T01 | After a reorder (a child before its parent), tabs, picker and drawer show the same category ids in the same order. | `ResponsiveNavTest` |
+| RSP-T02 | A pin or unpin shows at once in tabs and pane without a restart. | `ResponsiveNavTest`, `CategoryPreferencesTest` |
+| RSP-T03 | Nested categories: the drawer names a category by its own name with its parent path under it; no indent. | `ResponsiveNavTest` |
+| RSP-T04 | A drawer category's feeds stay under that category. | `ResponsiveNavTest` |
+| RSP-T05 | The pane uses the same order. | `ResponsiveNavTest` |
+| RSP-T06 | A choice in the pane ends the old page's back-to-top movement (the tab, picker and drawer paths: P1-T08). | `ResponsiveNavTest`, `P1MoveTest` |
+| RSP-T07 | A 0.7.2 store (columns 0..3, no navigation key) reads as it was; navigation is Auto and nothing is written by reading. | `ResponsiveSettingsTest` |
+| RSP-T08 | The global columns 4 and 5 are stored; 6 and negative values read as automatic; the setting is offered in Settings. | `ResponsiveSettingsTest`, `ResponsiveNavTest` |
+| RSP-T09 | A category override keeps 0..5; 6 is refused; an unknown stored value reads as "use the default". | `CategoryPreferencesTest`, `ResponsiveNavTest` |
+| RSP-T10 | A chosen 5 is reduced on a narrow window and the stored choice is not changed. | `CardGridLayoutTest`, `ResponsiveNavTest` |
+| RSP-T11 | Widening restores the chosen 5. | `CardGridLayoutTest`, `ResponsiveNavTest` |
+| RSP-T12 | 200 % text takes columns away. | `CardGridLayoutTest`, `ResponsiveNavTest` |
+| RSP-T13 | One to three Magazine columns give exactly the sizes of 0.7.2 (a copy of that planner); the Bento 1..3 blocks equal the 0.7.2 output. | `WideColumnsTest`, `TileLayoutsTest` |
+| RSP-T14, T15 | Magazine Even on 4 and 5 columns: equal cells, no leftover. | `WideColumnsTest`, `ResponsiveNavTest` |
+| RSP-T16, T17 | Magazine Mixed on 4 and 5 columns: deterministic, gap-free rows, featured cards mixed in, no long run of small cards. | `WideColumnsTest`, `ResponsiveNavTest` |
+| RSP-T18 | The article in view stays through 3 -> 4 -> 5 and 5 -> 2 columns. | `ResponsiveNavTest` |
+| RSP-T19 | Masonry 4 and 5 lanes fill the width. | `ResponsiveNavTest`, `TileLayoutsTest` |
+| RSP-T20, T21 | Bento 4 and 5 columns: every block covers every cell, also at the end of the list and when packed from the end. | `TileLayoutsTest`, `ResponsiveNavTest` |
+| RSP-T22 | A new article at the newest end changes only the block there (the bound follows the patterns' size). | `TileLayoutsTest` |
+| RSP-T23 | A picture arriving does not change a card's height (the shape is fixed by the id; unchanged from 0.7.2). | `MdLayoutTest`, `TileLayoutTest` |
+| RSP-T24..T28 | Auto, Pane when possible, Drawer only and the compact fallback, by width and text size. | `NavigationLayoutTest`, `ResponsiveNavTest` |
+| RSP-T29 | The menu button is absent only while the pane is shown. | `ResponsiveNavTest` |
+| RSP-T30 | The tabs and the pager work beside the pane. | `ResponsiveNavTest` |
+| RSP-T31..T35 | 411, 600, 733, 839/840 and 1200 dp. | `ResponsiveNavTest` |
+| RSP-T36, T37 | Resize keeps the category, filter, sort, search and the article in view; nothing becomes read or saved. | `ResponsiveNavTest` |
+| RSP-T38 | 200 % text: fewer columns, the pane's entries stay 48 dp tall and usable. | `ResponsiveNavTest` |
+| RSP-T39 | The pane choice and the columns survive a restart of the store and a recreate of the screen. | `ResponsiveSettingsTest`, `ResponsiveNavTest` |
+| RSP-T40 | A 0.7.2 install with data keeps its categories, order, pins, overrides, theme, read and saved states after the 0.8.0 APK is installed over it. | `tools/p2_palette_restore_check.py` (procedure in the report) |

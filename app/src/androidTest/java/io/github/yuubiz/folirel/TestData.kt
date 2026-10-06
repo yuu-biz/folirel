@@ -47,6 +47,11 @@ object TestData {
         c.settings.setConfirmHttpOpen(true)
         c.settings.setConfirmMeteredRefresh(true)
         c.settings.setCardColumns(0)
+        try {
+            c.settings.setCategoryNavigation(io.github.yuubiz.folirel.data.preferences.CategoryNavigation.AUTO)
+        } catch (_: LinkageError) {
+            // Same as the colour set: an older release (before 0.8.0) has no category navigation.
+        }
         c.settings.setCardStyle(io.github.yuubiz.folirel.model.CardLayoutStyle.MIXED)
     }
 

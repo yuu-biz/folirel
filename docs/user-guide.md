@@ -81,7 +81,7 @@ Read, unread and saved are changed only by explicit actions. Refreshing never ov
 - **List style**: in **Display and filters** (for the category you are looking at, or for everything when you are on All) or in Settings (the default for all categories), choose one of five layouts:
   - **List**: one column with headline, summary and thumbnail.
   - **Compact list**: one dense line per article.
-  - **Magazine**: cards of mixed sizes (or all the same size, see Settings) in up to three columns on wide screens.
+  - **Magazine**: cards of mixed sizes (or all the same size, see Settings) in up to five columns on wide screens (the number follows the width of the window and the text size).
   - **Masonry**: cards of different heights in lanes (two on a phone), each picture in its own shape.
   - **Bento**: tiles of different shapes (small, wide, tall, big) that fill the width without gaps.
 
@@ -138,10 +138,11 @@ Settings opens on a short list of six pages; each row shows the values it holds 
 | Appearance | Light or dark | System, Light, Dark |
 | Appearance | Color | Classic (the blue used so far, default), Leaf, Sand, Violet, Dynamic (takes colors from your wallpaper; Android 12 and later, shown as unavailable on older versions). Light/dark and color are separate. Photos and icons are never tinted |
 | Appearance | Text size | A slider from 90% to 130% in steps of 5%, with **Reset to 100%**. The preview above it follows the slider; the size is saved when you let go. It multiplies the system font size |
-| Default layout | Layout | List, Compact list, Magazine, Masonry, Bento, shown as small pictures. This is the default for every category; a category can use its own |
-| Default layout | Magazine arrangement | Mixed, Even. Shown only for Magazine |
-| Default layout | Max columns | Automatic, 1, 2 or 3 columns, for Magazine, Masonry and Bento. If the chosen number would make headlines too narrow (small window, large text), fewer columns are used; text is never shrunk to keep columns |
-| Default layout | Show thumbnails and source icons | On by default. When off, no thumbnails or source icons are downloaded or shown. Icons are looked up once per feed from the feed or its own site, never from a third-party service |
+| Layout and navigation | Category navigation | Auto, Pane when possible, Drawer only. On a wide window (Auto: 840 dp or more; Pane when possible: 600 dp or more) the categories stay open in a pane at the left, and the tabs and swiping stay too; Drawer only keeps the menu button and the drawer. A narrow window always uses the drawer |
+| Layout and navigation | Layout | List, Compact list, Magazine, Masonry, Bento, shown as small pictures. This is the default for every category; a category can use its own |
+| Layout and navigation | Magazine arrangement | Mixed, Even. Shown only for Magazine |
+| Layout and navigation | Max columns | Automatic, 1, 2, 3, 4 or 5 columns, for Magazine, Masonry and Bento. If the chosen number would make headlines too narrow (small window, large text), fewer columns are used; text is never shrunk to keep columns |
+| Layout and navigation | Show thumbnails and source icons | On by default. When off, no thumbnails or source icons are downloaded or shown. Icons are looked up once per feed from the feed or its own site, never from a third-party service |
 | Opening articles | Open articles in | Custom Tabs, External browser |
 | Opening articles | Confirm before opening http:// articles | On by default |
 | Refresh & network | Automatic update | Off, every 15 / 30 minutes, 1 / 2 (default) / 6 / 12 / 24 hours |
