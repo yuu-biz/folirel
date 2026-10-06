@@ -278,12 +278,18 @@ class P1LayoutTest {
         compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("category_layout_sheet")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("cl_list_MAGAZINE").performClick()
         compose.waitForIdle()
-        compose.onNodeWithTag("cl_style_EVEN").performClick()
-        compose.onNodeWithTag("cl_cols_0").performClick() // automatic: a choice, not inheritance
+        compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("cl_style_EVEN")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("cl_style_EVEN").performScrollTo().performClick()
+        // The columns are a row that opens a list of values: automatic is a choice of its own, not inheritance.
+        compose.onNodeWithTag("cl_cols_row").performScrollTo().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("cl_cols_0")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("cl_cols_0").performClick()
         compose.waitForIdle()
         Thread.sleep(300)
         var p = prefs().getValue(beta.categoryId)
         assertEquals(listOf<Any?>(ListMode.MAGAZINE, CardLayoutStyle.EVEN, 0), listOf(p.listLayout, p.cardStyle, p.cardColumns))
+        compose.onNodeWithTag("cl_cols_row").performScrollTo().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("cl_cols_INHERIT")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("cl_cols_INHERIT").performClick()
         compose.waitForIdle()
         Thread.sleep(300)

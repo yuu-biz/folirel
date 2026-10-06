@@ -67,7 +67,7 @@ class HttpOpenSettingTest {
             setOf(
                 "io/github/yuubiz/folirel/data/preferences/SettingsRepository.kt",
                 "io/github/yuubiz/folirel/ui/home/HomeScreen.kt",
-                "io/github/yuubiz/folirel/ui/settings/SettingsScreen.kt",
+                "io/github/yuubiz/folirel/ui/settings/SettingsPages.kt",
             ),
             users,
         )
