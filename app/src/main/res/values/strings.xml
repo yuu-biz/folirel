@@ -581,4 +581,5 @@
     <string name="settings_group_backup">Subscriptions</string>
     <string name="layout_hidden_kept_note">Choices for a setting that this layout does not have are kept for when the layout changes.</string>
     <string name="browser_note">Custom Tabs open the article in a tab of your browser on top of this app. If that is not possible, the external browser is used.</string>
+    <string name="settings_save_failed">Could not save the setting.</string>
 </resources>

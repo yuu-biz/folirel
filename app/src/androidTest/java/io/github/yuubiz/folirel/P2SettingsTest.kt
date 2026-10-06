@@ -284,6 +284,34 @@ class P2SettingsTest {
         assertTrue(previewHas(Palettes.fixedScheme(ColorPalette.SAND, dark = true).primary.toArgb()))
     }
 
+    /** P2-T06: with the mode on System the colours follow the system's night setting, in both directions, and the page stays. */
+    @Test
+    fun theSystemModeFollowsTheSystemNightSetting() {
+        assumeTrue("cmd uimode night needs Android 10", Build.VERSION.SDK_INT >= 29)
+        fun shell(command: String) {
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)).use { it.readBytes() }
+        }
+        try {
+            launch()
+            openPage("APPEARANCE")
+            val light = Palettes.fixedScheme(ColorPalette.CLASSIC, dark = false)
+            val dark = Palettes.fixedScheme(ColorPalette.CLASSIC, dark = true)
+            compose.onNodeWithTag("theme_SYSTEM").assertIsSelected()
+            shell("cmd uimode night no")
+            until { exists("settings_page_APPEARANCE") && previewHas(light.surface.toArgb()) && !previewHas(dark.surface.toArgb()) }
+            shell("cmd uimode night yes")
+            until { exists("settings_page_APPEARANCE") && previewHas(dark.surface.toArgb()) && !previewHas(light.surface.toArgb()) }
+            // A forced mode ignores the system: Light stays light while the system is dark.
+            click("theme_LIGHT")
+            until { previewHas(light.surface.toArgb()) }
+            shell("cmd uimode night no")
+            click("theme_DARK")
+            until { previewHas(dark.surface.toArgb()) }
+        } finally {
+            shell("cmd uimode night auto")
+        }
+    }
+
     // ---- P2-B02: controls
 
     @Test

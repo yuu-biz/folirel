@@ -17,6 +17,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -41,7 +42,8 @@ import io.github.yuubiz.folirel.ui.common.NavRow
 import io.github.yuubiz.folirel.ui.common.listModeName
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -58,39 +60,30 @@ class SettingsViewModel(
 ) : ViewModel() {
     val settings: StateFlow<AppSettings> = repository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
 
-    /**
-     * Every change a control makes goes through this one queue and is written in the order it was made, so a quick series of taps
-     * (colour, light/dark, layout) or a slider released twice always ends with the last choice, never with an earlier one that
-     * happened to be written later.
-     */
-    private val writes = Channel<suspend SettingsRepository.() -> Unit>(Channel.UNLIMITED)
+    private val _saveFailures = MutableStateFlow(0)
 
-    init {
-        viewModelScope.launch {
-            for (write in writes) {
-                try {
-                    repository.write()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    // A failed write leaves the stored value as it was, and the control shows the stored value: nothing is claimed that is not saved.
-                }
-            }
-        }
-    }
+    /** How many writes have failed since the screen was opened; each failure raises it by one (the screen shows a message and drops what it was only previewing). */
+    val saveFailures: StateFlow<Int> = _saveFailures
 
-    fun update(block: suspend SettingsRepository.() -> Unit) {
-        writes.trySend(block)
-    }
+    private val queue = SettingsWriteQueue(viewModelScope, repository) { _saveFailures.update { it + 1 } }
+
+    fun update(block: suspend SettingsRepository.() -> Unit) = queue.submit(block)
 
     suspend fun articleCount(): Int = articles.countArticles(accountId())
 
     /** What the limit would remove now (nothing is removed by this call). */
     suspend fun retentionPreview(limit: Int): RetentionPreview = retention.preview(accountId(), limit)
 
-    /** The user confirmed the removal count: store the limit and apply it once now. */
-    suspend fun confirmRetention(limit: Int): Int {
-        repository.setRetentionLimit(limit)
+    /** The user confirmed the removal count: store the limit and apply it once now. Null when the limit could not be stored (nothing was removed then). */
+    suspend fun confirmRetention(limit: Int): Int? {
+        try {
+            repository.setRetentionLimit(limit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            _saveFailures.update { it + 1 }
+            return null
+        }
         return retention.apply(accountId(), limit)
     }
 
@@ -135,6 +128,11 @@ fun SettingsScreen(
 ) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    val failures by vm.saveFailures.collectAsStateWithLifecycle()
+    val failedText = stringResource(R.string.settings_save_failed)
+    LaunchedEffect(failures) {
+        if (failures > 0) snackbar.showSnackbar(failedText)
+    }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
@@ -148,7 +146,7 @@ fun SettingsScreen(
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).testTag(if (page == null) "settings_top" else "settings_page_${page.name}")) {
             when (page) {
                 null -> SettingsTop(s, onOpenPage)
-                SettingsPage.APPEARANCE -> AppearancePage(s, vm)
+                SettingsPage.APPEARANCE -> AppearancePage(s, vm, failures)
                 SettingsPage.LAYOUT -> LayoutPage(s, vm)
                 SettingsPage.OPEN -> OpenPage(s, vm)
                 SettingsPage.REFRESH -> RefreshPage(s, vm, onHttpsCheck)

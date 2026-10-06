@@ -250,14 +250,27 @@ class HomeViewModel(
         viewModelScope.launch { settingsRepository.setSortOrder(order) }
     }
 
+    /** A setting the reader chose: when it cannot be stored the stored value stays and the reader is told (no retry). */
+    private fun settingWrite(write: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                write()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                events.send(HomeEvent.Message(HomeEvent.Message.Kind.UPDATE_FAILED))
+            }
+        }
+    }
+
     /** "Open" in the http:// dialog with the box ticked. Cancelling never calls this, so nothing is saved then. */
     fun stopAskingBeforeHttpOpen() {
-        viewModelScope.launch { settingsRepository.setConfirmHttpOpen(false) }
+        settingWrite { settingsRepository.setConfirmHttpOpen(false) }
     }
 
     /** "Update now" in the metered-network dialog with the box ticked. Cancelling never calls this. */
     fun stopAskingBeforeMeteredRefresh() {
-        viewModelScope.launch { settingsRepository.setConfirmMeteredRefresh(false) }
+        settingWrite { settingsRepository.setConfirmMeteredRefresh(false) }
     }
 
     /** Pins the category to the front of the tabs, or unpins it. Changes nothing else: no article, no subscription, no selection. */
@@ -271,7 +284,7 @@ class HomeViewModel(
     }
 
     fun setListMode(mode: ListMode) {
-        viewModelScope.launch { settingsRepository.setListMode(mode) }
+        settingWrite { settingsRepository.setListMode(mode) }
     }
 
     /** The layout chosen in the display panel is written where the panel says: the category's own setting, or the global default. */

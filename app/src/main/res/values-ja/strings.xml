@@ -557,4 +557,5 @@
     <string name="settings_group_backup">購読</string>
     <string name="layout_hidden_kept_note">このレイアウトにない設定の選択は消えず、レイアウトを変えたときに使われます。</string>
     <string name="browser_note">Custom Tabsは、お使いのブラウザのタブをこのアプリの上に開いて記事を表示します。使えない場合は外部ブラウザで開きます。</string>
+    <string name="settings_save_failed">設定を保存できませんでした。</string>
 </resources>

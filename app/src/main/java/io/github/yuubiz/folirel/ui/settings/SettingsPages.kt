@@ -306,7 +306,8 @@ internal fun StoragePage(s: AppSettings, vm: SettingsViewModel, snackbar: Snackb
                     scope.launch {
                         val removed = vm.confirmRetention(p.limit)
                         dataVersion++
-                        snackbar.showSnackbar(removedText.format(removed))
+                        // A limit that could not be stored removed nothing; the screen already says that the setting was not saved.
+                        if (removed != null) snackbar.showSnackbar(removedText.format(removed))
                     }
                 }, modifier = Modifier.testTag("retention_confirm")) { Text(stringResource(R.string.retention_confirm)) }
             },

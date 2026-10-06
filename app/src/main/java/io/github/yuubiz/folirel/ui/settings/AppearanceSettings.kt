@@ -88,7 +88,7 @@ internal fun themeModeName(mode: ThemeMode): String = stringResource(
  * set are independent; every change is a stored setting and nothing else (no refresh, no article, no category, no scroll position).
  */
 @Composable
-internal fun AppearancePage(s: AppSettings, vm: SettingsViewModel) {
+internal fun AppearancePage(s: AppSettings, vm: SettingsViewModel, saveFailures: Int) {
     var previewPercent by remember { mutableStateOf<Int?>(null) }
     val storedPercent = AppSettings.textScalePercent(s.textScale)
     val sdk = Build.VERSION.SDK_INT
@@ -128,6 +128,7 @@ internal fun AppearancePage(s: AppSettings, vm: SettingsViewModel) {
             defaultPercent = 100,
             onPreview = { previewPercent = it },
             onCommit = { percent -> vm.update { setTextScale(AppSettings.textScaleOf(percent)) } },
+            saveFailures = saveFailures,
             modifier = Modifier.testTag("text_size_slider_row"),
         )
         SettingNote(stringResource(R.string.text_size_note))

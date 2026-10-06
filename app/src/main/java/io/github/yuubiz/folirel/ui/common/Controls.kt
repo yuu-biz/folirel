@@ -185,11 +185,20 @@ fun PercentSliderRow(
     onPreview: (Int?) -> Unit,
     onCommit: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    /** Raised by the caller when a write failed: what the slider was only showing (not stored) is dropped and the stored value shows again. */
+    saveFailures: Int = 0,
 ) {
     var local by remember { mutableStateOf<Int?>(null) }
     // The last value handed to the store that the store has not shown back yet: while it is set, a value equal to the stored one still has to be written (the earlier write is still on its way).
     var requested by remember { mutableStateOf<Int?>(null) }
     val shown = local ?: percent
+    LaunchedEffect(saveFailures) {
+        if (saveFailures > 0) {
+            local = null
+            requested = null
+            onPreview(null)
+        }
+    }
     LaunchedEffect(percent) {
         if (local == percent) {
             local = null
