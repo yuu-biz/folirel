@@ -143,6 +143,24 @@ class TileLayoutTest {
         }
     }
 
+    /** The new layouts are stored by name (Settings and per category) and read back, and the stored names are the documented ones. */
+    @Test
+    fun theNewLayoutsAreStoredAndReadBack() = kotlinx.coroutines.runBlocking {
+        val byPath = TestData.seedPaths(listOf(listOf("Alpha"), listOf("Beta")), perCategory = 2)
+        val c = TestData.container
+        val account = c.subscriptions.ensureLocalAccount()
+        for (mode in listOf(ListMode.MASONRY, ListMode.BENTO)) {
+            c.settings.setListMode(mode)
+            assertEquals(mode, c.settings.current().listMode)
+        }
+        c.subscriptions.setCategoryListLayout(account, byPath.getValue("Alpha"), ListMode.MASONRY)
+        c.subscriptions.setCategoryListLayout(account, byPath.getValue("Beta"), ListMode.BENTO)
+        val stored = c.database.subscriptionDao().categoryPreferences(account).associate { it.categoryId to it.listModeOverride }
+        assertEquals("MASONRY", stored[byPath.getValue("Alpha")])
+        assertEquals("BENTO", stored[byPath.getValue("Beta")])
+        c.settings.setListMode(ListMode.LIST)
+    }
+
     /** The way back to the top and the reading place across layouts, through the list's own controls. */
     @Test
     fun backToTopAndTheReadingPlaceWorkInBothTileLayouts() {
