@@ -30,7 +30,7 @@ open the original page in your browser.
   metered networks.
 - **Feed housekeeping:** find the feed behind a site address, move HTTP feeds to HTTPS after verifying it is the same
   feed, and clean up dead feeds in bulk.
-- **English and Japanese** UI (follows the system language; per-app language on Android 13+), light/dark theme, text size setting.
+- **English and Japanese** UI (follows the system language; per-app language on Android 13+), light/dark theme with five color sets, text size setting.
 
 ## Install
 
