@@ -182,6 +182,21 @@ class CategoryPreferencesTableTest(unittest.TestCase):
         problems = run("install", lambda after: self.with_table(after, rows=1))
         self.assertTrue(any("category_preferences" in p for p in problems), problems)
 
+    def test_rows_that_the_previous_release_already_had_must_stay_exactly(self):
+        before, after = seed(new_db()), seed(new_db())
+        self.with_table(before, rows=3)
+        self.with_table(after, rows=3)
+        problems, info = cas.compare(before, after, dict(SETTINGS), dict(SETTINGS), "install")
+        self.assertEqual([], problems)
+        self.assertIn("category_preferences: kept, 3 rows before, 3 after", info)
+        after.execute("update category_preferences set isPinned = 1 where categoryId = 'c1'")
+        problems, _ = cas.compare(before, after, dict(SETTINGS), dict(SETTINGS), "install")
+        self.assertTrue(any("category_preferences" in p for p in problems), problems)
+        after.execute("update category_preferences set isPinned = 0 where categoryId = 'c1'")
+        after.execute("delete from category_preferences where categoryId = 'c2'")
+        problems, _ = cas.compare(before, after, dict(SETTINGS), dict(SETTINGS), "install")
+        self.assertTrue(any("category_preferences" in p for p in problems), problems)
+
     def test_user_data_is_still_compared_with_the_new_table_present(self):
         def mutate(after):
             self.with_table(after)

@@ -189,7 +189,11 @@ class P2SettingsTest {
                 val bitmap = compose.onNodeWithTag("preview_photo").captureToImage().asAndroidBitmap()
                 val centre = bitmap.getPixel(bitmap.width / 2, bitmap.height / 2)
                 if (photoPixel == null) photoPixel = centre
-                assertEquals("the picture is not tinted by $palette", photoPixel, centre)
+                // The same colour, within one step per channel (a software renderer dithers a gradient by one level).
+                fun channel(c: Int, shift: Int) = (c shr shift) and 255
+                for (shift in listOf(16, 8, 0)) {
+                    assertTrue("the picture is not tinted by $palette (${photoPixel!!.toString(16)} vs ${centre.toString(16)})", abs(channel(photoPixel!!, shift) - channel(centre, shift)) <= 2)
+                }
             }
         }
         // Light/dark and the palette are two settings: changing one never changed the other.

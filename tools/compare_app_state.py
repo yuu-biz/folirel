@@ -193,7 +193,13 @@ def compare(before_conn, after_conn, before_settings, after_settings, mode):
         problems += [f"article_states: state for {a} has no article" for a in new_states - new_articles]
     # Schema 4 adds category_preferences (the intended difference). Updating chooses nothing for the reader, so it holds no row: every
     # category has the defaults (no saved place, not pinned, nothing overridden).
-    if table_exists(after_conn, "category_preferences"):
+    if table_exists(after_conn, "category_preferences") and table_exists(before_conn, "category_preferences"):
+        # Updating between two releases that both have the table (0.5.0 onward): the reader's choices must be exactly as they were.
+        rb, ra = rows(before_conn, "category_preferences", ("categoryId",)), rows(after_conn, "category_preferences", ("categoryId",))
+        info.append(f"category_preferences: kept, {len(rb)} rows before, {len(ra)} after")
+        if rb != ra:
+            problems.append("category_preferences: the rows are not the same as before the update")
+    elif table_exists(after_conn, "category_preferences"):
         n = after_conn.execute("select count(*) from category_preferences").fetchone()[0]
         info.append(f"category_preferences: new table, {n} rows")
         if n:

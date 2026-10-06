@@ -152,9 +152,17 @@ def checked_rows(root):
     return out
 
 
-def column_value(root):
-    """Since 0.7.0 the columns are a row that shows its value (a dialog lists the choices): the value text."""
-    return [t for t in texts(root) if re.fullmatch(r"d columns?|Automatic|Use the default (.*)", t)]
+def column_choice(root):
+    """Since 0.7.0 the columns are a row (its value is not in the accessibility text uiautomator reads): open the row, read the checked entry of the
+    dialog and close it again. [] when the layout has no columns row (a list)."""
+    row = find_text(root, "Max columns")
+    if row is None:
+        return []
+    tap(row)
+    dlg = dump()
+    chosen = checked_rows(dlg)
+    back()
+    return chosen
 
 
 def selected_tab_text(root):
@@ -280,13 +288,13 @@ def panel_layout(category):
     if find_text(root, "Arrangement and columns…") is not None:
         tap(find_text(root, "Arrangement and columns…"))
         droot = wait_for(lambda r: find_text(r, f"Display of {category}") is not None)
-        details = checked_rows(droot) + column_value(droot)
+        details = checked_rows(droot) + column_choice(droot)
         # The sheet is taller than the screen: look at the rest as well.
         for _scroll in range(3):  # a short screen needs more than one scroll to reach the columns
             adb("shell", "input", "swipe", "540", "1900", "540", "700", "400")
             time.sleep(1)
             nxt = dump()
-            details += checked_rows(nxt) + column_value(nxt)
+            details += checked_rows(nxt) + column_choice(nxt)
         back()
     back()
     return layout, details
