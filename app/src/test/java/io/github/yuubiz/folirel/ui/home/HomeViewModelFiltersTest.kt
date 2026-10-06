@@ -277,6 +277,8 @@ class HomeViewModelFiltersTest {
         assertFiltersKept()
         // "All articles" on top of Saved + 7 days + search + order: still Saved, 7 days, the search and the order; the keywords stay too.
         assertEquals(ReadFilter.SAVED, vm.selection.value.filter)
+        // The keyword was queued as a write at the start; wait until it is stored (the assertion is that it is still there).
+        waitFor { runBlocking { settings.current().activeHiddenKeywords } == listOf("zzz") }
         assertEquals(listOf("zzz"), runBlocking { settings.current().activeHiddenKeywords })
         // The other direction: a filter change leaves the scope where it is.
         vm.selectScope(ArticleScope.Uncategorized)
