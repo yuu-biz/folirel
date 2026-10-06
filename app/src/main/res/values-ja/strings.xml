@@ -513,4 +513,7 @@
     <string name="list_mode_masonry">段違い（Masonry）</string>
     <string name="list_mode_bento">タイル（Bento）</string>
     <string name="layout_grid_only">マガジン・段違い・タイルのレイアウトのときだけ使われます。ここでの選択は消えません。</string>
+    <string name="metered_dont_ask">今後、従量制ネットワークでも確認しない</string>
+    <string name="settings_confirm_metered">従量制ネットワークで更新する前に確認</string>
+    <string name="settings_confirm_metered_note">自動更新が従量制でないネットワークを待つ設定のとき、手動で更新する前に確認します。自動更新の動作は変わりません。</string>
 </resources>

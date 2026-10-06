@@ -537,4 +537,7 @@
     <string name="list_mode_masonry">Masonry</string>
     <string name="list_mode_bento">Bento</string>
     <string name="layout_grid_only">Used only in the Magazine, Masonry and Bento layouts. A choice made here is kept for them.</string>
+    <string name="metered_dont_ask">Do not ask again on metered networks</string>
+    <string name="settings_confirm_metered">Confirm before updating on a metered network</string>
+    <string name="settings_confirm_metered_note">Asked when you update by hand while automatic updates wait for an unmetered network. Automatic updates are not changed.</string>
 </resources>

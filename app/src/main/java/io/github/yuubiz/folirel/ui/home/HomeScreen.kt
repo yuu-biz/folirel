@@ -244,7 +244,7 @@ fun HomeScreen(
     )
 
     fun requestRefresh() {
-        if (network.metered && settings.unmeteredOnly && network.connected) meteredConfirm = true else vm.refreshCurrentScope()
+        if (network.metered && settings.unmeteredOnly && network.connected && settings.confirmMeteredRefresh) meteredConfirm = true else vm.refreshCurrentScope()
     }
 
     val scopeTitle = scopeTitle(selection.scope, structure)
@@ -523,12 +523,13 @@ fun HomeScreen(
         MarkAllReadDialog(request, onConfirm = { vm.confirmMarkAllRead(request); markAllRequest = null }, onDismiss = { markAllRequest = null })
     }
     if (meteredConfirm) {
-        AlertDialog(
-            onDismissRequest = { meteredConfirm = false },
-            title = { Text(stringResource(R.string.metered_title)) },
-            text = { Text(stringResource(R.string.metered_message)) },
-            confirmButton = { TextButton(onClick = { meteredConfirm = false; vm.refreshCurrentScope() }) { Text(stringResource(R.string.metered_confirm)) } },
-            dismissButton = { TextButton(onClick = { meteredConfirm = false }) { Text(stringResource(R.string.cancel)) } },
+        MeteredRefreshDialog(
+            onUpdate = { dontAskAgain ->
+                meteredConfirm = false
+                if (dontAskAgain) vm.stopAskingBeforeMeteredRefresh()
+                vm.refreshCurrentScope()
+            },
+            onDismiss = { meteredConfirm = false },
         )
     }
     httpConfirmUrl?.let { url ->
@@ -554,6 +555,40 @@ fun HomeScreen(
             }
         }
     }
+}
+
+/**
+ * Confirmation before a manual update on a metered network (automatic updates wait for an unmetered one). The "don't ask
+ * again" box starts unticked; it is saved only through [onUpdate], never by cancelling, and Settings can turn the question
+ * back on.
+ */
+@Composable
+private fun MeteredRefreshDialog(onUpdate: (dontAskAgain: Boolean) -> Unit, onDismiss: () -> Unit) {
+    var dontAskAgain by rememberSaveable { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.metered_title)) },
+        text = {
+            Column {
+                Text(stringResource(R.string.metered_message))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .toggleable(value = dontAskAgain, role = Role.Checkbox, onValueChange = { dontAskAgain = it })
+                        .testTag("metered_dont_ask"),
+                ) {
+                    Checkbox(checked = dontAskAgain, onCheckedChange = null)
+                    Text(stringResource(R.string.metered_dont_ask), modifier = Modifier.padding(start = 8.dp))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onUpdate(dontAskAgain) }, modifier = Modifier.testTag("metered_confirm")) { Text(stringResource(R.string.metered_confirm)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss, modifier = Modifier.testTag("metered_cancel")) { Text(stringResource(R.string.cancel)) } },
+    )
 }
 
 /**

@@ -35,6 +35,7 @@ object TestData {
         c.settings.setSortOrder(SortOrder.NEWEST)
         c.settings.setTextScale(1.0f)
         c.settings.setConfirmHttpOpen(true)
+        c.settings.setConfirmMeteredRefresh(true)
         c.settings.setCardColumns(0)
         c.settings.setCardStyle(io.github.yuubiz.folirel.model.CardLayoutStyle.MIXED)
     }

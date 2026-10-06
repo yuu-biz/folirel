@@ -255,6 +255,11 @@ class HomeViewModel(
         viewModelScope.launch { settingsRepository.setConfirmHttpOpen(false) }
     }
 
+    /** "Update now" in the metered-network dialog with the box ticked. Cancelling never calls this. */
+    fun stopAskingBeforeMeteredRefresh() {
+        viewModelScope.launch { settingsRepository.setConfirmMeteredRefresh(false) }
+    }
+
     /** Pins the category to the front of the tabs, or unpins it. Changes nothing else: no article, no subscription, no selection. */
     fun togglePinned(categoryId: String) {
         val pinned = structure.value.preferences[categoryId]?.isPinned == true

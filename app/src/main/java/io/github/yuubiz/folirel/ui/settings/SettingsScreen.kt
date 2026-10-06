@@ -226,6 +226,14 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onExport: () -> Un
             }
             item { Toggle(stringResource(R.string.settings_unmetered), stringResource(R.string.settings_unmetered_note), s.unmeteredOnly) { v -> vm.update { setUnmeteredOnly(v) } } }
             item {
+                Toggle(
+                    stringResource(R.string.settings_confirm_metered),
+                    stringResource(R.string.settings_confirm_metered_note),
+                    s.confirmMeteredRefresh,
+                    Modifier.testTag("confirm_metered_refresh"),
+                ) { v -> vm.update { setConfirmMeteredRefresh(v) } }
+            }
+            item {
                 Toggle(stringResource(R.string.settings_allow_http), stringResource(R.string.settings_allow_http_note), s.allowHttp, Modifier.testTag("allow_http")) { v ->
                     if (v) httpWarning = true else vm.update { setAllowHttp(false) }
                 }

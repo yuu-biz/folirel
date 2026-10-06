@@ -99,7 +99,7 @@ Categories are optional and can be nested.
 ## How updates work
 
 - **Pull down** on the list, or choose **Refresh** in the more-options menu. A refresh covers only what you are looking at (All, one category, or Uncategorized). The Unread, Saved and search filters do not narrow it.
-- If you are on a metered network, a dialog (**Metered network**) asks whether to update this time (**Update now**).
+- If you are on a metered network, a dialog (**Metered network**) asks whether to update this time (**Update now**). Tick **Do not ask again on metered networks** to update without asking from then on; **Confirm before updating on a metered network** in Settings brings the question back.
 - **Automatic update** (Settings) runs in the background every 15 or 30 minutes, 1, 2, 6, 12 or 24 hours, or is **Off**. The default is every 2 hours. Android decides the exact time and may delay it. By default it runs only on unmetered networks (this uses Android's metered flag, which is not a strict Wi-Fi check).
 - **Update when the app opens** (on by default) refreshes when you open the app, at most once every 30 minutes, under the same network rule.
 - Feeds are fetched up to 4 at a time, at most 2 from the same host, within a time budget of about 6 minutes per update. Feeds that were not reached are fetched first next time. After a periodic update that ran out of time, up to two short follow-up runs continue with the unfinished feeds.
@@ -144,6 +144,7 @@ Open **Subscriptions** from the navigation menu.
 | Updates | Automatic update | Off, every 15 / 30 minutes, 1 / 2 (default) / 6 / 12 / 24 hours |
 | Updates | Update when the app opens | On by default; at most every 30 minutes |
 | Updates | Automatic updates on unmetered networks only | On by default |
+| Updates | Confirm before updating on a metered network | On by default |
 | Updates | Allow unencrypted HTTP feeds and images | Off by default. A shortcut to **Check HTTPS support of HTTP feeds** appears when HTTP feeds exist |
 | Data | Articles to keep on the device | No limit (default), or about 1,000 / 3,000 / 5,000 / 10,000 / 30,000. See below |
 | Data | Image cache size | 64, 128 (default), 256 or 512 MB; applies at the next app start. **Clear image cache** removes cached thumbnails only |

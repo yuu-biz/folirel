@@ -79,7 +79,7 @@ These are deliberate. Contributions that add them are out of scope.
 | Read filter / sort | All; newest first. Both can be changed and the choice is remembered. Order is deterministic for equal timestamps. |
 | Tap on an article | Custom Tabs; an external browser if Custom Tabs is unavailable or chosen. Neither marks anything as read. |
 | Refresh | One fetch after the first import. Update on open when the last attempt was at least 30 minutes ago (separate switch). Periodic update every 2 hours by default; options Off / 15 / 30 / 60 / 120 / 360 / 720 / 1440 minutes. |
-| Automatic network use | Explained during first run. Default: unmetered networks only. A manual refresh uses the current connection; on a metered network it asks first. |
+| Automatic network use | Explained during first run. Default: unmetered networks only. A manual refresh uses the current connection; on a metered network it asks first, with a "do not ask again" box (saved only with "Update now"; Settings can turn the question back on). |
 | HTTP (not HTTPS) | Off by default. `http://` feeds can be registered but are not fetched, and `http://` images are not loaded, until the user allows HTTP in Settings. |
 | Thumbnail cache | Disk cache of 128 MiB by default (64 / 128 / 256 / 512 selectable, applied at next start), least-recently-used eviction. Offline availability of every image is not guaranteed. |
 | Article retention | No automatic deletion by default. Settings can set "articles to keep on the device" (no limit, 1,000, 3,000, 5,000, 10,000 or 30,000); see S40. Database size and article count are shown, with a non-blocking warning above 100 MB. |
@@ -249,7 +249,7 @@ Sections: Display, Opening articles, Updates, Data, About.
 
 - **Display:** theme (System / Light / Dark), list layout (List / Compact list / Magazine), Magazine arrangement (mixed sizes or the same size) and most columns, text size, and "Show thumbnails and source icons".
 - **Opening articles:** browser (Custom Tabs or external), the confirmation switch for `http://` articles. A note states that opening an article never marks it read.
-- **Updates:** automatic update interval, update when the app opens (at most every 30 minutes, same network rule), "unmetered networks only", "Allow unencrypted HTTP feeds and images" (with a confirmation explaining the risk; certificate checks do not change), and the HTTPS check.
+- **Updates:** automatic update interval, update when the app opens (at most every 30 minutes, same network rule), "unmetered networks only", "Confirm before updating on a metered network", "Allow unencrypted HTTP feeds and images" (with a confirmation explaining the risk; certificate checks do not change), and the HTTPS check.
 - **Data:** articles to keep on the device, article count and database size (with a warning above 100 MB), image cache size, "Clear image cache", and OPML export.
 - **About:** version, build identifier, a note that data stays on the device, and the open-source licence summary.
 

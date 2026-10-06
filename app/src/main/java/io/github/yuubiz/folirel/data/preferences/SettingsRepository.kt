@@ -44,6 +44,11 @@ data class AppSettings(
      * from the browser's own checks.
      */
     val confirmHttpOpen: Boolean = true,
+    /**
+     * Ask before a manual update on a metered network while automatic updates wait for an unmetered one. Off only after
+     * "don't ask again" was ticked in that dialog or the switch was turned off in settings. Automatic updates are unaffected.
+     */
+    val confirmMeteredRefresh: Boolean = true,
     val onboardingDone: Boolean = false,
     val lastScope: ArticleScope = ArticleScope.All,
     val lastFilter: ReadFilter = ReadFilter.ALL,
@@ -80,6 +85,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val unmeteredOnly = booleanPreferencesKey("unmetered_only")
         val allowHttp = booleanPreferencesKey("allow_http")
         val confirmHttpOpen = booleanPreferencesKey("confirm_http_open")
+        val confirmMeteredRefresh = booleanPreferencesKey("confirm_metered_refresh")
         val onboardingDone = booleanPreferencesKey("onboarding_done")
         val lastScope = stringPreferencesKey("last_scope")
         val lastFilter = stringPreferencesKey("last_filter")
@@ -103,6 +109,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             unmeteredOnly = p[Keys.unmeteredOnly] ?: defaults.unmeteredOnly,
             allowHttp = p[Keys.allowHttp] ?: defaults.allowHttp,
             confirmHttpOpen = p[Keys.confirmHttpOpen] ?: defaults.confirmHttpOpen,
+            confirmMeteredRefresh = p[Keys.confirmMeteredRefresh] ?: defaults.confirmMeteredRefresh,
             onboardingDone = p[Keys.onboardingDone] ?: defaults.onboardingDone,
             lastScope = ArticleScope.decode(p[Keys.lastScope]),
             lastFilter = enumOr(p[Keys.lastFilter], defaults.lastFilter),
@@ -132,6 +139,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setUnmeteredOnly(value: Boolean) = store.edit { it[Keys.unmeteredOnly] = value }
     suspend fun setAllowHttp(value: Boolean) = store.edit { it[Keys.allowHttp] = value }
     suspend fun setConfirmHttpOpen(value: Boolean) = store.edit { it[Keys.confirmHttpOpen] = value }
+    suspend fun setConfirmMeteredRefresh(value: Boolean) = store.edit { it[Keys.confirmMeteredRefresh] = value }
     suspend fun setOnboardingDone(value: Boolean) = store.edit { it[Keys.onboardingDone] = value }
     suspend fun setLastScope(value: ArticleScope) = store.edit { it[Keys.lastScope] = value.encode() }
     suspend fun setLastFilter(value: ReadFilter) = store.edit { it[Keys.lastFilter] = value.name }

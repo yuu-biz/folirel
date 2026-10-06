@@ -156,6 +156,40 @@ class HomeNoticeFlowTest : HomeFlowTestBase() {
         assertEquals(1, subscriptionsOpened)
     }
 
+    /**
+     * Metered network, automatic updates on unmetered only: the manual update asks first. "Do not ask again" with "Update now"
+     * updates and stops the question; the next manual update runs at once. Cancelling never saves the box.
+     */
+    @Test
+    fun theMeteredQuestionCanBeTurnedOff() {
+        firstFetchThenShow()
+        network.value = NetworkState(connected = true, metered = true)
+        compose.waitForIdle()
+        val refreshText = compose.activity.getString(R.string.menu_refresh)
+        fun manualRefresh() {
+            compose.onNodeWithTag("home_more").performClick()
+            compose.onNode(hasText(refreshText)).performClick()
+            compose.waitForIdle()
+        }
+        val before = coordinator.state.value.requests.size
+        manualRefresh()
+        until(3_000) { existsAnywhere("metered_dont_ask") }
+        compose.onNodeWithTag("metered_dont_ask").performClick()
+        compose.onNodeWithTag("metered_cancel").performClick()
+        until(3_000) { !existsAnywhere("metered_dont_ask") }
+        assertTrue("cancel saves nothing", runBlocking { TestData.container.settings.current().confirmMeteredRefresh })
+        assertEquals("cancel does not update", before, coordinator.state.value.requests.size)
+        manualRefresh()
+        until(3_000) { existsAnywhere("metered_dont_ask") }
+        compose.onNodeWithTag("metered_dont_ask").performClick()
+        compose.onNodeWithTag("metered_confirm").performClick()
+        until(5_000) { coordinator.state.value.requests.size == before + 1 }
+        until(5_000) { !runBlocking { TestData.container.settings.current().confirmMeteredRefresh } }
+        manualRefresh()
+        until(5_000) { coordinator.state.value.requests.size == before + 2 }
+        assertTrue("no question any more", !existsAnywhere("metered_dont_ask"))
+    }
+
     /** The notice's own "details" button opens subscription management too. */
     @Test
     fun theNoticeLeadsToTheDetails() {
