@@ -34,7 +34,11 @@ object TestData {
         c.settings.setLastFilter(ReadFilter.ALL)
         c.settings.setSortOrder(SortOrder.NEWEST)
         c.settings.setTextScale(1.0f)
-        c.settings.setPalette(io.github.yuubiz.folirel.data.preferences.ColorPalette.CLASSIC)
+        try {
+            c.settings.setPalette(io.github.yuubiz.folirel.data.preferences.ColorPalette.CLASSIC)
+        } catch (_: NoSuchMethodError) {
+            // The upgrade checks prepare their state in an older release through this helper; a release before 0.7.0 has no colour set.
+        }
         c.settings.setTheme(io.github.yuubiz.folirel.data.preferences.ThemeMode.SYSTEM)
         c.settings.setBrowserMode(io.github.yuubiz.folirel.data.preferences.BrowserMode.CUSTOM_TABS)
         c.settings.setUnmeteredOnly(true)

@@ -39,8 +39,10 @@ EXPECTED_PINNED = ["Zeta", "Gamma"]
 # What each category's display panel must show: (layout row that is checked, arrangement row, columns row) - None: not looked at.
 EXPECTED_LAYOUT = {
     "Delta": ("Compact list", None, None),
-    "Beta": ("Magazine", "Same size for every card", "2 columns"),
-    "Eta": ("Use the default (List)", None, "2 columns"),
+    # Since 0.7.0 the sheet shows only what a layout has: Eta (layout inherited: List) has no columns row on screen; its stored columns are
+    # checked through the database rows, which must be equal before and after.
+    "Beta": ("Magazine", "Even", "2 columns"),
+    "Eta": ("Use the default (List)", None, None),
     "Epsilon": ("Use the default (List)", None, None),
 }
 TABLES = {"accounts": ("id",), "feeds": ("id",), "categories": ("id",), "feed_categories": ("feedId", "categoryId"),
@@ -148,6 +150,11 @@ def checked_rows(root):
         if n.get("checked") == "true":
             out += [t.get("text") for t in n.iter("node") if t.get("text")]
     return out
+
+
+def column_value(root):
+    """Since 0.7.0 the columns are a row that shows its value (a dialog lists the choices): the value text."""
+    return [t for t in texts(root) if re.fullmatch(r"d columns?|Automatic|Use the default (.*)", t)]
 
 
 def selected_tab_text(root):
@@ -273,12 +280,13 @@ def panel_layout(category):
     if find_text(root, "Arrangement and columns…") is not None:
         tap(find_text(root, "Arrangement and columns…"))
         droot = wait_for(lambda r: find_text(r, f"Display of {category}") is not None)
-        details = checked_rows(droot)
+        details = checked_rows(droot) + column_value(droot)
         # The sheet is taller than the screen: look at the rest as well.
         for _scroll in range(3):  # a short screen needs more than one scroll to reach the columns
             adb("shell", "input", "swipe", "540", "1900", "540", "700", "400")
             time.sleep(1)
-            details += checked_rows(dump())
+            nxt = dump()
+            details += checked_rows(nxt) + column_value(nxt)
         back()
     back()
     return layout, details

@@ -41,6 +41,17 @@ class P1RestoreSetup {
         fun id(name: String) = byPath.getValue(name)
         c.settings.setListMode(ListMode.LIST)
         c.settings.setCardColumns(0)
+        // Global values that are not the defaults, so that an update over this release can be checked to keep every one of them (calls that every release since 0.5.0 has).
+        c.settings.setTheme(io.github.yuubiz.folirel.data.preferences.ThemeMode.DARK)
+        c.settings.setTextScale(1.15f)
+        c.settings.setBrowserMode(io.github.yuubiz.folirel.data.preferences.BrowserMode.EXTERNAL)
+        c.settings.setRetentionLimit(3000)
+        c.settings.setImageCacheMb(256)
+        c.settings.setUnmeteredOnly(false)
+        c.settings.setConfirmHttpOpen(false)
+        c.settings.setConfirmMeteredRefresh(false)
+        c.settings.setRefreshIntervalMinutes(60)
+        c.settings.setStartupRefresh(true)
         // Pins first (Gamma, then Zeta), then the order of each group the way the organizer does it.
         repo.setCategoryPinned(account, id("Gamma"), true)
         repo.setCategoryPinned(account, id("Zeta"), true)

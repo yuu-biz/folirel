@@ -60,7 +60,7 @@ These are deliberate. Contributions that add them are out of scope.
 | R11 | Manual state | Read/unread, save/unsave and "mark all as read" are explicit and persisted. |
 | R12 | Share | The Android share sheet receives one article's title and original URL. |
 | R13 | Local search | Substring search over stored titles, summaries and source names, including Japanese. It does not query anything remote. |
-| R14 | Settings | Theme, list layout, text size, images, browser, update frequency and network rules, retention, cache. |
+| R14 | Settings | Light/dark and colour set, list layout, text size, images, browser, update frequency and network rules, retention, cache. |
 | R15 | Position restore | Returning from an article, refreshing or rotating does not move the list or change its scope. |
 | R16 | Persistence | Subscriptions, categories, read state and saved state survive app restarts and database schema changes. |
 | R17 | Safety | External XML and URLs are validated, TLS stays enforced, data does not leak, permissions are minimal. |

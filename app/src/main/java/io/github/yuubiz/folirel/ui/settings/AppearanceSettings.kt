@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -117,7 +118,7 @@ internal fun AppearancePage(s: AppSettings, vm: SettingsViewModel) {
         if (s.palette != effective) SettingNote(stringResource(R.string.palette_dynamic_fallback_note), Modifier.testTag("palette_fallback_note"))
         SettingNote(stringResource(R.string.palette_note))
 
-        GroupHeader(stringResource(R.string.settings_text_size))
+        HorizontalDivider(Modifier.padding(top = 8.dp))
         PercentSliderRow(
             title = stringResource(R.string.settings_text_size),
             percent = storedPercent,
