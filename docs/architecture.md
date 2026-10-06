@@ -33,7 +33,7 @@ minimum SDK is 28 and the code targets the current SDK; all dependency versions 
 
 ```text
 app/src/main/java/io/github/yuubiz/folirel/
-  app/                    Application, AppContainer, MainActivity (navigation), DocumentIo (SAF)
+  app/                    Application, AppContainer, MainActivity (navigation), ShareIntent (Intent to share request), DocumentIo (SAF)
   model/                  Backend-independent models: scopes, list models, normalized feed, errors, subscription tree
   data/db/                Room entities, DAOs, migrations
   data/preferences/       DataStore settings
@@ -43,12 +43,13 @@ app/src/main/java/io/github/yuubiz/folirel/
   backend/local/parser/   FeedParser, SafeXmlReader, XmlCharset, FeedDates, HtmlText, EntryKeys
   backend/local/opml/     OpmlParser, OpmlWriter
   backend/local/icon/     FeedIconResolver, IconDecoder
-  backend/local/discovery/ FeedDiscovery (in-site search for a moved feed)
-  network/                NetworkGuard, redirect handling, HttpClients, AddressPolicy, UrlNormalizer, NetworkStatus
+  backend/local/discovery/ FeedProbe (page and feed reading shared by both searches), FeedDiscovery (in-site search for a moved feed)
+  network/                NetworkGuard, redirect handling, HttpClients, AddressPolicy, UrlNormalizer, SharedUrlExtractor, NetworkStatus
   sync/                   RefreshCoordinator, RefreshWorker/Scheduler, AutoRefreshPolicy, HTTPS-migration,
-                          icon and discovery coordinators
+                          icon and discovery coordinators, ShareDiscoveryService (Share to Subscribe: what a shared address offers)
   ui/home/                Article lists, drawer, tabs, search
   ui/subscriptions/       OPML import, subscription management, categories, feed detail
+  ui/share/               Share to Subscribe: the request state machine (ShareSubscriptionController) and its dialog
   ui/settings/            Settings: top page and its pages (appearance, default layout, opening, refresh and network, storage, about)
   ui/common/              Controls shared by Settings and the home screen: layout picker, choice, selection dialog row, switch row, slider row
   ui/onboarding/          First-run screen
@@ -82,6 +83,9 @@ sixths up to three columns, one unit per column on four and five: `MagazinePlan.
 columns as well (`BentoPlan` has patterns for four and five columns).
 The list position is remembered per list key (account, scope, filter, sort order, search), up to 40 keys, and the
 layout is deliberately not part of the key.
+
+**Share to Subscribe (0.9.2).** `MainActivity` (`singleTask`) turns an `ACTION_SEND` `text/plain` intent into a request and nothing more (`ShareIntent`, on `onCreate` only without saved state, and on `onNewIntent`); it hands the text to `SubscriptionsViewModel.share`, a `ShareSubscriptionController`. The controller extracts the addresses (`SharedUrlExtractor`), asks `ShareDiscoveryService` what the chosen one offers and keeps the state (`ShareState`: Idle, ChoosingUrl, Discovering, Candidates, Failed, Subscribing, Done). Only the newest request may write the state (a generation counter, like `DiscoveryController`), a request waits until first-run setup is done, and registering goes through `SubscriptionsViewModel.addFeed` (the single add-feed path, so one message, one HTTP rule and one refresh). `ShareDiscoveryService` and the moved-feed search both sit on `FeedProbe`, which owns the page read, the `rel=alternate` links, the feed fetch and parse and the limit of 8 candidates. The dialog (`ShareSubscribeOverlay`) is drawn above the navigation stack and is not a route.
+
 
 The order of the pages is one function, `TabOrder.resolve` (pinned categories first, each group by the saved rank, the
 unplaced after the placed in path order); `Structure` carries it (`tabOrdered`, `tabCategories`) together with the per-category

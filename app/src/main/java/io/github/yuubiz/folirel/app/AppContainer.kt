@@ -14,6 +14,7 @@ import io.github.yuubiz.folirel.backend.local.LocalBackend
 import io.github.yuubiz.folirel.backend.local.SmallResourceFetcher
 import io.github.yuubiz.folirel.backend.local.icon.AndroidIconDecoder
 import io.github.yuubiz.folirel.backend.local.discovery.FeedDiscovery
+import io.github.yuubiz.folirel.backend.local.discovery.FeedProbe
 import io.github.yuubiz.folirel.backend.local.icon.FeedIconResolver
 import io.github.yuubiz.folirel.browser.BrowserLauncher
 import io.github.yuubiz.folirel.data.db.AppDatabase
@@ -31,6 +32,7 @@ import io.github.yuubiz.folirel.network.HttpClients
 import io.github.yuubiz.folirel.network.NetworkGuard
 import io.github.yuubiz.folirel.sync.AutoRefreshPolicy
 import io.github.yuubiz.folirel.sync.FeedDiscoveryService
+import io.github.yuubiz.folirel.sync.ShareDiscoveryService
 import io.github.yuubiz.folirel.sync.FeedIconCoordinator
 import io.github.yuubiz.folirel.sync.HttpsUpgradeCoordinator
 import io.github.yuubiz.folirel.sync.RefreshCoordinator
@@ -132,11 +134,17 @@ class AppContainer(context: Context) {
         scope = appScope,
     )
 
-    /** In-site search for a moved feed: same client and policy as feeds (HTTP opt-in, address policy, TLS). */
+    /** Page and feed reading shared by the moved-feed search and Share to Subscribe: same client and policy as feeds (HTTP opt-in, address policy, TLS). */
+    private val feedProbe = FeedProbe(SmallResourceFetcher(feedHttpClient), FeedFetcher(feedHttpClient, clock))
+
+    /** In-site search for a moved feed. */
     val discovery = FeedDiscoveryService(
-        discovery = FeedDiscovery(SmallResourceFetcher(feedHttpClient), FeedFetcher(feedHttpClient, clock)),
+        discovery = FeedDiscovery(feedProbe),
         subscriptions = subscriptions,
     )
+
+    /** "Subscribe to a shared address": looks only; the user's confirmation registers the feed through the add-feed path. */
+    val shareDiscovery = ShareDiscoveryService(feedProbe, subscriptions)
 
     val scheduler = RefreshScheduler(appContext)
 

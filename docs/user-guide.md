@@ -56,6 +56,16 @@ Choose **Add feed URL** (home screen menu, empty-state button, or the plus butto
 
 If the URL starts with `http://`, the feed is registered but not fetched until you allow HTTP in Settings (see [HTTP and HTTPS](#http-and-https)).
 
+## Subscribe from another app (Share to Subscribe)
+
+In a browser or any app, share a page or a link to **Folirel** (the share sheet lists it for text). Folirel takes the web addresses out of the shared text and, with one address, looks for a feed there: if the address is a feed itself, or the page declares RSS/Atom feeds, it checks that each is a real feed. If the text has several addresses, you choose which to look at.
+
+- Nothing is added when you share. A dialog shows what was found (title, address, number of entries, latest date); tap **Subscribe** to add it, or **Cancel** / Back to leave everything as it was. When a page offers several feeds you pick one.
+- If you already subscribe to the feed, the dialog says so and offers **Feed details**. If you unsubscribed from it earlier, it offers **Subscribe again**, and its articles, read and saved state and categories come back as they were.
+- The feed is added without a category; change that in the feed details. `http://` addresses follow the HTTP setting like everything else: while HTTP is off, Folirel says so and sends nothing.
+- If no feed is found (a plain page that declares none), Folirel says so; it does not search the web for you. Find the feed address yourself and use **Add feed URL**.
+- If you share before finishing the first-run explanation, the share waits and is handled once it is done.
+
 ## Daily use
 
 ### Reading
@@ -137,7 +147,7 @@ Settings opens on a short list of six pages; each row shows the values it holds 
 | Page | Option | Choices / notes |
 |---|---|---|
 | Appearance | Light or dark | System, Light, Dark |
-| Appearance | Color | Classic (the blue used so far, default), Leaf, Sand, Violet, Dynamic (takes colors from your wallpaper; Android 12 and later, shown as unavailable on older versions). Light/dark and color are separate. Photos and icons are never tinted |
+| Appearance | Color | Classic (the blue used so far, default), Leaf, Sand, Violet, Dynamic (takes colors from your wallpaper; Android 12 and later, shown as unavailable on older versions). Light/dark and color are separate. Every color except Classic also colors the top bars and the tab strip, and Leaf, Sand and Violet tint the background and cards more strongly; Classic is unchanged. Photos and icons are never tinted |
 | Appearance | Text size | A slider from 90% to 130% in steps of 5%, with **Reset to 100%**. The preview above it follows the slider; the size is saved when you let go. It multiplies the system font size |
 | Layout and navigation | Category navigation | Auto, Pane when possible, Drawer only. On a wide window (Auto: 840 dp or more; Pane when possible: 600 dp or more) the categories stay open in a pane at the left, and the tabs and swiping stay too; Drawer only keeps the menu button and the drawer. A narrow window always uses the drawer |
 | Layout and navigation | Layout | List, Compact list, Magazine, Masonry, Bento, shown as small pictures. This is the default for every category; a category can use its own |

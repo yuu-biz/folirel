@@ -23,6 +23,7 @@ open the original page in your browser.
 
 - **OPML import and export.** Importing shows what will be added before anything is written, and only adds or merges.
   Existing read/saved state and categories are never overwritten.
+- **Share to Subscribe.** Share a page or link from any app to Folirel: it checks the address for an RSS/Atom feed (the address itself, or the feeds the page declares) and subscribes only after you confirm.
 - **Direct fetching** of RSS 2.0, Atom 1.0 and RSS 1.0 feeds, with conditional requests, charset detection (including
   Shift_JIS) and per-feed diagnostics when a feed fails.
 - **Five list layouts:** List, Compact list, Magazine (mixed card sizes with thumbnails and summaries), Masonry (lanes of cards of different heights) and Bento (tiles of different shapes).

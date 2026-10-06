@@ -12,7 +12,7 @@ policy).
 RSS 2.0, Atom 1.0 and RSS 1.0 (RDF) are supported. Elements are matched by namespace URI and local name, never by
 prefix. Not supported: Atom 0.3 (`UNSUPPORTED_FORMAT`), JSON Feed, vendor-specific JSON APIs. An HTML page in place of
 a feed is reported as `NOT_A_FEED`; feed URLs are not discovered from arbitrary HTML when adding a feed. (The only
-HTML reading is the user-triggered search for a moved feed, section 8.)
+HTML reading is the user-triggered search for a moved feed and the check of an address shared from another app, both section 8.)
 
 | Field | RSS 2.0 | Atom 1.0 | RSS 1.0 |
 |---|---|---|---|
@@ -285,8 +285,11 @@ cookies or saved passwords.
   manifest when upgrading it. No storage, notification, location, contacts or audio permissions are needed. The
   manifest `queries` element lists Custom Tabs provider discovery and https `VIEW` handlers (package visibility).
 - Files: OPML import and export use the Storage Access Framework, with no storage permission.
-- Components: the only app-defined exported component is `MainActivity` with the launcher intent filter. No intent
-  filter imports OPML or feed URLs from other apps; import happens only through the in-app file picker.
+- Components: the only app-defined exported component is `MainActivity` (`singleTask`) with the launcher intent filter and one
+  `ACTION_SEND` filter for `text/plain` (Share to Subscribe, section 8). Receiving a share starts no fetch before the
+  first-run explanation is done and subscribes to nothing by itself. No other intent
+  filter imports OPML or feed URLs from other apps; import happens only through the in-app file picker. The intent text is
+  read once and removed from the intent, is never logged, and above 64 Ki characters is not read at all.
 - No advertising, analytics or automatic crash-reporting SDK. Background task failures are logged with the exception
   class name only, never URLs or content.
 - Sharing sends only what the user triggers: the system share sheet with one article's title and URL, and, from the
@@ -347,6 +350,21 @@ automatically.
 Adopting a candidate needs explicit confirmation and changes only `fetchUrl` (data-and-import.md section 8). The
 refresh layer is notified so the next refresh targets the new address. A separate "search the web" action hands
 "<feed name> RSS" to the device's web search; the app holds no search endpoint, API key or HTML scraping for it.
+
+### Share to Subscribe (an address shared from another app)
+
+Triggered by the user sharing text to Folirel. A single address is looked at at once; with several, nothing is fetched until the user picks one.
+The text is reduced to at most 8 normalized `http`/`https` addresses (`SharedUrlExtractor`: other schemes, user info,
+over-long tokens and text above 64 Ki characters are dropped or refused before any network use). The chosen address is
+read by the same core as the moved-feed search (`FeedProbe`), with the same clients, so every rule above applies
+unchanged and no sharing-specific exception exists: public addresses only, cleartext HTTP only after the user's opt-in
+(without it an `http://` address is refused with nothing sent, and a redirect is never upgraded or downgraded), normal
+certificate verification, every redirect hop checked, the page limit of 512 KiB (cut, not refused) and the feed limits.
+A candidate is a document that parses as RSS/Atom/RDF; its address is the final address after redirects. The shared
+address is not sent anywhere except the host it names (and the feed hosts that page declares), never to a search or
+feed-finding service. Results are facts only; the feed is registered by the add-feed path after the user's explicit
+confirmation (one refresh follows), and an address that already has a feed row (subscribed, or unsubscribed with its data)
+is merged into that row, never added twice. An unsubscribed feed is taken again only on an explicit "Subscribe again".
 
 ## 9. HTTP to HTTPS migration
 

@@ -302,6 +302,15 @@ class SubscriptionRepository(
         }
     }
 
+    /**
+     * The feed an address already stands for, subscribed or not (registered, fetched, moved to HTTPS or moved by the user).
+     * Read-only; the same lookup [addFeed] uses, so what this finds is what [addFeed] would merge into instead of adding a copy.
+     */
+    suspend fun findFeed(accountId: String, rawUrl: String): FeedEntity? {
+        val url = UrlNormalizer.normalizedOrNull(rawUrl) ?: return null
+        return feedLookup(accountId).find(url)
+    }
+
     /** Soft unsubscribe: stops updates and hides the feed from normal lists; articles and saved state remain. */
     suspend fun unsubscribe(feedId: String) {
         dao.setSubscribed(feedId, false)

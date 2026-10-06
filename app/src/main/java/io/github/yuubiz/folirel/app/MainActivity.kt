@@ -1,5 +1,6 @@
 package io.github.yuubiz.folirel.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -7,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -14,6 +16,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +41,7 @@ import io.github.yuubiz.folirel.ui.onboarding.OnboardingScreen
 import io.github.yuubiz.folirel.ui.settings.SettingsPage
 import io.github.yuubiz.folirel.ui.settings.SettingsScreen
 import io.github.yuubiz.folirel.ui.settings.SettingsViewModel
+import io.github.yuubiz.folirel.ui.share.ShareSubscribeOverlay
 import io.github.yuubiz.folirel.ui.subscriptions.AddFeedDialog
 import io.github.yuubiz.folirel.ui.subscriptions.CategoriesScreen
 import io.github.yuubiz.folirel.ui.subscriptions.FeedDetailScreen
@@ -55,10 +59,26 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainActivity : ComponentActivity() {
+    private val container get() = (application as FolirelApp).container
+
+    // Owned here, not by the composition, so that a share can be handed over before anything is drawn and survives recreation.
+    private val subscriptionsVm: SubscriptionsViewModel by viewModels {
+        viewModelFactory {
+            initializer {
+                SubscriptionsViewModel(
+                    container.subscriptions, container.refresh, container.httpsUpgrade, container.discovery, container.shareDiscovery, container.documents,
+                    { container.settings.current().allowHttp }, container.clock, container.settings,
+                )
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val container = (application as FolirelApp).container
+        val container = container
+        // A recreated activity (rotation, process restart) gets its old intent back; that share was handled when it arrived.
+        if (savedInstanceState == null) handleShare(intent)
         setContent {
             val settings by container.settings.settings.collectAsStateWithLifecycle(initialValue = null as AppSettings?)
             val current = settings ?: return@setContent // render nothing until preferences are loaded
@@ -67,17 +87,30 @@ class MainActivity : ComponentActivity() {
                 val iconVersions = remember { flow { emit(container.subscriptions.ensureLocalAccount()) }.flatMapLatest { container.feedIcons.observeVersions(it) } }
                 ProvideFeedIcons(iconStore, iconVersions, enabled = current.showImages) {
                     Surface(Modifier.fillMaxSize()) {
-                        AppNavigation(container, current)
+                        AppNavigation(container, current, subscriptionsVm)
                     }
                 }
             }
         }
     }
+
+    /** A later share while the app is running (or was left in the background): a new request over whatever is showing. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleShare(intent)
+    }
+
+    /** Intent in, request out; looking at the text and the network are the share controller's business. */
+    private fun handleShare(intent: Intent?) {
+        val shared = ShareIntent.consume(intent) ?: return
+        subscriptionsVm.share.receive(shared.text)
+    }
 }
 
 /** Minimal back stack: home is the root; routes are plain strings so they survive process death. */
 @Composable
-private fun AppNavigation(container: AppContainer, settings: AppSettings) {
+private fun AppNavigation(container: AppContainer, settings: AppSettings, subscriptionsVm: SubscriptionsViewModel) {
     var stack by rememberSaveable { mutableStateOf(listOf(ROUTE_HOME)) }
     var addFeedOpen by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -102,16 +135,6 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
     val importVm: ImportViewModel = viewModel(
         factory = viewModelFactory { initializer { ImportViewModel(container.documents, container.subscriptions, container.settings, container.refresh) } },
     )
-    val subscriptionsVm: SubscriptionsViewModel = viewModel(
-        factory = viewModelFactory {
-            initializer {
-                SubscriptionsViewModel(
-                    container.subscriptions, container.refresh, container.httpsUpgrade, container.discovery, container.documents,
-                    { container.settings.current().allowHttp }, container.clock, container.settings,
-                )
-            }
-        },
-    )
     val settingsVm: SettingsViewModel = viewModel(
         factory = viewModelFactory {
             initializer {
@@ -126,6 +149,8 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
     // Results of add-feed / export / category operations, wherever they were triggered from.
     val rootSnackbar = remember { SnackbarHostState() }
     SubscriptionEvents(subscriptionsVm, rootSnackbar)
+    // A share that arrived during first-run setup waits; it is looked at only after setup, which a share never skips.
+    LaunchedEffect(settings.onboardingDone) { subscriptionsVm.share.setReady(settings.onboardingDone) }
 
     val openOpml = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         // Cancel: nothing happens, no message.
@@ -207,6 +232,8 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings) {
         }
         SnackbarHost(rootSnackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
+    // A dialog over the current screen, not a route: the stack and the state under it stay as they are.
+    ShareSubscribeOverlay(subscriptionsVm.share, onOpenFeed = { push(ROUTE_FEED_PREFIX + it) })
     if (addFeedOpen) {
         AddFeedDialog(
             onAdd = { url ->

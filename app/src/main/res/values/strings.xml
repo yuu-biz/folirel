@@ -614,4 +614,29 @@
     <string name="layout_hidden_kept_note">Choices for a setting that this layout does not have are kept for when the layout changes.</string>
     <string name="browser_note">Custom Tabs open the article in a tab of your browser on top of this app. If that is not possible, the external browser is used.</string>
     <string name="settings_save_failed">Could not save the setting.</string>
+    <!-- Share to Subscribe -->
+    <string name="share_title">Subscribe to a feed</string>
+    <string name="share_choose_note">The shared text has several web addresses. Pick the one to check; nothing is looked at before you pick.</string>
+    <string name="share_exploring">Looking for a feed on %s…</string>
+    <string name="share_found_one">This feed was found. It is added only when you tap Subscribe.</string>
+    <string name="share_found_many">These feeds were found. Pick the one to subscribe to.</string>
+    <string name="share_action_subscribe">Subscribe</string>
+    <string name="share_action_resubscribe">Subscribe again</string>
+    <string name="share_already">You already subscribe to this feed.</string>
+    <string name="share_unsubscribed_note">You unsubscribed from this feed before. Subscribing again keeps its articles, read state and categories.</string>
+    <string name="share_open_feed">Feed details</string>
+    <string name="share_latest">latest %s</string>
+    <string name="share_subscribing">Subscribing…</string>
+    <string name="share_problem_no_url">No web address (http or https) was found in the shared text.</string>
+    <string name="share_problem_too_large">The shared text is too large to read.</string>
+    <string name="share_problem_invalid_url">That is not a usable web address.</string>
+    <string name="share_problem_no_feed">No RSS/Atom feed was found at this address.</string>
+    <string name="share_problem_feeds_unreadable">The page points to a feed, but it could not be read as RSS/Atom.</string>
+    <string name="share_problem_http">This address uses http://, which is not allowed in Settings. Nothing was sent. Allow HTTP there and share it again, or share the https:// address.</string>
+    <string name="share_problem_tls">A secure connection could not be made (certificate problem). Certificates are always checked.</string>
+    <string name="share_problem_network">The address could not be reached. Check the connection and try again.</string>
+    <string name="share_problem_blocked">This address is not allowed (local network, or an unsafe redirect).</string>
+    <string name="share_problem_status">The site answered with an error.</string>
+    <string name="share_problem_page_large">The page is too large to read.</string>
+    <string name="share_problem_failed">Something went wrong. Nothing was changed.</string>
 </resources>

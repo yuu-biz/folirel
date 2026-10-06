@@ -88,6 +88,7 @@ Rules that apply to every layer:
 | `HomeFlowTest` | First launch without data (`T01`), opening/scrolling/returning never marks read (`T29`), Custom Tabs path and URL-less article (`T32`), position after rotation and recreation (`T34`), layouts and images off (`T31`, `T37`) |
 | `PagerAndMagazineTest` | Category pager and tabs (`N01`, `N03`, `N24`), layouts List / Compact list / Magazine persisted (`N09`), tabs following the drag, underline position, back to top (arrow and tab re-tap) in every layout, quick successive taps, distant tabs at large text (`V31-T03`) |
 | `UxNextTest` | Position kept across layout changes (`U03`), category round trip in Magazine (`U04`), HTTP confirmation and "do not ask again" (`U06`), bulk unsubscribe and undo (`U10`, `U11`) |
+| `ShareOverlayUiTest` | The Share to Subscribe dialog: Subscribe / Cancel / Feed details / Subscribe again and a problem message (needs a device; compiled only in 0.9.2). |
 | `NewArticleBannerTest` | The new-article banner on the real list composable in all three layouts and both orders: one tap answers it for every new article of the list (it goes to the top, or to the first new article when oldest first), the cross only closes it, the arrow and the second tap on the tab answer it, only the list shown is answered, articles arriving after the tap are announced as new, arrivals at the head keep the reading place (`UXR-12` to `UXR-18`) |
 | `HomeBannerFlowTest`, `HomeNoticeFlowTest` | The real thing end to end (`HomeFlowTestBase`): feeds served by a local MockWebServer, fetched by the real `LocalBackend`, saved by the real `FeedStore` into the app's Room database, driven by a real `RefreshCoordinator`, seen through the real `HomeViewModel` and drawn by the real `HomeScreen` (pager, tabs, list, banner, notices). Only the address policy differs from the app (loopback allowed in the test source set). Banner: one tap goes to the top and ends the notice, the cross, a report that lists answered articles again does not bring them back (`UXR-12`, `UXR-14`, `UXR-17`, `UXR-19`). Notices: partial failure notice and its end, no second notice after the screen is built again, a newer notice survives the older one's timer, the warning badge and offline mark stay, "Retry" and "Details", feeds the update did not reach, the notice and the banner together (`UXR-07` to `UXR-11`, `UXR-21`) |
 | `BackToTopListTest` | End positions of back to top on the real list with 3,000 uneven rows in all three layouts: after arrivals, with arrivals during the movement, with many batches (`V4-R01`) |
@@ -463,3 +464,37 @@ a movable clock). `DailyReadingUiTest` drives the menu, the panel and the sheet 
 | P3A-F02 | Changing the scope (drawer, pane, tabs, picker, a source, Back from a source) keeps the read filter, period, search, order and the hidden keywords; "All articles" resets none of them. | `HomeViewModelFiltersTest`, `DailyReadingUiTest` |
 | P3A-F03 | Changing a filter does not move the scope. | `HomeViewModelFiltersTest` |
 | P3A-F04 | A single feed opened from the Saved filter keeps the Saved filter. | `HomeViewModelFiltersTest` |
+
+### 4.12 Share to Subscribe (0.9.2, P3B-T01 to P3B-T36)
+
+JVM tests run the real network stack (OkHttp client with the app's address policy, HTTP opt-in and TLS verification), `FeedProbe`, the parser, Room and a real `SubscriptionsViewModel` against a local MockWebServer; `MainActivityShareTest` drives the real `MainActivity` under Robolectric. `ShareOverlayUiTest` shows the dialog on a device and needs one.
+
+| ID | Scenario | Where |
+|---|---|---|
+| P3B-T01..T03 | An address alone, text before and after it, Japanese text (punctuation, brackets, full-width space, text touching the address). | `SharedUrlExtractorTest` |
+| P3B-T04 | Several addresses are all returned, in order; the flow waits for the user's choice and fetches nothing meanwhile; an address that was not offered cannot be chosen. | `SharedUrlExtractorTest`, `ShareSubscriptionControllerTest` |
+| P3B-T05..T07 | Duplicates removed after normalizing; trailing punctuation and unmatched closing brackets dropped (Wikipedia-style brackets kept); only http/https taken (`javascript:`, `file:`, `content:`, `data:`, `ftp:`, `view-source:` and user info refused); at most 8. | `SharedUrlExtractorTest` |
+| P3B-T08 | Text above 64 Ki characters is refused unread; pathological inputs are handled in bounded time. | `SharedUrlExtractorTest`, `ShareSubscriptionControllerTest` |
+| P3B-T09, T10 | A direct RSS / Atom address is a candidate with title, site and entry count; nothing is stored. | `ShareToSubscribeTest` |
+| P3B-T11, T12 | A page with one declared feed; a page with several (only verified feeds, in page order; at most 8 looked at). | `ShareToSubscribeTest` |
+| P3B-T13, T14 | A page without feed links is "no feed"; an HTML page at a declared or entered feed address is never a candidate. | `ShareToSubscribeTest` |
+| P3B-T15 | A redirect inside a candidate gives the final address; a redirect of the shared address is followed and links resolve against the final page. | `ShareToSubscribeTest` |
+| P3B-T16 | Untrusted certificate (nothing past the handshake), unreachable host, error status, unsafe (non-public) address, malformed address: each a different problem. | `ShareToSubscribeTest` |
+| P3B-T17 | `http://` while HTTP is off: refused, the server receives nothing; allowed once the setting is on. | `ShareToSubscribeTest` |
+| P3B-T18 | Cancel and a newer request invalidate an older run, including one that ignores cancellation; a late result brings nothing back. | `ShareSubscriptionControllerTest` |
+| P3B-T19 | Before Subscribe: no feed row, no refresh. | `ShareToSubscribeTest`, `ShareSubscriptionControllerTest` |
+| P3B-T20 | Subscribe registers once (a second tap does nothing), through `SubscriptionsViewModel.addFeed`, and ends as Done. | `ShareToSubscribeTest`, `ShareSubscriptionControllerTest` |
+| P3B-T21 | An already subscribed feed (also when known under the declared address of a redirect) is shown as such; no registration, no second row. | `ShareToSubscribeTest`, `ShareSubscriptionControllerTest` |
+| P3B-T22 | An unsubscribed feed is not subscribed by seeing it; Subscribe again keeps the same row and its categories. | `ShareToSubscribeTest`, `ShareSubscriptionControllerTest` |
+| P3B-T23 | HTTP pending: Share verifies a feed before offering it, so with HTTP off no `http://` feed is offered or registered (the existing add-feed "pending" rule applies to the path itself). | `ShareToSubscribeTest` |
+| P3B-T24 | After subscribing the add path's one refresh fetches the new feed exactly once. | `ShareToSubscribeTest` |
+| P3B-T25..T27 | Cold start, warm start (`onNewIntent`) and recreation on the real activity: one request each, none replayed. | `MainActivityShareTest`, `ShareIntentTest` |
+| P3B-T28 | Cancel and Back close the dialog and change nothing (dialog on a device). | `ShareSubscriptionControllerTest` (state), `ShareOverlayUiTest` (not run) |
+| P3B-T29 | Scope, filters, search and scroll under the dialog: the dialog is not a route and writes none of them. | By construction (no navigation or home state is touched; reviewed); on a device not run |
+| P3B-T30 | Sharing the same text later is a new request. | `ShareSubscriptionControllerTest`, `MainActivityShareTest` |
+| P3B-T31 | A share before first-run setup waits and is handled after it; setup is not skipped. | `ShareSubscriptionControllerTest`, `MainActivityShareTest` |
+| P3B-T32 | Malformed intent (no text, text that is not text, another type, another action) does not crash. | `ShareIntentTest`, `MainActivityShareTest` |
+| P3B-T33 | A launcher start, and a launcher tap on a running instance, are not shares; the manifest keeps the launcher entry and adds no permission. | `ShareIntentTest`, `MainActivityShareTest` |
+| P3B-T34 | "Add feed URL" unchanged: the dialog calls the same `addFeed` with the same message, HTTP rule and one refresh (the only change: a failing account lookup is now reported as an error message instead of escaping the coroutine). | `ShareToSubscribeTest` (the share path through the same function); no dialog test on a device |
+| P3B-T35 | The moved-feed search is unchanged on top of `FeedProbe`. | `FeedDiscoveryTest` (unchanged), `ShareToSubscribeTest.theMovedFeedSearchStillSharesTheSameCore` |
+| P3B-T36 | A cancelled share leaves feeds and settings as they were. | `ShareToSubscribeTest`, `ShareSubscriptionControllerTest` |

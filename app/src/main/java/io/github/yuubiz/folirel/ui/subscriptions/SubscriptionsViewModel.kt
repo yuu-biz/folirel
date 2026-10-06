@@ -23,6 +23,8 @@ import io.github.yuubiz.folirel.model.FeedFetchInfo
 import io.github.yuubiz.folirel.model.Structure
 import io.github.yuubiz.folirel.sync.FeedAddressChange
 import io.github.yuubiz.folirel.sync.FeedDiscoveryService
+import io.github.yuubiz.folirel.sync.ShareDiscoveryService
+import io.github.yuubiz.folirel.ui.share.ShareSubscriptionController
 import io.github.yuubiz.folirel.sync.HttpsUpgradeCoordinator
 import io.github.yuubiz.folirel.sync.HttpsUpgradeState
 import io.github.yuubiz.folirel.sync.RefreshState
@@ -82,6 +84,7 @@ class SubscriptionsViewModel(
     private val coordinator: RefreshCoordinator,
     private val httpsUpgrade: HttpsUpgradeCoordinator,
     private val discovery: FeedDiscoveryService,
+    private val shareDiscovery: ShareDiscoveryService,
     private val documents: DocumentIo,
     private val allowHttp: suspend () -> Boolean,
     private val clock: Clock,
@@ -142,11 +145,11 @@ class SubscriptionsViewModel(
     }
 
 
-    fun addFeed(url: String, onDone: (AddFeedResult) -> Unit = {}) = viewModelScope.launch {
-        val account = subscriptions.ensureLocalAccount()
-        val result = runCatching { subscriptions.addFeed(account, url) }.getOrNull()
+    fun addFeed(url: String, onDone: (AddFeedResult) -> Unit = {}, onFailed: () -> Unit = {}) = viewModelScope.launch {
+        val result = runCatching { subscriptions.addFeed(subscriptions.ensureLocalAccount(), url) }.getOrNull()
         if (result == null) {
             events.send(SubscriptionEvent.OperationFailed)
+            onFailed()
             return@launch
         }
         val feedId = when (result) {
@@ -329,6 +332,16 @@ class SubscriptionsViewModel(
         }
         if (changed.isNotEmpty()) coordinator.refresh(RefreshScope.Feeds(changed), RefreshReason.MANUAL)
     }
+
+    /**
+     * Share to Subscribe. Registering goes through [addFeed], so the confirmation message, the HTTP-pending rule and the one
+     * refresh of the new feed are the same as for "Add feed URL".
+     */
+    val share = ShareSubscriptionController(
+        viewModelScope,
+        discover = { shareDiscovery.discover(it) },
+        register = { url, onDone, onFailed -> addFeed(url, onDone, onFailed) },
+    )
 
     // Finding where a feed moved (SUB-DISCOVERY)
 
