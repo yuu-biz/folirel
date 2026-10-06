@@ -145,7 +145,7 @@ class TileLayoutTest {
 
     /** The new layouts are stored by name (Settings and per category) and read back, and the stored names are the documented ones. */
     @Test
-    fun theNewLayoutsAreStoredAndReadBack() = kotlinx.coroutines.runBlocking {
+    fun theNewLayoutsAreStoredAndReadBack() = kotlinx.coroutines.runBlocking<Unit> {
         val byPath = TestData.seedPaths(listOf(listOf("Alpha"), listOf("Beta")), perCategory = 2)
         val c = TestData.container
         val account = c.subscriptions.ensureLocalAccount()
