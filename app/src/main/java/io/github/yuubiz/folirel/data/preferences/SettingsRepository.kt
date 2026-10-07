@@ -1,9 +1,11 @@
 package io.github.yuubiz.folirel.data.preferences
 
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -262,4 +264,13 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     private inline fun <reified E : Enum<E>> enumOr(value: String?, default: E): E =
         value?.let { v -> enumValues<E>().firstOrNull { it.name == v } } ?: default
+
+    companion object {
+        /**
+         * A settings file that cannot be decoded is replaced by the defaults instead of failing every read: otherwise the app
+         * would stop at each start and the only way out, clearing the app's storage, would also delete the database.
+         * Subscriptions, articles and reading state are in Room and are not affected; HTTP is off again by default.
+         */
+        val corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() }
+    }
 }

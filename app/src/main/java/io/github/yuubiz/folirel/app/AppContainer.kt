@@ -48,7 +48,7 @@ import okio.Path.Companion.toOkioPath
 import java.time.Clock
 import java.util.concurrent.atomic.AtomicBoolean
 
-private val Context.settingsDataStore by preferencesDataStore(name = "settings")
+private val Context.settingsDataStore by preferencesDataStore(name = "settings", corruptionHandler = SettingsRepository.corruptionHandler)
 
 /** Manual dependency container (docs/architecture.md: no DI framework). One instance per process. */
 class AppContainer(context: Context) {
