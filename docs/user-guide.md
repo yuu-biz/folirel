@@ -208,3 +208,4 @@ The Storage & data page also shows the number of articles stored and the databas
 | Automatic updates seem late | Android may delay background work (battery saver, Doze). Set the app's battery usage to unrestricted if you need more regular updates, and keep **Update when the app opens** on. |
 | Cannot install an update | The APK is signed with a different key than the installed one. See [Install](#install). |
 | **No app can open this link** | Install or enable a browser, or switch **Open articles in** to the other option. |
+| The first-run screen appears again and the settings are back to their defaults | The settings file could not be read (for example after a storage error) and was reset. Subscriptions, articles and read and saved state are kept; choose your settings again (HTTP is off until you allow it). |

@@ -184,7 +184,10 @@ name. Attribute values are XML-escaped and characters not allowed in XML 1.0 are
 settings and images are not exported.
 
 For a feed that had its address changed (HTTPS migration or approved move) the **current fetch URL** is written as
-`xmlUrl`, so importing the file again finds the same feed.
+`xmlUrl`, so importing the file again finds the same feed. The same applies to a feed registered as `http://` that a
+permanent redirect moved to `https://` (0.9.4): the file would otherwise be held back as HTTP pending on a device without
+HTTP, although the feed is no longer read over `http://`. Other permanent redirects keep the registered URL, which still
+leads to the feed. The export reads feeds, categories and memberships in one transaction.
 
 Exporting and re-importing in the same installation yields an equivalent set of subscription URLs and direct
 category memberships. A cancelled file dialog or a write failure produces no success message. Subscription URLs can
@@ -222,6 +225,10 @@ Settings show article counts and database size.
 Uninstalling the app removes local state. Android backup and device transfer are disabled in the manifest and in the
 data extraction rules because URLs and subscriptions may be personal. OPML export is the only backup mechanism and is
 not a complete backup (it excludes articles and reading state).
+
+**Unreadable settings file.** If the DataStore file cannot be decoded, it is replaced by the defaults (0.9.4) instead of
+failing every read, which would stop the app at each start and leave only "clear storage", deleting the database too.
+The Room data is not affected; the first-run screen is shown again and HTTP is off until it is allowed again.
 
 ## 7. Renaming categories
 
@@ -276,7 +283,7 @@ failure never changes the feed's fetch state. The lookup procedure and schedule 
 every setting; deleting the category deletes the row; no row means all defaults. `tabOrder` is one rank among all the
 categories (null: no saved place, the path order applies and a new category follows the placed ones); `isPinned` does not
 change it, so unpinning returns the saved place. `listModeOverride` (`LIST`, `COMPACT_LIST`, `MAGAZINE`, `MASONRY`, `BENTO`),
-`cardStyleOverride` (`MIXED`, `EVEN`) and `cardColumnsOverride` (0 = automatic, 1 to 3) are null when inherited from the
+`cardStyleOverride` (`MIXED`, `EVEN`) and `cardColumnsOverride` (0 = automatic, 1 to 5) are null when inherited from the
 global settings below; an unknown stored value is read as inherited. Writes change one field at a time (a missing row is
 created with the defaults first), refuse a category of another account in the repository, and saving an order writes
 the ranks in one transaction. A move ("by n places" or "before this neighbour") is computed from the order stored when the
@@ -293,7 +300,8 @@ reader's own choices would have to include this table (and the DataStore keys be
 | `color_palette` | Colour set: `CLASSIC`, `LEAF`, `SAND`, `VIOLET`, `DYNAMIC`, `CUSTOM` (an unknown name reads as `CLASSIC`; `DYNAMIC` before Android 12 is stored as chosen and drawn as Classic). Added in 0.7.0; a store without it reads as `CLASSIC`, so an update changes nothing visible and no migration is needed. | `CLASSIC` |
 | `custom_seed` | Base colour of the `CUSTOM` set, an opaque ARGB integer (alpha in a stored value is ignored). Added in 0.9.3; absent reads as the default teal `#00796B`, and nothing is written by reading. Kept when another set is chosen; "Reset to default" writes the default, "Apply" in the picker writes it together with `color_palette=CUSTOM` in one step. | `#00796B` |
 | `list_layout` | `LIST`, `COMPACT_LIST`, `MAGAZINE`, `MASONRY`, `BENTO`; the default of every category that has no override | `LIST` |
-| `card_columns` | Maximum Magazine columns: 0 = automatic, 1 to 3 | 0 |
+| `card_columns` | Maximum columns of Magazine, Masonry and Bento: 0 = automatic, 1 to 5 | 0 |
+| `category_navigation` | Categories on a wide window: `AUTO` (pane from 840 dp), `PANE` (pane from 600 dp when the articles keep room), `DRAWER` | `AUTO` |
 | `card_style` | Magazine arrangement: `MIXED` or `EVEN` | `MIXED` |
 | `text_scale` | 0.90 to 1.30 in steps of 0.05 (the slider; the four older values are on the grid; any other value reads as 1.0) | 1.0 |
 | `show_images` | Thumbnails and source icons | on |
@@ -308,6 +316,9 @@ reader's own choices would have to include this table (and the DataStore keys be
 | `image_cache_mb` | Thumbnail disk cache: 64, 128, 256, 512 (applied at next start) | 128 |
 | `onboarding_done` | First-run screen completed | off |
 | `last_scope`, `last_filter`, `sort_order` | Last selection | all / all / newest |
+| `period_filter` | `ALL`, `HOURS_24`, `DAYS_3`, `DAYS_7`, `DAYS_30` | `ALL` |
+| `hidden_keywords` | Up to 32 words of at most 64 characters, one list for all scopes | empty |
+| `hidden_keywords_enabled` | Whether the hidden keywords are applied (switched on by the first word added) | off |
 | `last_refresh_attempt` | Start time of the last refresh of any kind | 0 |
 
 A missing `startup_refresh` follows whether the interval is non-zero.

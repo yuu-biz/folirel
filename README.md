@@ -16,8 +16,9 @@ open the original page in your browser.
 
 **Folirel** is a coined name inspired by *folio* and *reader*. The word *folio* ultimately traces back to Latin *folium*, "leaf" or "sheet," reflecting the idea of turning the feeds you choose into pages you can browse. The logo is two leaves, the larger one carrying lines of text like a page.
 
-> **Status:** early release (0.4.x). The app is feature-complete for its first scope and is tested on emulators.
-> Debug-signed APKs are published on the Releases page; there is no Google Play listing yet.
+> **Status:** release candidate stage before 1.0 (0.9.x). The features planned for 1.0 are in place and covered by
+> automated tests; device checks are done by hand. Debug-signed APKs are published on the Releases page; there is no
+> Google Play listing yet.
 
 ## Features
 
@@ -27,7 +28,8 @@ open the original page in your browser.
 - **Direct fetching** of RSS 2.0, Atom 1.0 and RSS 1.0 feeds, with conditional requests, charset detection (including
   Shift_JIS) and per-feed diagnostics when a feed fails.
 - **Five list layouts:** List, Compact list, Magazine (mixed card sizes with thumbnails and summaries), Masonry (lanes of cards of different heights) and Bento (tiles of different shapes).
-- **Categories** with nesting, a navigation drawer, category tabs that follow your finger while you swipe between them, a category picker with search, pinned and re-orderable tabs, and a layout of their own per category if you want one.
+- **Categories** with nesting, a navigation drawer (or a category pane that stays open on wide windows such as tablets and unfolded foldables), category tabs that follow your finger while you swipe between them, a category picker with search, pinned and re-orderable tabs, and a layout of their own per category if you want one.
+- **Filters:** unread or saved articles, a period (24 hours, 3 days, 7 days, 30 days) and hidden keywords that keep matching articles out of the list.
 - **Explicit read state.** Articles are marked read, unread or saved only when you say so. Opening an article never
   marks it read.
 - **Original site first.** Articles open in Custom Tabs (or your external browser); there is no built-in reader.
@@ -36,7 +38,7 @@ open the original page in your browser.
   metered networks.
 - **Feed housekeeping:** find the feed behind a site address, move HTTP feeds to HTTPS after verifying it is the same
   feed, and clean up dead feeds in bulk.
-- **English and Japanese** UI (follows the system language; per-app language on Android 13+), light/dark theme with five color sets, text size setting.
+- **English and Japanese** UI (follows the system language; per-app language on Android 13+), light/dark theme with six color sets (Classic, Leaf, Sand, Violet, Dynamic on Android 12+, and Custom made from one color you pick), text size setting.
 
 ## Install
 
