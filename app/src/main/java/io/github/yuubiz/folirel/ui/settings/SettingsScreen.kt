@@ -126,6 +126,9 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onExport: () -> Unit,
     onHttpsCheck: () -> Unit,
+    backup: BackupViewModel,
+    onCreateBackup: () -> Unit,
+    onRestore: () -> Unit,
 ) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -152,7 +155,7 @@ fun SettingsScreen(
                 SettingsPage.LAYOUT -> LayoutPage(s, vm)
                 SettingsPage.OPEN -> OpenPage(s, vm)
                 SettingsPage.REFRESH -> RefreshPage(s, vm, onHttpsCheck)
-                SettingsPage.STORAGE -> StoragePage(s, vm, snackbar, onExport)
+                SettingsPage.STORAGE -> StoragePage(s, vm, snackbar, onExport, backup, onCreateBackup, onRestore)
                 SettingsPage.ABOUT -> AboutPage()
             }
         }

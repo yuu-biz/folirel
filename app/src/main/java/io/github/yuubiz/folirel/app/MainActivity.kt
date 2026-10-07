@@ -31,6 +31,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import io.github.yuubiz.folirel.data.backup.BackupFormat
 import io.github.yuubiz.folirel.data.preferences.AppSettings
 import io.github.yuubiz.folirel.ui.home.FeedIconStore
 import io.github.yuubiz.folirel.ui.home.HomeNavigation
@@ -39,6 +40,8 @@ import io.github.yuubiz.folirel.ui.home.HomeViewModel
 import io.github.yuubiz.folirel.ui.home.ProvideFeedIcons
 import io.github.yuubiz.folirel.ui.onboarding.OnboardingNext
 import io.github.yuubiz.folirel.ui.onboarding.OnboardingScreen
+import io.github.yuubiz.folirel.ui.settings.BackupViewModel
+import io.github.yuubiz.folirel.ui.settings.RestoreScreen
 import io.github.yuubiz.folirel.ui.settings.SettingsPage
 import io.github.yuubiz.folirel.ui.settings.SettingsScreen
 import io.github.yuubiz.folirel.ui.settings.SettingsViewModel
@@ -58,6 +61,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import java.time.ZonedDateTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainActivity : ComponentActivity() {
@@ -131,7 +135,7 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings, subscr
             initializer {
                 HomeViewModel(
                     container.articles, container.subscriptions, container.settings, container.refresh,
-                    container.networkStatus.observe(), createSavedStateHandle(), container.clock,
+                    container.networkStatus.observe(), createSavedStateHandle(), container.clock, container.backup.replaced,
                 )
             }
         },
@@ -149,6 +153,9 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings, subscr
                 )
             }
         },
+    )
+    val backupVm: BackupViewModel = viewModel(
+        factory = viewModelFactory { initializer { BackupViewModel(container.backup, container.documents, container.appScope) } },
     )
     // Results of add-feed / export / category operations, wherever they were triggered from.
     val rootSnackbar = remember { SnackbarHostState() }
@@ -168,6 +175,19 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings, subscr
     }
     val pickOpml = { openOpml.launch(arrayOf("*/*")) }
     val exportOpml = { createOpml.launch("folirel-subscriptions.opml") }
+    val createBackupDocument = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(BackupFormat.MIME_TYPE)) { uri ->
+        if (uri != null) backupVm.createBackup(uri)
+    }
+    val openBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        // Cancel: nothing happens. A picked file is only read and checked; the restore screen shows what it holds.
+        if (uri != null) {
+            backupVm.load(uri)
+            if (stack.lastOrNull() != ROUTE_RESTORE) push(ROUTE_RESTORE)
+        }
+    }
+    val createBackup = { createBackupDocument.launch(BackupFormat.fileName(ZonedDateTime.now())) }
+    // Any type: some providers label a ZIP as octet-stream; the content decides, not the label.
+    val pickBackup = { openBackup.launch(arrayOf("*/*")) }
 
     Box(Modifier.fillMaxSize()) {
         if (!settings.onboardingDone) {
@@ -231,6 +251,16 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings, subscr
                     onBack = ::pop,
                     onExport = exportOpml,
                     onHttpsCheck = { push(ROUTE_HTTPS) },
+                    backup = backupVm,
+                    onCreateBackup = createBackup,
+                    onRestore = pickBackup,
+                )
+                route == ROUTE_RESTORE -> RestoreScreen(
+                    backupVm,
+                    onPickAgain = pickBackup,
+                    onClose = { backupVm.close(); pop() },
+                    // The data changed under every screen: start again from the article list.
+                    onFinished = { backupVm.close(); stack = listOf(ROUTE_HOME) },
                 )
             }
         }
@@ -256,3 +286,4 @@ private const val ROUTE_CATEGORIES = "categories"
 private const val ROUTE_TAB_ORDER = "categories/order"
 private const val ROUTE_FEED_PREFIX = "feed/"
 private const val ROUTE_HTTPS = "https"
+private const val ROUTE_RESTORE = "restore"

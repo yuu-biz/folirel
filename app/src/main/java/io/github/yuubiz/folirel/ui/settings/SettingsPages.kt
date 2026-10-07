@@ -13,6 +13,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +30,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.yuubiz.folirel.BuildConfig
 import io.github.yuubiz.folirel.R
 import io.github.yuubiz.folirel.app.AppContainer
@@ -236,7 +238,15 @@ internal fun RefreshPage(s: AppSettings, vm: SettingsViewModel, onHttpsCheck: ()
  * cache, and the OPML export. Clearing the image cache never touches articles, read or saved state or categories.
  */
 @Composable
-internal fun StoragePage(s: AppSettings, vm: SettingsViewModel, snackbar: SnackbarHostState, onExport: () -> Unit) {
+internal fun StoragePage(
+    s: AppSettings,
+    vm: SettingsViewModel,
+    snackbar: SnackbarHostState,
+    onExport: () -> Unit,
+    backup: BackupViewModel,
+    onCreateBackup: () -> Unit,
+    onRestore: () -> Unit,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var cacheVersion by remember { mutableIntStateOf(0) }
@@ -250,6 +260,18 @@ internal fun StoragePage(s: AppSettings, vm: SettingsViewModel, snackbar: Snackb
     val dbBytes = remember(articleCount) { vm.databaseBytes() }
     val cacheBytes = remember(cacheVersion) { vm.imageCacheBytes() }
     val cacheCleared = stringResource(R.string.settings_cache_cleared)
+    val backupState by backup.backup.collectAsStateWithLifecycle()
+    val written = (backupState as? BackupState.Written)?.counts
+    val writtenText = written?.let { stringResource(R.string.backup_written, it.feeds, it.articles) }
+    val backupFailedText = stringResource(R.string.backup_failed)
+    LaunchedEffect(backupState) {
+        when (backupState) {
+            is BackupState.Written -> snackbar.showSnackbar(writtenText.orEmpty())
+            BackupState.Failed -> snackbar.showSnackbar(backupFailedText)
+            else -> return@LaunchedEffect
+        }
+        backup.backupMessageShown()
+    }
 
     Column(Modifier.fillMaxWidth()) {
         GroupHeader(stringResource(R.string.settings_group_articles))
@@ -309,8 +331,18 @@ internal fun StoragePage(s: AppSettings, vm: SettingsViewModel, snackbar: Snackb
 
         GroupHeader(stringResource(R.string.settings_group_backup))
         Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-            OutlinedButton(onClick = onExport, modifier = Modifier.testTag("export_opml")) { Text(stringResource(R.string.action_export_opml)) }
+            OutlinedButton(onClick = onExport, modifier = Modifier.testTag("export_opml")) { Text(stringResource(R.string.action_export_subscriptions)) }
             SettingNote(stringResource(R.string.settings_export_note), Modifier.padding(horizontal = 0.dp))
+            // The full backup is a separate thing from the OPML list: Folirel's own format, everything the app holds.
+            val writing = backupState == BackupState.Writing
+            OutlinedButton(onClick = onCreateBackup, enabled = !writing, modifier = Modifier.padding(top = 8.dp).testTag("create_backup")) {
+                Text(stringResource(if (writing) R.string.backup_writing else R.string.action_create_backup))
+            }
+            SettingNote(stringResource(R.string.settings_backup_note), Modifier.padding(horizontal = 0.dp))
+            OutlinedButton(onClick = onRestore, enabled = !writing, modifier = Modifier.padding(top = 8.dp).testTag("restore_backup")) {
+                Text(stringResource(R.string.action_restore_backup))
+            }
+            SettingNote(stringResource(R.string.settings_restore_note), Modifier.padding(horizontal = 0.dp))
         }
     }
     retentionAsk?.let { p ->
