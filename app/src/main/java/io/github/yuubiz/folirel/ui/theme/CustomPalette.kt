@@ -4,7 +4,10 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.toArgb
 import io.github.yuubiz.folirel.data.preferences.AppSettings
+import io.github.yuubiz.folirel.data.preferences.CustomColors
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cbrt
@@ -29,9 +32,75 @@ import kotlin.math.sin
  * grey scheme).
  *
  * Light and dark come from the same seed. Nothing is looked up or stored here: the same seed always gives the same colours.
+ *
+ * Since 0.9.5 the reader can also set five colours of each mode by hand ([detailed]); those are the reader's choice and are not checked
+ * or corrected (the editor only warns about low contrast, [hasLowContrast]).
  */
 object CustomPalette {
     val DEFAULT_SEED: Int = AppSettings.DEFAULT_CUSTOM_SEED
+
+    /**
+     * The Custom scheme to draw: the [colors] the reader set by hand for this mode ([detailed], whatever the seed), or, when there are
+     * none, the scheme made from [seed]. A store written before 0.9.5 has none, so it looks exactly as it did.
+     */
+    fun scheme(seed: Int, dark: Boolean, colors: CustomColors?): ColorScheme = if (colors == null) scheme(seed, dark) else detailed(colors, dark)
+
+    /** The five colours the detail editor starts from: those of the scheme made from [seed] (what the reader sees before editing). */
+    fun generatedColors(seed: Int, dark: Boolean): CustomColors {
+        val s = scheme(seed, dark)
+        return CustomColors(s.primary.toArgb(), s.primaryContainer.toArgb(), s.secondary.toArgb(), s.surface.toArgb(), s.onSurface.toArgb())
+    }
+
+    /**
+     * A complete scheme from the five colours set by hand (0.9.5). The five are used exactly as given, never corrected; the other roles
+     * are made from them alone (not from the seed), so changing the base colour does not change a mode the reader set by hand:
+     * - text on a coloured role is whichever of the reader's text and background colours stands out more from it;
+     * - secondary text, lines and the surface steps of cards and sheets lie between the background and the text (neutral steps, not tinted
+     *   towards the accent), the secondary container between the background and the secondary colour;
+     * - tertiary (hardly used) is the secondary colour; the error colours are the fixed ones of the generated scheme.
+     */
+    fun detailed(colors: CustomColors, dark: Boolean): ColorScheme {
+        val a = Color(colors.accent)
+        val ac = Color(colors.accentContainer)
+        val s = Color(colors.secondary)
+        val bg = Color(colors.background)
+        val text = Color(colors.text)
+        fun on(color: Color): Color = if (contrast(text.toArgb(), color.toArgb()) >= contrast(bg.toArgb(), color.toArgb())) text else bg
+        fun step(share: Float) = lerp(bg, text, share)
+        val secondaryContainer = lerp(bg, s, if (dark) 0.35f else 0.25f)
+        val base = if (dark) darkColorScheme() else lightColorScheme()
+        return base.copy(
+            primary = a, onPrimary = on(a), primaryContainer = ac, onPrimaryContainer = on(ac), inversePrimary = ac,
+            secondary = s, onSecondary = on(s), secondaryContainer = secondaryContainer, onSecondaryContainer = on(secondaryContainer),
+            tertiary = s, onTertiary = on(s), tertiaryContainer = secondaryContainer, onTertiaryContainer = on(secondaryContainer),
+            background = bg, onBackground = text, surface = bg, onSurface = text,
+            surfaceVariant = step(if (dark) 0.16f else 0.09f), onSurfaceVariant = lerp(text, bg, 0.28f),
+            surfaceTint = a,
+            inverseSurface = text, inverseOnSurface = bg,
+            outline = lerp(text, bg, 0.5f), outlineVariant = lerp(text, bg, 0.78f),
+            error = if (dark) Color(0xFFF2B8B5) else Color(0xFFB3261E), onError = if (dark) Color(0xFF601410) else Color.White,
+            errorContainer = if (dark) Color(0xFF8C1D18) else Color(0xFFF9DEDC), onErrorContainer = if (dark) Color(0xFFF9DEDC) else Color(0xFF410E0B),
+            scrim = Color.Black,
+            surfaceDim = if (dark) bg else step(0.12f), surfaceBright = if (dark) step(0.18f) else bg,
+            surfaceContainerLowest = if (dark) lerp(bg, Color.Black, 0.4f) else bg,
+            surfaceContainerLow = step(0.04f),
+            surfaceContainer = step(if (dark) 0.08f else 0.06f),
+            surfaceContainerHigh = step(if (dark) 0.12f else 0.08f),
+            surfaceContainerHighest = step(if (dark) 0.17f else 0.10f),
+        )
+    }
+
+    /** The contrast below which the detail editor warns (it never refuses): ordinary text on a surface. */
+    const val LOW_CONTRAST = 4.5
+
+    /**
+     * Whether the text of [colors] is hard to read on the background or on a card (the surfaces most text is on). Only a warning for the
+     * editor; the colours are saved as they are.
+     */
+    fun hasLowContrast(colors: CustomColors, dark: Boolean): Boolean {
+        val card = detailed(colors, dark).surfaceContainerHigh.toArgb()
+        return contrast(colors.text, colors.background) < LOW_CONTRAST || contrast(colors.text, card) < LOW_CONTRAST
+    }
 
     /** A scheme for [seed] (an RGB colour; alpha is ignored), light or [dark]. */
     fun scheme(seed: Int, dark: Boolean): ColorScheme {
@@ -248,17 +317,13 @@ internal object Lch {
 /** The seed as a person sees and types it (`#RRGGBB`) and as a picker moves it (hue, saturation, value). Pure; nothing is stored here. */
 object SeedColor {
     /** `#RRGGBB` of [seed] (upper case, alpha ignored). */
-    fun hex(seed: Int): String = "#%06X".format(seed and 0xFFFFFF)
+    fun hex(seed: Int): String = CustomColors.hex(seed)
 
     /**
      * The opaque colour of [text], or null. Exactly six hexadecimal digits, with or without the leading `#`, and white space around is
      * ignored; nothing else (no 3-digit form, no alpha, no colour names) is accepted, so a half-typed or wrong value is never stored.
      */
-    fun parse(text: String): Int? {
-        val t = text.trim().removePrefix("#")
-        if (t.length != 6 || !t.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) return null
-        return 0xFF000000.toInt() or t.toInt(16)
-    }
+    fun parse(text: String): Int? = CustomColors.parseHex(text)
 
     class Hsv(val hue: Float, val saturation: Float, val value: Float)
 

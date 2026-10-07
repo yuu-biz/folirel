@@ -61,6 +61,10 @@ data class AppSettings(
     val palette: ColorPalette = ColorPalette.CLASSIC,
     /** The base colour of [ColorPalette.CUSTOM], opaque ARGB. It is kept when another set is chosen. Absent in a store written before 0.9.3. */
     val customSeed: Int = DEFAULT_CUSTOM_SEED,
+    /** Colours of the light Custom scheme set by hand (0.9.5); null: made from [customSeed]. Absent in a store written before 0.9.5. */
+    val customLight: CustomColors? = null,
+    /** The same for the dark Custom scheme; light and dark are independent. */
+    val customDark: CustomColors? = null,
     val listMode: ListMode = ListMode.LIST,
     val textScale: Float = 1.0f,
     /** Columns of the Magazine, Masonry and Bento layouts: 0 = automatic by width and text size, otherwise 1..5 (reduced when they do not fit). */
@@ -144,6 +148,8 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val theme = stringPreferencesKey("theme")
         val palette = stringPreferencesKey("color_palette")
         val customSeed = intPreferencesKey("custom_seed")
+        val customLight = stringPreferencesKey("custom_light_colors")
+        val customDark = stringPreferencesKey("custom_dark_colors")
         val listMode = stringPreferencesKey("list_layout")
         val textScale = floatPreferencesKey("text_scale")
         val cardColumns = intPreferencesKey("card_columns")
@@ -175,6 +181,8 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             theme = enumOr(p[Keys.theme], defaults.theme),
             palette = enumOr(p[Keys.palette], defaults.palette),
             customSeed = p[Keys.customSeed]?.let { AppSettings.opaque(it) } ?: defaults.customSeed,
+            customLight = CustomColors.decode(p[Keys.customLight]),
+            customDark = CustomColors.decode(p[Keys.customDark]),
             listMode = enumOr(p[Keys.listMode], defaults.listMode),
             textScale = p[Keys.textScale]?.takeIf { AppSettings.isTextScale(it) } ?: defaults.textScale,
             cardStyle = enumOr(p[Keys.cardStyle], defaults.cardStyle),
@@ -216,8 +224,19 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         it[Keys.palette] = ColorPalette.CUSTOM.name
     }
 
-    /** Back to the default base colour; the colour set stays as it is. */
+    /** Back to the default base colour; the colour set and the colours set by hand stay as they are. */
     suspend fun resetCustomSeed() = store.edit { it[Keys.customSeed] = AppSettings.DEFAULT_CUSTOM_SEED }
+
+    /** The colours of the light or [dark] Custom scheme set by hand (the editor's Save), in one write. The base colour is not touched. */
+    suspend fun setCustomColors(dark: Boolean, colors: CustomColors) = store.edit {
+        it[if (dark) Keys.customDark else Keys.customLight] = colors.encode()
+    }
+
+    /** Forgets the colours set by hand for [light] and/or [dark]: those modes are made from the base colour again ("Regenerate"). */
+    suspend fun regenerateCustomColors(light: Boolean, dark: Boolean) = store.edit {
+        if (light) it.remove(Keys.customLight)
+        if (dark) it.remove(Keys.customDark)
+    }
     suspend fun setListMode(value: ListMode) = store.edit { it[Keys.listMode] = value.name }
     suspend fun setTextScale(value: Float) = store.edit { it[Keys.textScale] = value }
     suspend fun setCardColumns(value: Int) = store.edit { it[Keys.cardColumns] = value }

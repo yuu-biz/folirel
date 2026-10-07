@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import io.github.yuubiz.folirel.data.preferences.ColorPalette
+import io.github.yuubiz.folirel.data.preferences.CustomColors
 import io.github.yuubiz.folirel.data.preferences.ThemeMode
 
 /** Whether [themeMode] draws dark colours, given what the system currently asks for. */
@@ -30,6 +31,8 @@ fun FolirelTheme(
     textScale: Float,
     palette: ColorPalette = ColorPalette.CLASSIC,
     customSeed: Int = CustomPalette.DEFAULT_SEED,
+    customLight: CustomColors? = null,
+    customDark: CustomColors? = null,
     content: @Composable () -> Unit,
 ) {
     val dark = isDarkTheme(themeMode, isSystemInDarkTheme())
@@ -38,7 +41,7 @@ fun FolirelTheme(
     val drawn = palette.effective(Build.VERSION.SDK_INT)
     CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale * textScale)) {
         CompositionLocalProvider(LocalTintedBars provides usesTintedBars(drawn)) {
-            MaterialTheme(colorScheme = Palettes.scheme(drawn, dark, context, customSeed), typography = Typography(), content = content)
+            MaterialTheme(colorScheme = Palettes.scheme(drawn, dark, context, customSeed, if (dark) customDark else customLight), typography = Typography(), content = content)
         }
     }
 }

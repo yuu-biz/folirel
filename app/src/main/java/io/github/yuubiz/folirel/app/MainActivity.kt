@@ -86,7 +86,7 @@ class MainActivity : ComponentActivity() {
             val current = settings ?: return@setContent // render nothing until preferences are loaded
             val dark = isDarkTheme(current.theme, isSystemInDarkTheme())
             LaunchedEffect(dark) { applySystemBars(dark) }
-            FolirelTheme(current.theme, current.textScale, current.palette, current.customSeed) {
+            FolirelTheme(current.theme, current.textScale, current.palette, current.customSeed, current.customLight, current.customDark) {
                 val iconStore = remember { FeedIconStore { feedId -> container.feedIcons.png(feedId) } }
                 val iconVersions = remember { flow { emit(container.subscriptions.ensureLocalAccount()) }.flatMapLatest { container.feedIcons.observeVersions(it) } }
                 ProvideFeedIcons(iconStore, iconVersions, enabled = current.showImages) {

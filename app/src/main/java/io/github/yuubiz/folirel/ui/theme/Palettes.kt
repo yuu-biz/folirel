@@ -11,6 +11,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import io.github.yuubiz.folirel.data.preferences.ColorPalette
+import io.github.yuubiz.folirel.data.preferences.CustomColors
 
 /**
  * The colour sets. Each fixed palette has a light and a dark [ColorScheme] defined as one coherent set (primary, secondary and
@@ -122,17 +123,19 @@ object Palettes {
 
     /**
      * The scheme to draw. [palette] should already be the effective one ([ColorPalette.effective]): Dynamic is read from the system
-     * wallpaper colours and exists only on Android 12 and later; asked for on an older system it is Classic.
+     * wallpaper colours and exists only on Android 12 and later; asked for on an older system it is Classic. [customColors] are the
+     * colours the reader set by hand for this mode of the Custom set; null (none set) makes it from [customSeed].
      */
     fun scheme(
         palette: ColorPalette,
         dark: Boolean,
         context: Context,
         customSeed: Int = CustomPalette.DEFAULT_SEED,
+        customColors: CustomColors? = null,
     ): ColorScheme =
         when {
             palette == ColorPalette.DYNAMIC && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> neutralText(dynamic(dark, context), dark)
-            palette == ColorPalette.CUSTOM -> CustomPalette.scheme(customSeed, dark)
+            palette == ColorPalette.CUSTOM -> CustomPalette.scheme(customSeed, dark, customColors)
             else -> fixedScheme(palette, dark)
         }
 

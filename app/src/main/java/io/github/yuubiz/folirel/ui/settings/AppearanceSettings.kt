@@ -55,12 +55,14 @@ import androidx.compose.ui.unit.dp
 import io.github.yuubiz.folirel.R
 import io.github.yuubiz.folirel.data.preferences.AppSettings
 import io.github.yuubiz.folirel.data.preferences.ColorPalette
+import io.github.yuubiz.folirel.data.preferences.CustomColors
 import io.github.yuubiz.folirel.data.preferences.ThemeMode
 import io.github.yuubiz.folirel.ui.common.Choice
 import io.github.yuubiz.folirel.ui.common.GroupHeader
 import io.github.yuubiz.folirel.ui.common.PercentSliderRow
 import io.github.yuubiz.folirel.ui.common.SettingNote
 import io.github.yuubiz.folirel.ui.common.layoutPickerPerRow
+import io.github.yuubiz.folirel.ui.theme.CustomPalette
 import io.github.yuubiz.folirel.ui.theme.Palettes
 import io.github.yuubiz.folirel.ui.theme.isDarkTheme
 
@@ -93,6 +95,8 @@ internal fun themeModeName(mode: ThemeMode): String = stringResource(
 internal fun AppearancePage(s: AppSettings, vm: SettingsViewModel, saveFailures: Int) {
     var previewPercent by remember { mutableStateOf<Int?>(null) }
     var pickerOpen by rememberSaveable { mutableStateOf(false) }
+    // The detail editor that is open: false = light, true = dark, null = none.
+    var editing by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val storedPercent = AppSettings.textScalePercent(s.textScale)
     val sdk = Build.VERSION.SDK_INT
     val effective = s.palette.effective(sdk)
@@ -116,6 +120,7 @@ internal fun AppearancePage(s: AppSettings, vm: SettingsViewModel, saveFailures:
             dark = isDarkTheme(s.theme, isSystemInDarkTheme()),
             sdk = sdk,
             customSeed = s.customSeed,
+            customColors = if (isDarkTheme(s.theme, isSystemInDarkTheme())) s.customDark else s.customLight,
             onSelect = { palette -> vm.update { setPalette(palette) } },
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
@@ -124,6 +129,13 @@ internal fun AppearancePage(s: AppSettings, vm: SettingsViewModel, saveFailures:
                 seed = s.customSeed,
                 onPick = { pickerOpen = true },
                 onReset = { vm.update { resetCustomSeed() } },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            CustomDetailsSection(
+                light = s.customLight,
+                dark = s.customDark,
+                onEdit = { dark -> editing = dark },
+                onRegenerate = { light, dark -> vm.update { regenerateCustomColors(light, dark) } },
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
@@ -155,6 +167,16 @@ internal fun AppearancePage(s: AppSettings, vm: SettingsViewModel, saveFailures:
             onCancel = { pickerOpen = false },
         )
     }
+    editing?.let { dark ->
+        // Starts from what this mode shows now: its colours set by hand, or those made from the base colour.
+        CustomDetailDialog(
+            initial = (if (dark) s.customDark else s.customLight) ?: CustomPalette.generatedColors(s.customSeed, dark),
+            dark = dark,
+            storedPercent = storedPercent,
+            onSave = { colors -> vm.update { setCustomColors(dark, colors) }; editing = null },
+            onCancel = { editing = null },
+        )
+    }
 }
 
 /**
@@ -163,7 +185,15 @@ internal fun AppearancePage(s: AppSettings, vm: SettingsViewModel, saveFailures:
  * same words the theme uses, and Dynamic is disabled with the reason said in words and in its state description.
  */
 @Composable
-internal fun PaletteChooser(effective: ColorPalette, dark: Boolean, sdk: Int, customSeed: Int, onSelect: (ColorPalette) -> Unit, modifier: Modifier = Modifier) {
+internal fun PaletteChooser(
+    effective: ColorPalette,
+    dark: Boolean,
+    sdk: Int,
+    customSeed: Int,
+    onSelect: (ColorPalette) -> Unit,
+    modifier: Modifier = Modifier,
+    customColors: CustomColors? = null,
+) {
     val context = LocalContext.current
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val perRow = layoutPickerPerRow(maxWidth.value, LocalDensity.current.fontScale)
@@ -173,7 +203,7 @@ internal fun PaletteChooser(effective: ColorPalette, dark: Boolean, sdk: Int, cu
                     rowPalettes.forEach { palette ->
                         val available = ColorPalette.isAvailable(palette, sdk)
                         val swatches = if (available) {
-                            val scheme = Palettes.scheme(palette, dark, context, customSeed)
+                            val scheme = Palettes.scheme(palette, dark, context, customSeed, customColors)
                             listOf(scheme.primary, scheme.primaryContainer, scheme.secondary, scheme.surface)
                         } else {
                             emptyList()

@@ -16,9 +16,13 @@ import androidx.compose.ui.test.click
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.yuubiz.folirel.data.preferences.AppSettings
 import io.github.yuubiz.folirel.data.preferences.ColorPalette
+import io.github.yuubiz.folirel.data.preferences.CustomColors
 import io.github.yuubiz.folirel.data.preferences.ThemeMode
 import io.github.yuubiz.folirel.ui.settings.CustomColorDialog
 import io.github.yuubiz.folirel.ui.settings.CustomColorRow
+import io.github.yuubiz.folirel.ui.settings.CustomDetailDialog
+import io.github.yuubiz.folirel.ui.settings.CustomDetailsSection
+import io.github.yuubiz.folirel.ui.theme.CustomPalette
 import io.github.yuubiz.folirel.ui.theme.FolirelTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -102,5 +106,65 @@ class CustomColorUiTest {
         compose.waitForIdle()
         assertEquals(1, resets)
         compose.onNodeWithTag("custom_reset").assertIsNotEnabled()
+    }
+
+    // --- details (0.9.5): five colours per mode, saved as chosen; compiled only until a device is available ---
+
+    private val savedDetails = ArrayList<CustomColors>()
+
+    private fun showDetailEditor(dark: Boolean) = compose.setContent {
+        FolirelTheme(ThemeMode.LIGHT, 1f, ColorPalette.CUSTOM, start) {
+            CustomDetailDialog(
+                initial = CustomPalette.generatedColors(start, dark),
+                dark = dark,
+                storedPercent = 100,
+                onSave = { savedDetails += it },
+                onCancel = { cancels++ },
+            )
+        }
+    }
+
+    @Test
+    fun theTextColourCanBeSetEvenWhenItIsHardToReadWithAWarningOnly() {
+        showDetailEditor(dark = true)
+        compose.onNodeWithTag("custom_detail_save").assertIsNotEnabled()
+        compose.onNodeWithTag("custom_role_TEXT").performClick()
+        val background = CustomColors.hex(CustomPalette.generatedColors(start, true).background)
+        compose.onNodeWithTag("custom_hex_field").performTextClearance()
+        compose.onNodeWithTag("custom_hex_field").performTextInput(background)
+        compose.onNodeWithTag("custom_contrast_warning").assertIsDisplayed()
+        compose.onNodeWithTag("custom_detail_save").assertIsEnabled().performClick()
+        assertEquals(1, savedDetails.size)
+        assertEquals(CustomPalette.generatedColors(start, true).background, savedDetails.single().text)
+    }
+
+    @Test
+    fun anInvalidCodeInTheEditorCannotBeSavedAndCancelSavesNothing() {
+        showDetailEditor(dark = false)
+        compose.onNodeWithTag("custom_role_BACKGROUND").performClick()
+        compose.onNodeWithTag("custom_hex_field").performTextClearance()
+        compose.onNodeWithTag("custom_hex_field").performTextInput("#12")
+        compose.onNodeWithTag("custom_hex_error").assertIsDisplayed()
+        compose.onNodeWithTag("custom_detail_save").assertIsNotEnabled()
+        compose.onNodeWithTag("custom_detail_cancel").performClick()
+        assertTrue(savedDetails.isEmpty())
+        assertEquals(1, cancels)
+    }
+
+    @Test
+    fun regenerationAsksFirstAndIsOfferedOnlyForAModeSetByHand() {
+        val regenerated = ArrayList<Pair<Boolean, Boolean>>()
+        val hand = CustomPalette.generatedColors(start, false).with(CustomColors.Role.TEXT, 0xFF000000.toInt())
+        compose.setContent {
+            FolirelTheme(ThemeMode.LIGHT, 1f, ColorPalette.CUSTOM, start) {
+                CustomDetailsSection(light = hand, dark = null, onEdit = {}, onRegenerate = { l, d -> regenerated += l to d })
+            }
+        }
+        compose.onNodeWithTag("custom_regen_dark").assertIsNotEnabled()
+        compose.onNodeWithTag("custom_regen_both").assertIsNotEnabled()
+        compose.onNodeWithTag("custom_regen_light").assertIsEnabled().performClick()
+        assertTrue("nothing before the confirmation", regenerated.isEmpty())
+        compose.onNodeWithTag("custom_regen_confirm").performClick()
+        assertEquals(listOf(true to false), regenerated)
     }
 }
