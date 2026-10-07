@@ -578,3 +578,4 @@ manual ([backup-format.md](backup-format.md) section 7).
 | BR-T45 | OPML import and export unchanged. | The existing OPML tests (`OpmlParserTest`, `ImportRepositoryTest`, `OpmlPortabilityTest`, `CategoryAndExportTest`) |
 | BR-T47 | Debug backup → uninstall → differently signed install → restore → compare. | Manual, at the release candidate ([backup-format.md](backup-format.md) section 7) |
 | (§17) | 1,000 feeds and 30,000 articles with long Japanese summaries and JSON special characters round-trip exactly. | `largeInstallRoundTrips` |
+| (own data) | A category name stored untrimmed and not in NFC, and a very long feed name, are restored as they are (the reader's own backup is not refused by today's input rules). | `olderStoredNamesAreRestoredAsTheyAre` |

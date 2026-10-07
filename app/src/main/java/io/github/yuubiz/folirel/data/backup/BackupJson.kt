@@ -36,9 +36,11 @@ internal object BackupJson {
     /** Room ids are UUIDs; anything outside this alphabet is not an id Folirel wrote. */
     private val ID = Regex("[A-Za-z0-9._:-]{1,128}")
 
-    /** Safety bounds, not the parser's limits: values an older version stored must still fit. */
-    private const val SHORT_TEXT_CODE_POINTS = 2_000
-    private const val SUMMARY_CODE_POINTS = 8_000
+    /**
+     * Safety bounds only, far above the parser's limits: text an older version stored (or a long name the reader typed) must never make
+     * the reader's own backup unrestorable. The entry size limits bound the archive as a whole.
+     */
+    private const val TEXT_CHARS = 64 * 1024
     private const val KEY_CHARS = 64 * 1024
     private const val MAX_CATEGORY_DEPTH = 64
 
@@ -203,7 +205,7 @@ internal object BackupJson {
             format = o.string("format"),
             formatVersion = o.int("formatVersion"),
             createdAt = o.time("createdAt"),
-            appVersionName = app.text("versionName", 64),
+            appVersionName = app.string("versionName").also { if (it.length > 64) invalid("app.versionName too long") },
             appVersionCode = app.int("versionCode"),
             schemaVersion = o.int("schemaVersion"),
             counts = BackupCounts(
@@ -308,8 +310,8 @@ internal object BackupJson {
             subscriptionUrl = o.url("subscriptionUrl"),
             fetchUrl = o.url("fetchUrl"),
             siteUrl = o.nullableUrl("siteUrl"),
-            feedTitle = o.nullableText("feedTitle", SHORT_TEXT_CODE_POINTS),
-            userTitle = o.nullableText("userTitle", SHORT_TEXT_CODE_POINTS),
+            feedTitle = o.nullableText("feedTitle"),
+            userTitle = o.nullableText("userTitle"),
             subscribed = o.bool("subscribed"),
             paused = o.bool("paused"),
             createdAt = o.time("createdAt"),
@@ -324,9 +326,10 @@ internal object BackupJson {
         val path = o.array("path").map { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content ?: invalid("category path") }
         if (path.isEmpty() || path.size > MAX_CATEGORY_DEPTH) invalid("category path depth")
         for (segment in path) {
-            // What createCategory / the OPML import store: NFC, trimmed, not empty.
-            if (segment.isEmpty() || segment != io.github.yuubiz.folirel.backend.local.parser.TextNormalizer.nfcTrim(segment)) invalid("category segment")
-            checkText(segment, SHORT_TEXT_CODE_POINTS, "category segment")
+            // Only what the structure needs: the database keeps the path as it is, and a name stored by an older version (whatever its
+            // spaces or normalization) must not make the reader's own backup unrestorable.
+            if (segment.isEmpty()) invalid("empty category segment")
+            checkText(segment, "category segment")
         }
         return BackupCategory(
             id = o.id("id"),
@@ -348,9 +351,9 @@ internal object BackupJson {
             entryKey = o.key("entryKey"),
             externalEntryId = o.nullableString("externalEntryId")?.also { checkKey(it) },
             linkUrl = o.nullableUrl("linkUrl"),
-            title = o.text("title", SHORT_TEXT_CODE_POINTS),
-            summaryText = o.text("summaryText", SUMMARY_CODE_POINTS),
-            author = o.nullableText("author", SHORT_TEXT_CODE_POINTS),
+            title = o.text("title"),
+            summaryText = o.text("summaryText"),
+            author = o.nullableText("author"),
             publishedAt = o.nullableLong("publishedAt")?.also { checkTime(it, MIN_EPOCH_MS, "publishedAt") },
             firstSeenAt = o.time("firstSeenAt"),
             sortAt = o.long("sortAt").also { checkTime(it, MIN_EPOCH_MS, "sortAt") },
@@ -375,8 +378,8 @@ internal object BackupJson {
         if (value.isEmpty() || value.length > KEY_CHARS) invalid("key length")
     }
 
-    private fun checkText(value: String, maxCodePoints: Int, what: String) {
-        if (value.codePointCount(0, value.length) > maxCodePoints) invalid("$what too long")
+    private fun checkText(value: String, what: String) {
+        if (value.length > TEXT_CHARS) invalid("$what too long")
     }
 
     private fun checkTime(value: Long, min: Long, what: String) {
@@ -431,9 +434,9 @@ internal object BackupJson {
 
         fun key(name: String): String = string(name).also { checkKey(it) }
 
-        fun text(name: String, maxCodePoints: Int): String = string(name).also { checkText(it, maxCodePoints, "$what.$name") }
+        fun text(name: String): String = string(name).also { checkText(it, "$what.$name") }
 
-        fun nullableText(name: String, maxCodePoints: Int): String? = nullableString(name)?.also { checkText(it, maxCodePoints, "$what.$name") }
+        fun nullableText(name: String): String? = nullableString(name)?.also { checkText(it, "$what.$name") }
 
         /** An http(s) address the URL rules accept (no other scheme, no user info, within the length limit). Read only, never fetched. */
         fun url(name: String): String = string(name).also { if (UrlNormalizer.normalize(it) !is UrlNormalizer.Result.Valid) invalid("$what.$name URL") }

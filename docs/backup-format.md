@@ -104,7 +104,9 @@ has seen what the backup holds and confirmed.
    - Values: enum names this version knows (an unknown name is refused, never rounded to a default), columns 0–5,
      text size on the 5% grid from 90% to 130%, update interval, article limit and cache size among the offered values,
      complete Custom colours `#RRGGBB`, hidden keywords as the app stores them (normalized, unique, at most 32 of at most
-     64 characters), category names as stored (NFC, trimmed), times in range, text lengths within safety bounds.
+     64 characters), category names not empty, times in range, text within a safety bound of 64 Ki characters. Text that
+     an older version stored is not judged by today's input rules (spaces, normalization, the parser's length limits), so
+     the reader's own backup is never refused for it.
    - Addresses: feed, site, article and image addresses must be `http`/`https` addresses the URL rules accept (no
      other scheme, no user name or password, at most 8 KiB). They are checked as text only.
    - Consistency: no duplicate ids, subscription URLs, category paths, article keys (feed + entry key), states,
@@ -174,12 +176,15 @@ data. The full backup is the way across:
 
 1. In the installed (debug-signed) Folirel 0.10.0 or later: Settings > Storage & data > **Create Folirel backup**, and
    save the file outside the app (for example Downloads or a cloud folder).
-2. Optionally note the counts the backup reported (feeds, articles) and take an OPML export as a second copy of the
-   subscription list.
-3. Uninstall the old app.
-4. Install the differently signed (release) APK and open it. Complete or skip the first-run screen.
-5. Settings > Storage & data > **Restore from Folirel backup**, pick the file, compare the preview with step 2, confirm.
-6. Check: subscriptions and categories (order, pins, layouts), unread and saved counts, a saved article of an
+2. **Check the file before uninstalling.** In the same app: **Restore from Folirel backup**, pick the file just saved,
+   wait for the preview, compare its counts with the app (feeds, articles, saved), then **Cancel**. The preview runs
+   every check a restore runs and changes nothing, so a backup that shows its preview can be restored; one that is
+   refused must not be relied on (keep the old app and report the message).
+3. Optionally take an OPML export as a second copy of the subscription list.
+4. Uninstall the old app.
+5. Install the differently signed (release) APK and open it. Complete or skip the first-run screen.
+6. Settings > Storage & data > **Restore from Folirel backup**, pick the file, compare the preview with step 2, confirm.
+7. Check: subscriptions and categories (order, pins, layouts), unread and saved counts, a saved article of an
    unsubscribed feed, the theme and Custom colours, hidden keywords and period, then a manual update.
 
 The release key and the switch to it are not part of 0.10.0; this procedure is carried out at the release candidate.

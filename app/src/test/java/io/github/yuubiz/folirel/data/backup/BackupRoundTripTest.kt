@@ -370,6 +370,24 @@ class BackupRoundTripTest {
         }
     }
 
+    /**
+     * The reader's own data is never refused for how an older version stored it: a category name with spaces around it or not in NFC,
+     * and a very long name the reader typed, are restored exactly.
+     */
+    @Test
+    fun olderStoredNamesAreRestoredAsTheyAre() {
+        val a = BackupDevice()
+        val b = BackupDevice(idPrefix = "fresh")
+        devices(a, b) {
+            val account = a.account()
+            val feed = (a.subscriptions.addFeed(account, "https://names.example.com/feed") as io.github.yuubiz.folirel.data.repository.AddFeedResult.Added).feedId
+            a.env.db.backupDao().insertCategories(listOf(io.github.yuubiz.folirel.data.db.CategoryEntity("legacy", account, " Ca\u0301fe ", io.github.yuubiz.folirel.data.repository.CategoryPaths.encode(listOf(" Ca\u0301fe ")))))
+            a.subscriptions.renameFeed(feed, "長い名前".repeat(1_000))
+            assertEquals(RestoreOutcome.Restored, b.restore(a.backupBytes()))
+            assertEquals(LogicalState.of(a), LogicalState.of(b))
+        }
+    }
+
     /** The archive is UTF-8 JSON a person can read: Japanese is written as it is, one record per line. */
     @Test
     fun archiveIsReadableJson() {

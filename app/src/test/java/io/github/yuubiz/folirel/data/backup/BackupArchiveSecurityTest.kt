@@ -317,8 +317,8 @@ class BackupArchiveSecurityTest {
         assertRefused(target, editFirst(bytes, BackupFormat.CATEGORIES) { it.with("cardColumns", JsonPrimitive(9)) }, BackupProblem.INVALID_DATA, "cardColumns")
         assertRefused(target, editFirst(bytes, BackupFormat.CATEGORIES) { it.with("listMode", JsonPrimitive("TIMELINE")) }, BackupProblem.INVALID_DATA, "unknown value")
         assertRefused(target, editFirst(bytes, BackupFormat.ARTICLES) { it.with("firstSeenAt", JsonPrimitive(-5)) }, BackupProblem.INVALID_DATA, "range")
-        assertRefused(target, editFirst(bytes, BackupFormat.ARTICLES) { it.with("title", JsonPrimitive("x".repeat(2_001))) }, BackupProblem.INVALID_DATA, "too long")
-        assertRefused(target, editFirst(bytes, BackupFormat.CATEGORIES) { it.with("path", JsonArray(listOf(JsonPrimitive(" padded ")))) }, BackupProblem.INVALID_DATA, "segment")
+        assertRefused(target, editFirst(bytes, BackupFormat.ARTICLES) { it.with("title", JsonPrimitive("x".repeat(64 * 1024 + 1))) }, BackupProblem.INVALID_DATA, "too long")
+        assertRefused(target, editFirst(bytes, BackupFormat.CATEGORIES) { it.with("path", JsonArray(listOf(JsonPrimitive("")))) }, BackupProblem.INVALID_DATA, "segment")
     }
 
     /** T26: checking and restoring an archive whose feeds point at a server never contacts it (no network during a restore). */
