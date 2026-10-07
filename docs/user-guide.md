@@ -163,7 +163,8 @@ Settings opens on a short list of six pages; each row shows the values it holds 
 | Refresh & network | Allow unencrypted HTTP feeds and images | Off by default. A shortcut to **Check HTTPS support of HTTP feeds** is on the same page |
 | Storage & data | Articles to keep on the device | No limit (default), or about 1,000 / 3,000 / 5,000 / 10,000 / 30,000. See below |
 | Storage & data | Image cache size | 64, 128 (default), 256 or 512 MB; applies at the next app start. **Clear image cache** removes cached thumbnails only |
-| Storage & data | Export OPML | Subscriptions and categories only |
+| Storage & data | Export subscription list (OPML) | Subscriptions and categories only |
+| Storage & data | Create Folirel backup / Restore from Folirel backup | Everything Folirel holds, in one file; restoring replaces the current data after a preview and a confirmation. See [Data, backup and uninstalling](#data-backup-and-uninstalling) |
 | About | Version, build, licence summary | The version line shows the version, version code and build identifier |
 
 The Storage & data page also shows the number of articles stored and the database size, and warns when the database is larger than 100 MB.
@@ -174,8 +175,10 @@ The Storage & data page also shows the number of articles stored and the databas
 
 - All data (subscriptions, categories, articles, read and saved state, settings) is stored only on the device, in the app's private storage. Android's automatic backup and device-to-device transfer are disabled for the app, deliberately, because feed URLs can contain private tokens.
 - **Uninstalling the app, or clearing its storage in Android's settings, deletes everything.**
-- **Export OPML** (in **Subscriptions** or in Settings, Data) saves your subscriptions and categories to a file you choose. It is the only backup. It does not include read or saved state or articles. Feed URLs may contain personal tokens, so keep the file private.
-- To move to a new phone: export OPML, copy the file, import it on the new device. Read and saved state will not come along.
+- **Create Folirel backup** (Settings > Storage & data) saves everything to one file you choose: subscriptions with their address history, categories with their order, pins and layouts, the articles kept on the device, read and saved state and all settings (including the Custom colours). Feed icons and the image cache are not included; they come back by themselves. The file is not encrypted and feed URLs may contain personal tokens, so keep it private.
+- **Restore from Folirel backup** (same page) first shows what the backup holds and what is on the device now, and changes nothing until you confirm. Restoring **replaces** all current Folirel data with the backup; it does not merge. If anything goes wrong during the restore, your data and settings stay as they were. No feed is fetched during the restore or right after it; your next update fetches as usual.
+- **Export subscription list (OPML)** (in **Subscriptions** or in Settings, Storage & data) saves only subscriptions and categories, in the format other readers understand. It does not include read or saved state, articles or settings. Importing OPML only adds and merges.
+- To move to a new phone, or to a Folirel signed with another key (which must be installed fresh): create a Folirel backup, copy the file, install Folirel on the new device and restore the backup there. Details: [Full backup and restore](backup-format.md).
 - Updating the app in place requires an APK with the same application ID and the same signing key. See [Install](#install) for debug builds.
 
 ## Limitations

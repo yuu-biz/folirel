@@ -530,3 +530,51 @@ The Share rows run the real network stack against a local MockWebServer and coun
 | P3C-T27 | The seed survives a restart (store); the open picker's draft survives rotation (saved state). | `CustomPaletteSettingTest`; the saver is exercised on a device only (not run) |
 | P3C-T28, T29 | Leaf, Sand, Violet keep every colour of 0.9.2 (written out); Classic is pinned exactly; the existing sets do not depend on the seed. | `ExistingPalettesUnchangedTest`, `PalettesTest.classicIsExactlyTheSetOf060` |
 | P3C-T30 | Custom draws tinted bars (every set but Classic does). | `ExistingPalettesUnchangedTest.customUsesTintedBarsAndClassicDoesNot` |
+
+### 4.14 Full backup and restore (0.10.0, BR-T01 to BR-T47)
+
+The specification numbers these T01–T47; they are BR-T01–BR-T47 here (P3C-* is taken by 0.9.3). All rows are JVM tests in
+`app/src/test/.../data/backup/` over in-memory Room, a file DataStore and the real repositories (`BackupFixture.kt`:
+`BackupDevice` is one install, `RichState` builds a used install through the app's own write paths, `LogicalState`
+dumps every backed-up table and setting without install-specific ids). Failures are injected through the service's
+step hook, a DataStore that fails writes, and an `Error` that stands for the process being killed. A device run
+(file pickers, the restore screen, a real process restart) is not automated; the release-signing walk-through is
+manual ([backup-format.md](backup-format.md) section 7).
+
+| ID | Scenario | Where |
+|---|---|---|
+| BR-T01 | An empty install backs up and restores; the seven entries in order. | `BackupRoundTripTest.t01_emptyInstall` |
+| BR-T02..T11, T30, T32..T36 | A used install (nested categories, a feed in two categories, order, pin, per-category layout with 0 and 5 columns, HTTPS migration, URL move, unsubscribed and paused feeds, articles with Japanese and JSON special characters, read and saved, a saved article of an unsubscribed feed, pruned entries, every setting away from its default, Custom seed and five light and five dark colours, hidden keywords, period) restores into a fresh install identically. | `t43_richStateRestoresIdenticallyIntoAFreshInstall` |
+| BR-T08 | Pruned entries travel and still stop a removed article from returning unread; past 90 days they are not restored. | `t08_prunedEntries` |
+| BR-T12 | No validators, failures, waits, pending requests, icons, diagnostics or install bookkeeping in the archive. | `t12_bookkeepingIsNotBackedUp` |
+| BR-T13 | Backups taken while feeds, articles, read state, categories and settings change are consistent snapshots. | `t13_snapshotIsConsistentUnderConcurrentChanges`, `backupDoesNotBreakAConcurrentWriter` |
+| BR-T14, T46 | OPML, text, empty file, other ZIPs are not backups; a backup given to the OPML parser is refused without a crash. | `BackupArchiveSecurityTest.t14_wrongFiles`, `t46_backupIsNotAnOpml` |
+| BR-T15 | Broken JSON in every entry, trailing data, wrong types, a cut-off ZIP. | `t15_malformedJson` |
+| BR-T16 | A missing entry or required field. | `t16_missingEntryOrField` |
+| BR-T17 | A newer (or zero) format version, also with sections this version cannot read. | `t17_futureFormat` |
+| BR-T18 | Duplicate entries (names patched into the ZIP). | `t18_duplicateEntry` |
+| BR-T19 | Traversal, absolute, backslash, drive, directory, unknown and out-of-order entries. | `t19_pathsAndUnexpectedEntries` |
+| BR-T20 | File, entry, total and small-entry limits; a 64 MB ZIP bomb by ratio; stored entries. | `t20_sizeLimitsAndZipBomb` |
+| BR-T21 | Duplicate feed id, subscription URL, category id and path, article id and key, state, pruned entry, membership. | `t21_duplicateIds` |
+| BR-T22 | References to missing feeds and articles, a category without its parent, an article without state, wrong counts, another account kind. | `t22_brokenReferences` |
+| BR-T23 | `file:`, `javascript:`, `content:`, `ftp:`, credentials, non-URLs; ids outside the id alphabet; an HTTPS migration that is not http → https. | `t23_invalidUrls` |
+| BR-T24 | Unknown enum names, columns, text size, interval, limits, Custom colours, keywords, scope, times, lengths, category names. | `t24_invalidValues` |
+| BR-T25 | Every refusal leaves data and settings exactly as they were. | `assertRefused` in every row above |
+| BR-T26 | Checking and restoring an archive whose feeds point at a local server sends it no request; the backup code has no network imports. | `t26_noNetworkWhileCheckingOrRestoring`, `t26_backupCodeHasNoNetworkPath` |
+| BR-T27 | The preview's counts equal the source install's; it shows what is on the device now. | `BackupRoundTripTest.t27_previewCountsAreExact` |
+| BR-T28, T29 | Inspecting and cancelling change nothing and delete the private copy. | `t28_t29_previewAndCancelChangeNothing` |
+| BR-T31 | Restoring over a used install leaves nothing of it; its account and last refresh attempt stay. | `t31_replacesANonEmptyInstall` |
+| BR-T32 | After a restore an old OPML matches the restored feeds and does not move a feed back to HTTP. | `t32_identityHistoryWorksAfterRestore` |
+| BR-T37 | Fetch bookkeeping starts fresh (only "fetched before" kept); addresses and history kept. | `t37_fetchBookkeepingStartsFresh` |
+| BR-T38 | Refresh is held and running refreshes are cancelled during a restore; a restore starts no refresh; periodic work switched on by a restore waits one interval. | `RestoreAftermathTest.t38_refreshIsHeldDuringARestore`, `t38_restoreStartsNoRefresh`, `periodicWorkAfterARestoreWaitsOneInterval` |
+| BR-T39 | A last selection naming nothing restored opens All; one that exists is restored. | `BackupRoundTripTest.t39_missingLastScopeOpensAll` |
+| BR-T40 | The settings write fails: nothing changed. | `RestoreRollbackTest.t40_settingsWriteFails` |
+| BR-T41 | The database replace fails before commit: data and settings unchanged; if the settings cannot be put back at once, the next start does it. | `t41_databaseReplaceFails`, `t41_databaseFailsAndSettingsCannotBeRevertedYet` |
+| (process death) | Killed before the settings, between settings and database, inside the transaction, after the commit: the next start leaves a consistent install. Busy background work stops a restore before any change. | `processDeath*`, `busyBackgroundWorkStopsTheRestoreBeforeAnyChange`, `backgroundWorkIsPausedAroundTheRestore` |
+| BR-T42 | After a restore a manual refresh works: known articles keep their state, the new one is announced, no old validators are sent. | `RestoreAftermathTest.t42_manualRefreshAfterRestore` |
+| (§8) | The home list switches to the restored selection, leaves search and starts at the top. | `RestoreAftermathTest.homeListFollowsTheRestore` |
+| BR-T43 | Rich state → backup → fresh install → restore → identical logical state. | `t43_richStateRestoresIdenticallyIntoAFreshInstall` |
+| BR-T44 | Backup → restore → backup: the same archive apart from the creation time. | `t44_backupOfARestoreEqualsTheOriginalBackup` |
+| BR-T45 | OPML import and export unchanged. | The existing OPML tests (`OpmlParserTest`, `ImportRepositoryTest`, `OpmlPortabilityTest`, `CategoryAndExportTest`) |
+| BR-T47 | Debug backup → uninstall → differently signed install → restore → compare. | Manual, at the release candidate ([backup-format.md](backup-format.md) section 7) |
+| (§17) | 1,000 feeds and 30,000 articles with long Japanese summaries and JSON special characters round-trip exactly. | `largeInstallRoundTrips` |

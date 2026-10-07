@@ -292,6 +292,14 @@ OPML import and re-import add and merge only: they find the same category by pat
 a rename keeps it. OPML does not carry these settings, so they are not part of the OPML export; a future backup of the
 reader's own choices would have to include this table (and the DataStore keys below).
 
+### Full backup
+
+Folirel's own backup (0.10.0) is a logical archive of the tables above and the preferences below, separate from OPML and
+independent of the schema version: [backup-format.md](backup-format.md). A restore replaces the local data in one
+transaction and the preferences through `SettingsRepository.replaceForRestore` (one DataStore write); it keeps the
+install's account and `last_refresh_attempt`, sets `onboarding_done`, and starts every feed with fresh fetch
+bookkeeping (only `initialized` is carried, as `fetchedBefore`). OPML import (add/merge only) is unchanged.
+
 ### Preferences (DataStore)
 
 | Key | Meaning | Default |

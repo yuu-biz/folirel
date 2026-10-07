@@ -284,7 +284,11 @@ cookies or saved passwords.
   WorkManager contributes its own normal permissions and components through manifest merging; check the merged
   manifest when upgrading it. No storage, notification, location, contacts or audio permissions are needed. The
   manifest `queries` element lists Custom Tabs provider discovery and https `VIEW` handlers (package visibility).
-- Files: OPML import and export use the Storage Access Framework, with no storage permission.
+- Files: OPML import and export and the full backup use the Storage Access Framework, with no storage permission. A
+  backup being restored is untrusted input like an OPML file: it is copied into app-private storage, read only through
+  bounded ZIP reading (entry names, order, duplicates, sizes counted on inflated bytes, compression ratio) and checked
+  completely before anything changes; its addresses are validated as text and never fetched during the restore
+  ([backup-format.md](backup-format.md)). A backup file contains feed URLs and article text and is not encrypted.
 - Components: the only app-defined exported component is `MainActivity` (`singleTask`) with the launcher intent filter and one
   `ACTION_SEND` filter for `text/plain` (Share to Subscribe, section 8). Receiving a share starts no fetch before the
   first-run explanation is done and subscribes to nothing by itself. No other intent

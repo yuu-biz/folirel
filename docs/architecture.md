@@ -37,6 +37,8 @@ app/src/main/java/io/github/yuubiz/folirel/
   model/                  Backend-independent models: scopes, list models, normalized feed, errors, subscription tree
   data/db/                Room entities, DAOs, migrations
   data/preferences/       DataStore settings
+  data/backup/            Full backup and restore: logical archive format, strict JSON reading, bounded ZIP reading and writing,
+                          validation, the Room snapshot/replace and the restore note (FullBackupService)
   data/repository/        FeedStore, SubscriptionRepository, ArticleRepository, FeedIconRepository, RetentionManager
   backend/                BackendSynchronizer contract, refresh scopes, results
   backend/local/          LocalBackend, FeedFetcher, SmallResourceFetcher, HtmlLinks, HttpsUpgradeChecker

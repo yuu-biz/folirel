@@ -16,7 +16,7 @@ open the original page in your browser.
 
 **Folirel** is a coined name inspired by *folio* and *reader*. The word *folio* ultimately traces back to Latin *folium*, "leaf" or "sheet," reflecting the idea of turning the feeds you choose into pages you can browse. The logo is two leaves, the larger one carrying lines of text like a page.
 
-> **Status:** release candidate stage before 1.0 (0.9.x). The features planned for 1.0 are in place and covered by
+> **Status:** release candidate stage before 1.0 (0.10.x). The features planned for 1.0 are in place and covered by
 > automated tests; device checks are done by hand. Debug-signed APKs are published on the Releases page; there is no
 > Google Play listing yet.
 
@@ -24,6 +24,9 @@ open the original page in your browser.
 
 - **OPML import and export.** Importing shows what will be added before anything is written, and only adds or merges.
   Existing read/saved state and categories are never overwritten.
+- **Full local backup and restore.** One file with everything (subscriptions and their history, categories, the
+  articles on the device, read and saved state, settings), for a new phone or a reinstall. Restoring shows what the
+  backup holds first and replaces the data only after you confirm; a failed restore changes nothing.
 - **Share to Subscribe.** Share a page or link from any app to Folirel: it checks the address for an RSS/Atom feed (the address itself, or the feeds the page declares) and subscribes only after you confirm.
 - **Direct fetching** of RSS 2.0, Atom 1.0 and RSS 1.0 feeds, with conditional requests, charset detection (including
   Shift_JIS) and per-feed diagnostics when a feed fails.
@@ -48,7 +51,8 @@ open the original page in your browser.
 3. Open Folirel and either import an OPML file or add a feed URL.
 
 Release APKs are currently signed with a debug key, so they update only over builds signed with the same key.
-Uninstalling the app deletes its data; use *Export OPML* to keep your subscription list.
+Uninstalling the app deletes its data; use *Create Folirel backup* (Settings > Storage & data) to keep everything, or
+*Export subscription list (OPML)* to keep the subscription list.
 Details: [User guide](docs/user-guide.md).
 
 ## Build from source
@@ -65,7 +69,8 @@ More in [docs/building.md](docs/building.md).
 
 ## Privacy and security
 
-- Subscriptions, articles and read state are stored only in the app's private storage. Backups are disabled.
+- Subscriptions, articles and read state are stored only in the app's private storage. Android's automatic backup is
+  disabled; a full backup is made only when you ask for it, to a file you choose (not encrypted).
 - The app contacts only the feed servers you subscribe to (and the sites and image hosts those feeds point to).
   There are no third-party SDKs and no telemetry.
 - Feed content is treated as untrusted: XML with DTD/DOCTYPE or external entities is rejected, TLS verification is
@@ -82,6 +87,7 @@ Details: [Fetch and security](docs/fetch-and-security.md).
 | [Product and UX](docs/product-and-ux.md) | Scope, requirements, screens and interaction rules |
 | [Architecture](docs/architecture.md) | Modules, data flow, extension boundary |
 | [Data and import](docs/data-and-import.md) | Database model, OPML, article identity, retention |
+| [Full backup and restore](docs/backup-format.md) | Backup contents, archive format, restore safety, moving to another signing key |
 | [Fetch and security](docs/fetch-and-security.md) | HTTP, parsing, images, refresh, network policy |
 | [Testing](docs/testing.md) | Test layers, fixtures, scenario catalogue |
 | [Building](docs/building.md) | Toolchain, build, CI, dependencies and licenses |
