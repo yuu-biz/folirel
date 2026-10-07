@@ -88,11 +88,19 @@ class CustomPaletteSettingTest {
         repo.setPalette(ColorPalette.LEAF)
         val seen = CopyOnWriteArrayList<Pair<ColorPalette, Int>>()
         val started = CompletableDeferred<Unit>()
-        val collecting = scope.launch { repo.settings.collect { seen += it.palette to it.customSeed; started.complete(Unit) } }
+        val reachedCustom = CompletableDeferred<Unit>()
+        val collecting = scope.launch {
+            repo.settings.collect {
+                seen += it.palette to it.customSeed
+                started.complete(Unit)
+                if (it.palette == ColorPalette.CUSTOM) reachedCustom.complete(Unit)
+            }
+        }
         // The collector has the starting state before the write is made.
         started.await()
         repo.applyCustomPalette(0xFF3366CC.toInt())
-        repo.settings.first { it.palette == ColorPalette.CUSTOM }
+        // Wait for this collector itself to see the result (another reader seeing it first does not mean this one has).
+        reachedCustom.await()
         collecting.cancelAndJoin()
         assertEquals(ColorPalette.LEAF to AppSettings.DEFAULT_CUSTOM_SEED, seen.first())
         assertEquals(ColorPalette.CUSTOM to 0xFF3366CC.toInt(), seen.last())
