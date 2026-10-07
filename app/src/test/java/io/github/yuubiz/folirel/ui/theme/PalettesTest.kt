@@ -21,7 +21,11 @@ class PalettesTest {
 
     private val fixedPalettes = ColorPalette.entries - ColorPalette.DYNAMIC
 
-    /** The colours of 0.6.0, written out. An update must not change how an existing install looks (P2-A02, P2-T01, P2-T02). */
+    /**
+     * The colours of 0.6.0, written out. An update must not change how an existing install looks (P2-A02, P2-T01, P2-T02), with one
+     * exception made on purpose in 0.9.5 at the reader's request: the text roles (`onSurface`, `onBackground`, `onSurfaceVariant`) are the
+     * neutral greys every preset uses now. Every other role is still the 0.6.0 value.
+     */
     @Test
     fun classicIsExactlyTheSetOf060() {
         val light = Palettes.fixedScheme(ColorPalette.CLASSIC, dark = false)
@@ -32,7 +36,7 @@ class PalettesTest {
         assertEquals(Color(0xFF52606D), light.secondary)
         assertEquals(Color(0xFFFBFCFE), light.surface)
         assertEquals(Color(0xFFE3E7EC), light.surfaceVariant)
-        assertEquals(Color(0xFF424A53), light.onSurfaceVariant)
+        assertEquals(Palettes.LIGHT_TEXT_VARIANT, light.onSurfaceVariant)
         assertEquals(Color(0xFFC9CED4), light.outlineVariant)
         assertEquals(Color(0xFFB3261E), light.error)
         val dark = Palettes.fixedScheme(ColorPalette.CLASSIC, dark = true)
@@ -43,14 +47,14 @@ class PalettesTest {
         assertEquals(Color(0xFFB9C3CE), dark.secondary)
         assertEquals(Color(0xFF111418), dark.surface)
         assertEquals(Color(0xFF2A3036), dark.surfaceVariant)
-        assertEquals(Color(0xFFC3C9D0), dark.onSurfaceVariant)
+        assertEquals(Palettes.DARK_TEXT_VARIANT, dark.onSurfaceVariant)
         assertEquals(Color(0xFF3E454C), dark.outlineVariant)
         assertEquals(Color(0xFFF2B8B5), dark.error)
-        // Every role not listed above is Material's baseline, as it was in 0.6.0 (the builders are given only the roles above).
-        assertEquals(lightColorScheme().onSurface, light.onSurface)
+        // Every other role not listed above is Material's baseline, as it was in 0.6.0 (the builders are given only the roles above).
+        assertEquals(Palettes.LIGHT_TEXT, light.onSurface)
         assertEquals(lightColorScheme().outline, light.outline)
         assertEquals(lightColorScheme().surfaceContainer, light.surfaceContainer)
-        assertEquals(darkColorScheme().onSurface, dark.onSurface)
+        assertEquals(Palettes.DARK_TEXT, dark.onSurface)
         assertEquals(darkColorScheme().outline, dark.outline)
         assertEquals(darkColorScheme().surfaceContainer, dark.surfaceContainer)
     }

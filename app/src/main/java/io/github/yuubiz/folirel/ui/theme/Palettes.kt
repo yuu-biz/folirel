@@ -17,8 +17,8 @@ import io.github.yuubiz.folirel.data.preferences.ColorPalette
  * tertiary with their containers, surface and its variants, outline, error), not a primary swapped into the baseline; the
  * contrast of every text/background pair is checked by `PalettesTest`.
  *
- * [ColorPalette.CLASSIC] is deliberately the exact definition used up to 0.6.0 (the unset roles are Material's baseline), so an
- * update does not change how an existing install looks. Photos and icons are never tinted by any of these colours.
+ * [ColorPalette.CLASSIC] is the definition used up to 0.6.0 (the unset roles are Material's baseline) except for the text roles: since
+ * 0.9.5 every preset draws its text in neutral greys ([neutralText]). Photos and icons are never tinted by any of these colours.
  */
 object Palettes {
     val classicLight: ColorScheme = lightColorScheme(
@@ -98,21 +98,40 @@ object Palettes {
 
     /** The scheme of a palette that does not depend on the device: everything except [ColorPalette.DYNAMIC]. */
     fun fixedScheme(palette: ColorPalette, dark: Boolean): ColorScheme = when (palette) {
-        ColorPalette.CLASSIC, ColorPalette.DYNAMIC -> if (dark) classicDark else classicLight
-        ColorPalette.LEAF -> if (dark) leafDark else leafLight
-        ColorPalette.SAND -> if (dark) sandDark else sandLight
-        ColorPalette.VIOLET -> if (dark) violetDark else violetLight
+        ColorPalette.CLASSIC, ColorPalette.DYNAMIC -> if (dark) drawn.classicDark else drawn.classicLight
+        ColorPalette.LEAF -> if (dark) drawn.leafDark else drawn.leafLight
+        ColorPalette.SAND -> if (dark) drawn.sandDark else drawn.sandLight
+        ColorPalette.VIOLET -> if (dark) drawn.violetDark else drawn.violetLight
         // Custom needs the user's seed; asked for without one it is made from the default seed.
         ColorPalette.CUSTOM -> CustomPalette.scheme(CustomPalette.DEFAULT_SEED, dark)
+    }
+
+    /** The presets as drawn, with [neutralText], made once (a scheme is compared by identity and asked for at every recomposition). */
+    private val drawn by lazy {
+        object {
+            val classicLight = neutralText(Palettes.classicLight, false)
+            val classicDark = neutralText(Palettes.classicDark, true)
+            val leafLight = neutralText(Palettes.leafLight, false)
+            val leafDark = neutralText(Palettes.leafDark, true)
+            val sandLight = neutralText(Palettes.sandLight, false)
+            val sandDark = neutralText(Palettes.sandDark, true)
+            val violetLight = neutralText(Palettes.violetLight, false)
+            val violetDark = neutralText(Palettes.violetDark, true)
+        }
     }
 
     /**
      * The scheme to draw. [palette] should already be the effective one ([ColorPalette.effective]): Dynamic is read from the system
      * wallpaper colours and exists only on Android 12 and later; asked for on an older system it is Classic.
      */
-    fun scheme(palette: ColorPalette, dark: Boolean, context: Context, customSeed: Int = CustomPalette.DEFAULT_SEED): ColorScheme =
+    fun scheme(
+        palette: ColorPalette,
+        dark: Boolean,
+        context: Context,
+        customSeed: Int = CustomPalette.DEFAULT_SEED,
+    ): ColorScheme =
         when {
-            palette == ColorPalette.DYNAMIC && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> dynamic(dark, context)
+            palette == ColorPalette.DYNAMIC && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> neutralText(dynamic(dark, context), dark)
             palette == ColorPalette.CUSTOM -> CustomPalette.scheme(customSeed, dark)
             else -> fixedScheme(palette, dark)
         }
@@ -120,6 +139,24 @@ object Palettes {
     @RequiresApi(Build.VERSION_CODES.S)
     private fun dynamic(dark: Boolean, context: Context): ColorScheme =
         if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+
+    /** Body text, titles and labels of the preset colour sets (0.9.5): neutral greys, not the hue of the set. */
+    val LIGHT_TEXT = Color(0xFF1B1B1B)
+    val LIGHT_TEXT_VARIANT = Color(0xFF474747)
+    val DARK_TEXT = Color(0xFFE8E8E8)
+    val DARK_TEXT_VARIANT = Color(0xFFC4C4C4)
+
+    /**
+     * The text roles of a preset made neutral (0.9.5): ordinary text, article titles and the labels of the screens are drawn in
+     * [ColorScheme.onSurface] / [ColorScheme.onBackground] and secondary text in [ColorScheme.onSurfaceVariant]; in the sets these
+     * leaned towards the set's hue, which showed most in dark mode. The colour of the set stays where Material puts it: selection,
+     * underlines, buttons and chips, icon accents, containers and the content drawn on them (`on*Container`).
+     */
+    internal fun neutralText(scheme: ColorScheme, dark: Boolean): ColorScheme = scheme.copy(
+        onSurface = if (dark) DARK_TEXT else LIGHT_TEXT,
+        onBackground = if (dark) DARK_TEXT else LIGHT_TEXT,
+        onSurfaceVariant = if (dark) DARK_TEXT_VARIANT else LIGHT_TEXT_VARIANT,
+    )
 
     /** Surface containers are the surface tinted towards the primary, so they stay in the hue of the palette. */
     @Suppress("LongParameterList")
