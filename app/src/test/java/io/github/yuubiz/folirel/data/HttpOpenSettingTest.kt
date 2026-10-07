@@ -68,6 +68,8 @@ class HttpOpenSettingTest {
         val users = files.filter { (_, text) -> text.contains("confirmHttpOpen") }.keys
         assertEquals(
             setOf(
+                // The full backup writes and reads the setting like every other one; it has no network path (BackupArchiveSecurityTest).
+                "io/github/yuubiz/folirel/data/backup/BackupJson.kt",
                 "io/github/yuubiz/folirel/data/preferences/SettingsRepository.kt",
                 "io/github/yuubiz/folirel/ui/home/HomeScreen.kt",
                 "io/github/yuubiz/folirel/ui/settings/SettingsPages.kt",

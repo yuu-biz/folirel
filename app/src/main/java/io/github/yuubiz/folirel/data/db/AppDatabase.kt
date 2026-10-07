@@ -30,6 +30,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun articleDao(): ArticleDao
     abstract fun diagnosticsDao(): DiagnosticsDao
     abstract fun iconDao(): FeedIconDao
+    abstract fun backupDao(): BackupDao
 
     companion object {
         const val VERSION = 4

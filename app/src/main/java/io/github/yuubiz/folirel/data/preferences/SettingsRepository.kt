@@ -281,6 +281,52 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     }
     suspend fun setLastRefreshAttempt(at: Long) = store.edit { it[Keys.lastAttempt] = at }
 
+    /** Everything stored, as it is (the restore keeps it to put back if the restore cannot finish). */
+    suspend fun rawSnapshot(): Preferences = store.data.first()
+
+    /** Puts back a [rawSnapshot] exactly, in one write. */
+    suspend fun replaceRaw(preferences: Preferences) {
+        store.updateData { preferences }
+    }
+
+    /**
+     * Replaces every setting with [settings] (a full restore), in one write: keys this version does not know are dropped, the colours set
+     * by hand are removed when [settings] has none. Kept from the device: the time of the last refresh attempt (bookkeeping of this
+     * install, not a choice). First-run setup counts as done: the restored app is set up.
+     */
+    suspend fun replaceForRestore(settings: AppSettings) = store.edit { p ->
+        val lastAttempt = p[Keys.lastAttempt]
+        p.clear()
+        lastAttempt?.let { p[Keys.lastAttempt] = it }
+        p[Keys.theme] = settings.theme.name
+        p[Keys.palette] = settings.palette.name
+        p[Keys.customSeed] = AppSettings.opaque(settings.customSeed)
+        settings.customLight?.let { p[Keys.customLight] = it.encode() }
+        settings.customDark?.let { p[Keys.customDark] = it.encode() }
+        p[Keys.listMode] = settings.listMode.name
+        p[Keys.textScale] = settings.textScale
+        p[Keys.cardColumns] = settings.cardColumns
+        p[Keys.cardStyle] = settings.cardStyle.name
+        p[Keys.showImages] = settings.showImages
+        p[Keys.categoryNavigation] = settings.categoryNavigation.name
+        p[Keys.browserMode] = settings.browserMode.name
+        p[Keys.refreshMinutes] = settings.refreshIntervalMinutes
+        p[Keys.startupRefresh] = settings.startupRefresh
+        p[Keys.retentionLimit] = settings.retentionLimit
+        p[Keys.imageCacheMb] = settings.imageCacheMb
+        p[Keys.unmeteredOnly] = settings.unmeteredOnly
+        p[Keys.allowHttp] = settings.allowHttp
+        p[Keys.confirmHttpOpen] = settings.confirmHttpOpen
+        p[Keys.confirmMeteredRefresh] = settings.confirmMeteredRefresh
+        p[Keys.onboardingDone] = true
+        p[Keys.lastScope] = settings.lastScope.encode()
+        p[Keys.lastFilter] = settings.lastFilter.name
+        p[Keys.sortOrder] = settings.sortOrder.name
+        p[Keys.periodFilter] = settings.periodFilter.name
+        p[Keys.hiddenKeywords] = HiddenKeywords.encode(settings.hiddenKeywords)
+        p[Keys.hiddenKeywordsEnabled] = settings.hiddenKeywordsEnabled
+    }
+
     private inline fun <reified E : Enum<E>> enumOr(value: String?, default: E): E =
         value?.let { v -> enumValues<E>().firstOrNull { it.name == v } } ?: default
 
