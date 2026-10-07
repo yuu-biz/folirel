@@ -286,6 +286,7 @@ fun HomeScreen(
         drawerContent = {
             // With a pane the drawer is not composed at all (its items would be there twice).
             if (!paneShown) HomeDrawer(
+                drawerState = drawerState,
                 structure = structure,
                 selection = selection,
                 attention = attention,

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.DrawerState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +43,7 @@ import io.github.yuubiz.folirel.model.Structure
 /** The modal drawer of a narrow window. Its content is [HomeNavigationContent], the same the persistent pane shows. */
 @Composable
 fun HomeDrawer(
+    drawerState: DrawerState,
     structure: Structure,
     selection: Selection,
     attention: Int,
@@ -49,7 +51,9 @@ fun HomeDrawer(
     onSubscriptions: () -> Unit,
     onSettings: () -> Unit,
 ) {
-    ModalDrawerSheet(Modifier.widthIn(max = 320.dp).testTag("home_drawer")) {
+    // The overload with the drawer state is the one that closes the drawer on Back (and follows the predictive back gesture);
+    // without it Back would go past the open drawer and leave the app.
+    ModalDrawerSheet(drawerState = drawerState, modifier = Modifier.widthIn(max = 320.dp).testTag("home_drawer")) {
         HomeNavigationContent(structure, selection, attention, onSelect, onSubscriptions, onSettings)
     }
 }

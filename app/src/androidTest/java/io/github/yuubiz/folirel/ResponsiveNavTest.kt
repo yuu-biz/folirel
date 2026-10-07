@@ -5,6 +5,8 @@ import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -159,8 +161,11 @@ class ResponsiveNavTest {
         assertEquals(listOf("drawer_pinned_${s["Delta"]}"), tagsInOrder("drawer_pinned_", vertical = true))
         // RSP-T04: the feeds of a category open under that category, wherever it stands: open the child (it stands before its parent).
         compose.onNodeWithTag("drawer_item_category:$child").assertExists()
+        // Back closes the open drawer and keeps the app (it used to go past the drawer and finish the activity).
         UiDevice.getInstance(instrumentation).pressBack()
         compose.waitForIdle()
+        until { runCatching { compose.onNodeWithTag("home_drawer").assertIsNotDisplayed() }.isSuccess }
+        compose.onNodeWithTag("drawer_open").assertIsDisplayed()
 
         compose.onNodeWithTag("scope_title").performClick()
         until { has("category_picker") }
