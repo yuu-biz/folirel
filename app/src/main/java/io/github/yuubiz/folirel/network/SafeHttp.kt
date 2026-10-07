@@ -172,9 +172,13 @@ object HttpClients {
         .addInterceptor(SafeRedirectInterceptor(guard))
         .build()
 
-    /** Image client: same policy; own bounded dispatcher; per-response size limit. */
+    /**
+     * Image client: same policy; own bounded dispatcher; per-response size limit. The limit is an application interceptor (inside the
+     * redirect one, so it sees every hop): it then counts the body after OkHttp has removed gzip, the bytes the decoder would get. As a
+     * network interceptor it counted the compressed bytes, and a small gzip body could expand far past the limit.
+     */
     fun imageClient(feedClient: OkHttpClient, maxBytes: Long): OkHttpClient = feedClient.newBuilder()
         .dispatcher(Dispatcher().apply { maxRequests = 4; maxRequestsPerHost = 2 })
-        .addNetworkInterceptor(ResponseSizeLimitInterceptor(maxBytes))
+        .addInterceptor(ResponseSizeLimitInterceptor(maxBytes))
         .build()
 }

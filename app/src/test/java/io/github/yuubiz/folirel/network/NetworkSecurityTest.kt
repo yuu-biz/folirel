@@ -17,6 +17,8 @@ import okhttp3.Request
 import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
 import okio.Buffer
+import okio.GzipSink
+import okio.buffer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -190,6 +192,21 @@ class NetworkSecurityTest {
         // Within limit
         server.enqueue(MockResponse.Builder().setHeader("Content-Type", "image/jpeg").body(Buffer().write(ByteArray(512))).build())
         assertEquals(512, images.newCall(Request.Builder().url(server.url("/ok.jpg")).build()).execute().use { it.body.bytes().size })
+    }
+
+    /** The limit is on what the image decoder would get: a small gzip body that expands past it is stopped too. */
+    @Test
+    fun imageSizeLimitCountsTheDecompressedBody() {
+        val images = HttpClients.imageClient(client(LOOPBACK_ALLOWED_FOR_TESTS, allowHttp = true), 1024)
+        val compressed = Buffer().also { out -> GzipSink(out).buffer().use { it.write(ByteArray(64 * 1024)) } }
+        assertTrue(compressed.size < 1024)
+        server.enqueue(MockResponse.Builder().setHeader("Content-Type", "image/jpeg").setHeader("Content-Encoding", "gzip").body(compressed).build())
+        val bomb = runCatching { images.newCall(Request.Builder().url(server.url("/bomb.jpg")).build()).execute().use { it.body.bytes() } }.exceptionOrNull()
+        assertTrue("$bomb", bomb is IOException)
+        // A gzip body that stays within the limit after expanding is delivered whole.
+        val small = Buffer().also { out -> GzipSink(out).buffer().use { it.write(ByteArray(800)) } }
+        server.enqueue(MockResponse.Builder().setHeader("Content-Type", "image/jpeg").setHeader("Content-Encoding", "gzip").body(small).build())
+        assertEquals(800, images.newCall(Request.Builder().url(server.url("/ok.jpg")).build()).execute().use { it.body.bytes().size })
     }
 
     @Test

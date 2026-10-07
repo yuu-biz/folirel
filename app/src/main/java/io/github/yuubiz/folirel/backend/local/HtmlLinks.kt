@@ -4,6 +4,7 @@ import io.github.yuubiz.folirel.network.UrlNormalizer
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.io.ByteArrayInputStream
+import java.nio.charset.Charset
 import kotlin.math.abs
 import kotlin.math.ln
 
@@ -18,9 +19,22 @@ object HtmlLinks {
 
     data class FeedLink(val url: String, val title: String?, val type: String)
 
-    /** Parses [bytes] (the caller already limited them to Limits.SITE_PAGE_MAX_BYTES); [charset] is from the response, jsoup also sniffs `<meta>`. */
+    /**
+     * Parses [bytes] (the caller already limited them to Limits.SITE_PAGE_MAX_BYTES); [charset] is from the response, jsoup also sniffs
+     * `<meta>`. The label is the server's text: quotes are removed, and a label this system does not know is dropped (jsoup would throw
+     * on it) so the page's own declaration or UTF-8 applies.
+     */
     fun parse(bytes: ByteArray, charset: String?, baseUrl: String): Document =
-        Jsoup.parse(ByteArrayInputStream(bytes), charset, baseUrl)
+        Jsoup.parse(ByteArrayInputStream(bytes), usableCharset(charset), baseUrl)
+
+    private fun usableCharset(label: String?): String? {
+        val name = label?.trim()?.trim('"', '\'')?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        return try {
+            if (Charset.isSupported(name)) name else null
+        } catch (_: IllegalArgumentException) {
+            null // IllegalCharsetNameException
+        }
+    }
 
     /** Whether [bytes] look like an HTML page (not an image or a feed that a misconfigured server returned). */
     fun looksLikeHtml(bytes: ByteArray, contentType: String?): Boolean {

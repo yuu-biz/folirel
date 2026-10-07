@@ -73,7 +73,7 @@ unsupported schemes). Images whose `width` or `height` attribute is explicitly 1
 pixels and skipped. `srcset`, Open Graph metadata and lazy-load attributes are not used.
 
 Image requests use Coil 3 with the shared network policy (section 6). The image client has its own dispatcher (4
-requests, 2 per host) and rejects any body over 8 MiB, whether declared or counted while reading. Coil's service-loader
+requests, 2 per host) and rejects any body over 8 MiB, whether declared or counted while reading; the count is taken after gzip is removed, so a small compressed body cannot expand past the limit (0.9.4). Coil's service-loader
 discovery is disabled, so no other fetchers exist, and no SVG decoder is installed. The disk cache is a setting (64,
 128, 256 or 512 MiB, default 128, applied at the next app start). Thumbnails are loaded only for rows that are
 composed; there is no bulk prefetch, and the app does not pre-warm the browser for article links.
@@ -116,7 +116,7 @@ fresh content.
 |---|---|
 | 200 with a valid feed | Applied in one database transaction per feed; reading state is preserved; validators, `initialized`, `lastSuccessAt` are updated and failure counters reset. |
 | 304 | Content unchanged; success time updated; previous body statistics kept (see the 304 rule above). |
-| 301 / 308 | Followed after the safety checks. If the fetch succeeds, `fetchUrl` is updated to the target of the leading run of 301/308 hops. The registered URL is not changed. |
+| 301 / 308 | Followed after the safety checks. If the fetch succeeds, `fetchUrl` is updated to the target of the leading run of 301/308 hops. The run ends before a hop from `https://` to `http://`: with HTTP allowed such a redirect is followed for that fetch, but it never becomes the feed's address (0.9.4). The registered URL is not changed. |
 | 300 / 302 / 303 / 307 | Followed for this request only; no stored URL changes. |
 | 401 / 403 | `ACCESS_DENIED`. No credentials or browser cookies are used. |
 | 404 / 410 | `NOT_FOUND` / `GONE`. The feed, its articles and saved state are never removed automatically. |

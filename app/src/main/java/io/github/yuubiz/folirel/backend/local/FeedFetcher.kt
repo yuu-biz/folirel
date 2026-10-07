@@ -5,6 +5,7 @@ import io.github.yuubiz.folirel.model.FetchError
 import io.github.yuubiz.folirel.model.Limits
 import io.github.yuubiz.folirel.network.BlockedRequestException
 import io.github.yuubiz.folirel.network.ConditionalValidators
+import io.github.yuubiz.folirel.network.RedirectHop
 import io.github.yuubiz.folirel.network.RedirectTrace
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
@@ -91,7 +92,7 @@ class FeedFetcher(
             .apply { if (validators != null) tag(ConditionalValidators::class.java, validators) }
             .build()
         return try {
-            client.newCall(request).await { response -> handle(response, trace, validators) }
+            client.newCall(request).await { response -> handle(httpUrl.toString(), response, trace, validators) }
         } catch (e: BlockedRequestException) {
             Raw.Done(FetchOutcome.Failure(e.error))
         } catch (_: SSLException) {
@@ -105,7 +106,7 @@ class FeedFetcher(
         }
     }
 
-    private fun handle(response: Response, trace: RedirectTrace, validators: ConditionalValidators?): Raw {
+    private fun handle(requestedUrl: String, response: Response, trace: RedirectTrace, validators: ConditionalValidators?): Raw {
         val code = response.code
         val failure = when {
             code == 304 -> return Raw.NotModified(validatorsSent = validators != null && validators.url == response.request.url.toString())
@@ -131,10 +132,7 @@ class FeedFetcher(
             // Counted after transparent gzip decompression.
             if (buffer.size > maxBytes) return Raw.Done(FetchOutcome.Failure(FetchError.LIMIT_EXCEEDED, httpStatus = code, detail = "BODY_SIZE"))
         }
-        var permanent: String? = null
-        for (hop in trace.hops) {
-            if (hop.status == 301 || hop.status == 308) permanent = hop.target else break
-        }
+        val permanent = permanentTarget(requestedUrl, trace.hops)
         return Raw.Done(
             FetchOutcome.Success(
                 body = buffer.readByteArray(),
@@ -159,9 +157,26 @@ class FeedFetcher(
         return date - clock.millis()
     }
 
-    private companion object {
+    internal companion object {
+        /**
+         * The address a feed moved to for good: the target of the leading run of 301/308 hops. The run ends before a hop from https:// to
+         * http://: with HTTP allowed such a redirect is followed for this fetch, but it never becomes the feed's address (the app never
+         * falls back from HTTPS to HTTP on its own; docs/fetch-and-security.md section 6).
+         */
+        fun permanentTarget(requestedUrl: String, hops: List<RedirectHop>): String? {
+            var from = requestedUrl
+            var permanent: String? = null
+            for (hop in hops) {
+                if (hop.status != 301 && hop.status != 308) break
+                if (from.startsWith("https://", ignoreCase = true) && hop.target.startsWith("http://", ignoreCase = true)) break
+                permanent = hop.target
+                from = hop.target
+            }
+            return permanent
+        }
+
         // Only an overflow guard; the store applies the real upper bound (RetryPolicy.MAX_SERVER_WAIT_MS).
-        const val MAX_RETRY_AFTER_SECONDS = 10L * 365 * 24 * 60 * 60
+        private const val MAX_RETRY_AFTER_SECONDS = 10L * 365 * 24 * 60 * 60
     }
 }
 
