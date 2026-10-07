@@ -2,6 +2,7 @@ package io.github.yuubiz.folirel.data.repository
 
 import androidx.room.withTransaction
 import io.github.yuubiz.folirel.backend.local.opml.OpmlDocument
+import io.github.yuubiz.folirel.backend.local.opml.OpmlWriter
 import io.github.yuubiz.folirel.data.db.AccountEntity
 import io.github.yuubiz.folirel.data.db.AppDatabase
 import io.github.yuubiz.folirel.data.db.CategoryEntity
@@ -519,15 +520,28 @@ class SubscriptionRepository(
     }
 
     /** Subscribed feeds with their direct category paths, for OPML export. */
-    suspend fun exportData(accountId: String): Pair<List<FeedEntity>, Map<String, List<List<String>>>> {
+    suspend fun exportData(accountId: String): Pair<List<FeedEntity>, Map<String, List<List<String>>>> = db.withTransaction {
+        // One transaction: an import or a category deletion in between cannot leave a membership without its category.
         // Feeds moved to HTTPS are exported with their current https:// fetch URL (it may have followed a later
         // permanent redirect); importing that file again finds the same feed by its fetch URL.
+        // A feed registered as http:// that a permanent redirect took to https:// is exported with https:// as well: the file would
+        // otherwise be held back as "HTTP pending" on a device without HTTP, although the feed is no longer read over http://.
         val migrated = (dao.httpsMigrations(accountId).map { it.feedId } + dao.urlMoves(accountId).map { it.feedId }).toSet()
         val feeds = dao.feeds(accountId).filter { it.isSubscribed }
-            .map { f -> if (f.id in migrated) f.copy(subscriptionUrl = f.fetchUrl) else f }
+            .map { f -> if (f.id in migrated || f.isRedirectedToHttps()) f.copy(subscriptionUrl = f.fetchUrl) else f }
         val paths = dao.categories(accountId).associate { it.id to CategoryPaths.decode(it.pathSegmentsJson) }
         val byFeed = dao.memberships(accountId).groupBy({ it.feedId }, { paths.getValue(it.categoryId) })
-        return feeds to byFeed
+        feeds to byFeed
+    }
+
+    private fun FeedEntity.isRedirectedToHttps() =
+        subscriptionUrl.startsWith("http://", ignoreCase = true) && fetchUrl.startsWith("https://", ignoreCase = true)
+
+    /** The OPML file the Subscriptions screen saves (docs/data-and-import.md section 5). [createdRfc822] fills `dateCreated`. */
+    suspend fun exportOpml(accountId: String, createdRfc822: String?): String {
+        val (feeds, paths) = exportData(accountId)
+        val exportFeeds = feeds.map { f -> OpmlWriter.ExportFeed(Structure.displayName(f), f.subscriptionUrl, f.siteUrl, paths[f.id].orEmpty()) }
+        return OpmlWriter.write("Folirel subscriptions", exportFeeds, createdRfc822)
     }
 
     // HTTP → HTTPS migration (after the user's consent and a successful HTTPS verification)
