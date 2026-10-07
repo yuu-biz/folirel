@@ -53,6 +53,15 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
 /** Keeps the unique periodic work in line with settings. Timing is inexact and may be delayed by the OS. */
 class RefreshScheduler(private val context: Context) {
     private var applied: Pair<Int, Boolean>? = null
+    @Volatile private var delayFirstRun = false
+
+    /**
+     * After a full restore: the periodic work the restored settings ask for waits one interval before its first run, instead of running
+     * as soon as the network allows (a restore never starts a refresh by itself).
+     */
+    fun delayNextFirstRun() {
+        delayFirstRun = true
+    }
 
     fun apply(settings: AppSettings) {
         val wanted = if (settings.onboardingDone) settings.refreshIntervalMinutes to settings.unmeteredOnly else 0 to true
@@ -66,9 +75,12 @@ class RefreshScheduler(private val context: Context) {
         }
         val constraints = constraints(unmeteredOnly)
         // The minimum period is 15 minutes; the OS may run the work later than asked.
-        val request = PeriodicWorkRequestBuilder<RefreshWorker>(minutes.toLong().coerceAtLeast(15), TimeUnit.MINUTES)
+        val period = minutes.toLong().coerceAtLeast(15)
+        val request = PeriodicWorkRequestBuilder<RefreshWorker>(period, TimeUnit.MINUTES)
             .setConstraints(constraints)
+            .apply { if (delayFirstRun) setInitialDelay(period, TimeUnit.MINUTES) }
             .build()
+        delayFirstRun = false
         workManager.enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 

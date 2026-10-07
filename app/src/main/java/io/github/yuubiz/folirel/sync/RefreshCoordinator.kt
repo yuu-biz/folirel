@@ -7,10 +7,15 @@ import io.github.yuubiz.folirel.backend.RefreshReason
 import io.github.yuubiz.folirel.backend.RefreshReport
 import io.github.yuubiz.folirel.backend.RefreshScope
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -116,7 +121,32 @@ class RefreshCoordinator(
     private val ids = AtomicLong()
     private val addressChanges = AtomicLong()
 
+    /** Paused for a restore: no request starts, and the backend calls that were running were cancelled. */
+    private val pauseLock = Any()
+    private var paused = false
+    private val runningWork = HashSet<Job>()
+
+    /**
+     * Stops refreshing for a full restore: requests made from now on return at once without doing anything, and running ones are
+     * cancelled (their finished feeds stay applied). [state] shows when they have ended. [resume] lets requests run again; nothing is
+     * started by it.
+     */
+    fun pause() {
+        val toCancel = synchronized(pauseLock) {
+            paused = true
+            runningWork.toList()
+        }
+        toCancel.forEach { it.cancel() }
+    }
+
+    fun resume() {
+        synchronized(pauseLock) { paused = false }
+    }
+
+    private fun isPaused(): Boolean = synchronized(pauseLock) { paused }
+
     suspend fun refresh(target: RefreshScope, reason: RefreshReason, force: Boolean = false): RefreshReport {
+        if (isPaused()) return RefreshReport(total = 0)
         if (reason.isAutomatic && !automaticAllowed(reason)) {
             _state.update { it.copy(lastAutoBlocked = true) }
             return RefreshReport(total = 0, deferredConstraint = 1)
@@ -152,8 +182,33 @@ class RefreshCoordinator(
         }
         var report: RefreshReport? = null
         try {
-            report = backend.refresh(accountId(), target, reason, force) { p -> updateRequest(id) { r -> r.copy(progress = p) } }
-            runCatching { afterRefresh() }
+            report = coroutineScope {
+                // Registered under the pause lock, so that a pause either sees this work and cancels it or this work sees the pause.
+                val work = synchronized(pauseLock) {
+                    if (paused) {
+                        null
+                    } else {
+                        async(start = CoroutineStart.LAZY) {
+                            backend.refresh(accountId(), target, reason, force) { p -> updateRequest(id) { r -> r.copy(progress = p) } }
+                        }.also { runningWork += it }
+                    }
+                }
+                if (work == null) {
+                    RefreshReport(total = 0)
+                } else {
+                    try {
+                        work.start()
+                        work.await()
+                    } catch (e: CancellationException) {
+                        // Cancelled by a pause, not by our caller: this request simply ends.
+                        if (work.isCancelled && currentCoroutineContext().isActive) RefreshReport(total = 0) else throw e
+                    } finally {
+                        synchronized(pauseLock) { runningWork -= work }
+                    }
+                }
+            }
+            // The retention cleanup writes the database; not while a restore replaces it.
+            if (!isPaused()) runCatching { afterRefresh() }
             return report
         } finally {
             val finished = report

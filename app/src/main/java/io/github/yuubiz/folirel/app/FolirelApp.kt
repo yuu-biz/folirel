@@ -16,6 +16,7 @@ class FolirelApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        container.recoverInterruptedRestore()
         ProcessLifecycleOwner.get().lifecycle.addObserver(StartupRefreshObserver(container))
     }
 }

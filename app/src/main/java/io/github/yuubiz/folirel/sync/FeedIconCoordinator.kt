@@ -44,6 +44,11 @@ class FeedIconCoordinator(
         }
     }
 
+    /** Waits until the background run (if any) has ended; with lookups disabled it ends after the lookups in flight. */
+    suspend fun awaitIdle() {
+        while (running.get()) job?.join() ?: kotlinx.coroutines.yield()
+    }
+
     /** All due lookups now, in this coroutine. Returns how many were attempted. Used by the background run and tests. */
     suspend fun runPasses(): Int {
         val attempted = java.util.concurrent.atomic.AtomicInteger()

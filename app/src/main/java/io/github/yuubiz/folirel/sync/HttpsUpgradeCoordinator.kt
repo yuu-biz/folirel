@@ -47,6 +47,8 @@ class HttpsUpgradeCoordinator(
     private val scope: CoroutineScope,
     private val maxParallel: Int = 4,
     private val maxPerHost: Int = 2,
+    /** False while a full restore runs: no check starts then. */
+    private val allowed: () -> Boolean = { true },
 ) {
     private val _state = MutableStateFlow(HttpsUpgradeState())
     val state: StateFlow<HttpsUpgradeState> = _state.asStateFlow()
@@ -54,10 +56,13 @@ class HttpsUpgradeCoordinator(
 
     suspend fun candidateCount(): Int = subscriptions.httpFeeds(subscriptions.ensureLocalAccount()).size
 
-    /** Starts the check; returns false if one is already running. */
+    /** A check is running (a restore waits for none). */
+    val isRunning: Boolean get() = job?.isActive == true
+
+    /** Starts the check; returns false if one is already running or a restore is under way. */
     @Synchronized
     fun start(): Boolean {
-        if (job?.isActive == true) return false
+        if (job?.isActive == true || !allowed()) return false
         _state.value = HttpsUpgradeState(running = true)
         job = scope.launch { runCheck() }
         return true

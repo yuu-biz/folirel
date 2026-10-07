@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -65,6 +66,8 @@ class HomeViewModel(
     network: Flow<NetworkState>,
     private val savedState: SavedStateHandle,
     private val clock: Clock = Clock.systemUTC(),
+    /** Raised after a full restore replaced the data (FullBackupService.replaced). */
+    dataReplaced: Flow<Long> = emptyFlow(),
 ) : ViewModel(), ListHost {
 
     private val accountId = MutableStateFlow<String?>(null)
@@ -221,6 +224,22 @@ class HomeViewModel(
                     notices.announce(added)
                     RefreshNotice.of(request, state)?.let { noticeBoard.post(it) }
                 }
+            }
+        }
+        viewModelScope.launch {
+            // After a restore the list opens as the backup left it: its last selection (already All when it named nothing restored),
+            // filter, order and period; no search, no pending arrivals, every list from its top.
+            dataReplaced.drop(1).collect {
+                val s = settingsRepository.settings.first()
+                notices.acknowledge(notices.pending.value)
+                setReturnScope(null)
+                _searchText.value = ""
+                _searchActive.value = false
+                savedState[KEY_SEARCH_ACTIVE] = false
+                anchors.clear()
+                savedState[KEY_ANCHORS] = emptyArray<String>()
+                periodNow.value = clock.millis()
+                updateSelection { Selection(scope = s.lastScope, filter = s.lastFilter, sort = s.sortOrder, period = s.periodFilter) }
             }
         }
         viewModelScope.launch {

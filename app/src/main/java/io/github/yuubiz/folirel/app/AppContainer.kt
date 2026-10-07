@@ -17,6 +17,9 @@ import io.github.yuubiz.folirel.backend.local.discovery.FeedDiscovery
 import io.github.yuubiz.folirel.backend.local.discovery.FeedProbe
 import io.github.yuubiz.folirel.backend.local.icon.FeedIconResolver
 import io.github.yuubiz.folirel.browser.BrowserLauncher
+import io.github.yuubiz.folirel.data.backup.AppVersion
+import io.github.yuubiz.folirel.data.backup.BackgroundWork
+import io.github.yuubiz.folirel.data.backup.FullBackupService
 import io.github.yuubiz.folirel.data.db.AppDatabase
 import io.github.yuubiz.folirel.data.preferences.SettingsRepository
 import io.github.yuubiz.folirel.data.repository.ArticleRepository
@@ -42,8 +45,10 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import okio.Path.Companion.toOkioPath
 import java.time.Clock
 import java.util.concurrent.atomic.AtomicBoolean
@@ -67,6 +72,9 @@ class AppContainer(context: Context) {
 
     /** Mirrors the HTTP opt-in for the synchronous network guard. Starts as false (deny) until settings load. */
     private val allowHttp = AtomicBoolean(false)
+
+    /** A full restore is replacing the data: no refresh, icon lookup or HTTPS check may start (no network while it runs). */
+    private val restoring = AtomicBoolean(false)
 
     val networkStatus = AndroidNetworkStatus(appContext)
     private val guard = NetworkGuard(AddressPolicy.PUBLIC_ONLY, { allowHttp.get() })
@@ -100,7 +108,7 @@ class AppContainer(context: Context) {
         enabled = {
             val s = settings.current()
             val n = networkStatus.current()
-            s.showImages && s.onboardingDone && n.connected && (!s.unmeteredOnly || !n.metered)
+            !restoring.get() && s.showImages && s.onboardingDone && n.connected && (!s.unmeteredOnly || !n.metered)
         },
         scope = appScope,
     )
@@ -132,6 +140,7 @@ class AppContainer(context: Context) {
         subscriptions = subscriptions,
         refresh = refresh,
         scope = appScope,
+        allowed = { !restoring.get() },
     )
 
     /** Page and feed reading shared by the moved-feed search and Share to Subscribe: same client and policy as feeds (HTTP opt-in, address policy, TLS). */
@@ -151,6 +160,40 @@ class AppContainer(context: Context) {
     val browser = BrowserLauncher()
 
     val documents = DocumentIo(appContext)
+
+    /** Stops every background writer and network user for a restore (refresh, icon lookups, HTTPS check) and lets them run again. */
+    private val backgroundWork = object : BackgroundWork {
+        override suspend fun pause(): Boolean {
+            restoring.set(true)
+            refresh.pause()
+            // A running HTTPS check changes feed addresses; the restore waits for the reader to let it finish instead of racing it.
+            if (httpsUpgrade.isRunning) return false
+            val idle = withTimeoutOrNull(PAUSE_WAIT_MS) {
+                refresh.state.first { !it.running }
+                iconCoordinator.awaitIdle()
+                true
+            } ?: false
+            // The restored settings may switch periodic updates on: their first run then waits one interval.
+            if (idle) scheduler.delayNextFirstRun()
+            return idle
+        }
+
+        override fun resume() {
+            refresh.resume()
+            restoring.set(false)
+        }
+    }
+
+    /** Full local backup and restore (Settings > Storage and data); OPML import and export stay as they are. */
+    val backup = FullBackupService(
+        db = database,
+        settings = settings,
+        accountId = { subscriptions.ensureLocalAccount() },
+        clock = clock,
+        workDir = appContext.noBackupFilesDir.resolve("backup"),
+        app = AppVersion(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+        background = backgroundWork,
+    )
 
     fun databaseFileBytes(): Long = AppDatabase.fileBytes(appContext)
 
@@ -172,6 +215,12 @@ class AppContainer(context: Context) {
         }
         .build()
 
+    /** A restore that did not live to finish is resolved before anything reads the settings; archive copies of earlier runs go. */
+    fun recoverInterruptedRestore() {
+        runBlocking { backup.recoverInterruptedRestore() }
+        backup.cleanWorkFiles()
+    }
+
     init {
         appScope.launch {
             var lastIconInputs: Pair<Boolean, Boolean>? = null
@@ -191,5 +240,8 @@ class AppContainer(context: Context) {
     companion object {
         private const val TAG = "Folirel"
         const val DB_WARNING_BYTES = 100L * 1024 * 1024
+
+        /** How long a restore waits for running refreshes and icon lookups to stop before it gives up (changing nothing). */
+        private const val PAUSE_WAIT_MS = 20_000L
     }
 }
