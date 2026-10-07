@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import io.github.yuubiz.folirel.app.DocumentIo
 import io.github.yuubiz.folirel.backend.RefreshReason
 import io.github.yuubiz.folirel.backend.RefreshScope
-import io.github.yuubiz.folirel.backend.local.opml.OpmlWriter
 import io.github.yuubiz.folirel.data.repository.AddFeedResult
 import io.github.yuubiz.folirel.data.repository.SubscriptionRepository
 import io.github.yuubiz.folirel.data.preferences.AppSettings
@@ -128,7 +127,7 @@ class SubscriptionsViewModel(
     fun dismissHttpsUpgrade() = httpsUpgrade.dismiss()
 
     /** Feeds whose last request did not finish or failed. A valid Retry-After is still respected. */
-    fun retryPending() = viewModelScope.launch { coordinator.refresh(RefreshScope.Pending, RefreshReason.MANUAL) }
+    fun retryPending() = viewModelScope.launch { refreshSafely(RefreshScope.Pending) }
 
     private val _search = MutableStateFlow("")
     val search: StateFlow<String> = _search.asStateFlow()
@@ -160,14 +159,14 @@ class SubscriptionsViewModel(
         val httpPending = feedId != null && url.trim().startsWith("http://", ignoreCase = true) && !allowHttp()
         events.send(SubscriptionEvent.FeedAdded(result, httpPending))
         onDone(result)
-        if (feedId != null) coordinator.refresh(RefreshScope.Feeds(listOf(feedId)), RefreshReason.MANUAL)
+        if (feedId != null) refreshSafely(RefreshScope.Feeds(listOf(feedId)))
     }
 
     fun unsubscribe(feedId: String) = guarded { subscriptions.unsubscribe(feedId) }
 
     fun resubscribe(feedId: String) = guarded {
         subscriptions.resubscribe(feedId)
-        coordinator.refresh(RefreshScope.Feeds(listOf(feedId)), RefreshReason.MANUAL)
+        refreshSafely(RefreshScope.Feeds(listOf(feedId)))
     }
 
     fun setPaused(feedId: String, paused: Boolean) = guarded { subscriptions.setPaused(feedId, paused) }
@@ -181,22 +180,19 @@ class SubscriptionsViewModel(
      * ("refetch bypassing the cache"); articles, read and saved state are kept.
      */
     fun refreshFeed(feedId: String, force: Boolean = false) =
-        viewModelScope.launch { coordinator.refresh(RefreshScope.Feeds(listOf(feedId)), RefreshReason.MANUAL, force) }
+        viewModelScope.launch { refreshSafely(RefreshScope.Feeds(listOf(feedId)), force) }
 
-    fun createCategory(parentId: String?, name: String) = viewModelScope.launch {
-        val account = subscriptions.ensureLocalAccount()
-        when (subscriptions.createCategory(account, parentId, name)) {
+    fun createCategory(parentId: String?, name: String) = categoryEdit { subscriptions.createCategory(subscriptions.ensureLocalAccount(), parentId, name) }
+
+    fun renameCategory(categoryId: String, name: String) = categoryEdit { subscriptions.renameCategory(categoryId, name) }
+
+    /** A storage failure is reported like the other category operations instead of ending the process. */
+    private fun categoryEdit(edit: suspend () -> SubscriptionRepository.CategoryResult) = viewModelScope.launch {
+        when (runCatching { edit() }.getOrNull()) {
             is SubscriptionRepository.CategoryResult.Ok -> Unit
             SubscriptionRepository.CategoryResult.Conflict -> events.send(SubscriptionEvent.CategoryConflict)
             SubscriptionRepository.CategoryResult.InvalidName -> events.send(SubscriptionEvent.CategoryInvalid)
-        }
-    }
-
-    fun renameCategory(categoryId: String, name: String) = viewModelScope.launch {
-        when (subscriptions.renameCategory(categoryId, name)) {
-            is SubscriptionRepository.CategoryResult.Ok -> Unit
-            SubscriptionRepository.CategoryResult.Conflict -> events.send(SubscriptionEvent.CategoryConflict)
-            SubscriptionRepository.CategoryResult.InvalidName -> events.send(SubscriptionEvent.CategoryInvalid)
+            null -> events.send(SubscriptionEvent.OperationFailed)
         }
     }
 
@@ -243,12 +239,8 @@ class SubscriptionsViewModel(
     /** Writes subscribed feeds and categories only (no reading state). Reports failure explicitly. */
     fun export(uri: Uri) = viewModelScope.launch {
         val ok = runCatching {
-            val (feeds, paths) = subscriptions.exportData(subscriptions.ensureLocalAccount())
-            val exportFeeds = feeds.map { f ->
-                OpmlWriter.ExportFeed(Structure.displayName(f), f.subscriptionUrl, f.siteUrl, paths[f.id].orEmpty())
-            }
             val created = DateTimeFormatter.RFC_1123_DATE_TIME.format(clock.instant().atOffset(ZoneOffset.UTC))
-            documents.write(uri, OpmlWriter.write("Folirel subscriptions", exportFeeds, created))
+            documents.write(uri, subscriptions.exportOpml(subscriptions.ensureLocalAccount(), created))
         }.isSuccess
         events.send(if (ok) SubscriptionEvent.ExportDone else SubscriptionEvent.ExportFailed)
     }
@@ -330,7 +322,7 @@ class SubscriptionsViewModel(
             events.send(SubscriptionEvent.OperationFailed)
             return@launch
         }
-        if (changed.isNotEmpty()) coordinator.refresh(RefreshScope.Feeds(changed), RefreshReason.MANUAL)
+        if (changed.isNotEmpty()) refreshSafely(RefreshScope.Feeds(changed))
     }
 
     /**
@@ -362,11 +354,24 @@ class SubscriptionsViewModel(
             SubscriptionRepository.MoveResult.Applied -> {
                 clearDiscovery()
                 events.send(SubscriptionEvent.MoveApplied)
-                coordinator.refresh(RefreshScope.Feeds(listOf(feedId)), RefreshReason.MANUAL)
+                refreshSafely(RefreshScope.Feeds(listOf(feedId)))
             }
             is SubscriptionRepository.MoveResult.Conflict -> events.send(SubscriptionEvent.MoveConflict(result.name))
             SubscriptionRepository.MoveResult.Stale, SubscriptionRepository.MoveResult.Invalid -> events.send(SubscriptionEvent.MoveStale)
             null -> events.send(SubscriptionEvent.OperationFailed)
+        }
+    }
+
+    /**
+     * A manual refresh whose bookkeeping failed (for example the storage is full) ends as an interrupted request in the refresh notice;
+     * it must not end the process. Cancellation still ends the caller.
+     */
+    private suspend fun refreshSafely(target: RefreshScope, force: Boolean = false) {
+        try {
+            coordinator.refresh(target, RefreshReason.MANUAL, force)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
         }
     }
 

@@ -299,17 +299,17 @@ class HomeViewModel(
     fun selectScope(scope: ArticleScope) {
         if (scope !is ArticleScope.Feed) setReturnScope(null)
         updateSelection { it.copy(scope = scope) }
-        viewModelScope.launch { settingsRepository.setLastScope(scope) }
+        settingWrite { settingsRepository.setLastScope(scope) }
     }
 
     fun selectFilter(filter: ReadFilter) {
         updateSelection { it.copy(filter = filter) }
-        viewModelScope.launch { settingsRepository.setLastFilter(filter) }
+        settingWrite { settingsRepository.setLastFilter(filter) }
     }
 
     fun selectSort(order: SortOrder) {
         updateSelection { it.copy(sort = order) }
-        viewModelScope.launch { settingsRepository.setSortOrder(order) }
+        settingWrite { settingsRepository.setSortOrder(order) }
     }
 
     /** A display condition only: no article is deleted, marked or fetched differently. The cutoff is renewed at once. */
@@ -439,12 +439,25 @@ class HomeViewModel(
     /** Manual refresh of the shown scope. Filter, sort and search are display conditions only (SYNC-02). */
     fun refreshCurrentScope() {
         val target = refreshTargetFor(_selection.value)
-        viewModelScope.launch { coordinator.refresh(target, RefreshReason.MANUAL) }
+        viewModelScope.launch { refreshSafely(target) }
     }
 
     /** Feeds whose last request did not finish or failed; a valid Retry-After is still respected. */
     fun retryPending() {
-        viewModelScope.launch { coordinator.refresh(RefreshScope.Pending, RefreshReason.MANUAL) }
+        viewModelScope.launch { refreshSafely(RefreshScope.Pending) }
+    }
+
+    /**
+     * A manual refresh whose bookkeeping failed (for example the storage is full) ends as an interrupted request in the refresh notice;
+     * it must not end the process. Cancellation still ends the caller.
+     */
+    private suspend fun refreshSafely(target: RefreshScope, force: Boolean = false) {
+        try {
+            coordinator.refresh(target, RefreshReason.MANUAL, force)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+        }
     }
 
     /** The notice ran out or was closed. Only the notice of that request: a newer one stays. */

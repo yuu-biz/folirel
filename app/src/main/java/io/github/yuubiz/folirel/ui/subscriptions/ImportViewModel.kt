@@ -80,7 +80,13 @@ class ImportViewModel(
             _state.value = ImportState.Done(result, httpFeeds)
             // DB registration is final regardless of the fetch outcome; the fetch result is shown separately.
             if (result.feedIdsToFetch.isNotEmpty()) {
-                coordinator.refresh(RefreshScope.Feeds(result.feedIdsToFetch), RefreshReason.IMPORT)
+                // A failed refresh shows as interrupted in the refresh notice; it must not end the process after a finished import.
+                try {
+                    coordinator.refresh(RefreshScope.Feeds(result.feedIdsToFetch), RefreshReason.IMPORT)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                }
             }
         }
     }
