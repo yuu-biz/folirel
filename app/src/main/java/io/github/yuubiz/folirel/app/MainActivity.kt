@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -52,6 +53,7 @@ import io.github.yuubiz.folirel.ui.subscriptions.SubscriptionEvents
 import io.github.yuubiz.folirel.ui.subscriptions.SubscriptionsScreen
 import io.github.yuubiz.folirel.ui.subscriptions.SubscriptionsViewModel
 import io.github.yuubiz.folirel.ui.theme.FolirelTheme
+import io.github.yuubiz.folirel.ui.theme.isDarkTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -82,6 +84,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings by container.settings.settings.collectAsStateWithLifecycle(initialValue = null as AppSettings?)
             val current = settings ?: return@setContent // render nothing until preferences are loaded
+            val dark = isDarkTheme(current.theme, isSystemInDarkTheme())
+            LaunchedEffect(dark) { applySystemBars(dark) }
             FolirelTheme(current.theme, current.textScale, current.palette, current.customSeed) {
                 val iconStore = remember { FeedIconStore { feedId -> container.feedIcons.png(feedId) } }
                 val iconVersions = remember { flow { emit(container.subscriptions.ensureLocalAccount()) }.flatMapLatest { container.feedIcons.observeVersions(it) } }
