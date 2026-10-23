@@ -31,6 +31,12 @@ object TestData {
         c.settings.setShowImages(showImages)
         c.settings.setListMode(ListMode.LIST)
         c.settings.setLastScope(ArticleScope.All)
+        try {
+            // The screen tests choose the tab the app opens on with setLastScope; the default start on All is HomeViewModelFiltersTest's.
+            c.settings.setRestoreLastScope(true)
+        } catch (_: LinkageError) {
+            // A release before this switch always opened the last tab.
+        }
         c.settings.setLastFilter(ReadFilter.ALL)
         c.settings.setSortOrder(SortOrder.NEWEST)
         c.settings.setTextScale(1.0f)

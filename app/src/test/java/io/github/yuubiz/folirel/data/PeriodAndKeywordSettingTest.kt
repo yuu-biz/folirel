@@ -55,6 +55,9 @@ class PeriodAndKeywordSettingTest {
         assertEquals(ThemeMode.DARK, s.theme)
         assertEquals(ListMode.BENTO, s.listMode)
         assertEquals(ArticleScope.Category("c1"), s.lastScope)
+        // The last tab is still stored, but a start opens All until the reader turns "open the last tab" on.
+        assertFalse(s.restoreLastScope)
+        assertEquals(ArticleScope.All, s.startScope)
         val keys = store.data.first().asMap().keys.map { it.name }
         assertFalse("period_filter" in keys || "hidden_keywords" in keys || "hidden_keywords_enabled" in keys)
         scope.cancel()

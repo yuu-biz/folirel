@@ -93,6 +93,13 @@ data class AppSettings(
      */
     val confirmMeteredRefresh: Boolean = true,
     val onboardingDone: Boolean = false,
+    /**
+     * Open the app on [lastScope] (the tab chosen last) instead of All. Off by default, also for a store written by 0.10.0 or earlier
+     * (which always reopened the last tab): a start begins on All. Only the scope depends on it; the read filter, order and period
+     * are restored either way.
+     */
+    val restoreLastScope: Boolean = false,
+    /** The scope chosen last; always stored, used at a start only while [restoreLastScope] is on (see [startScope]). */
     val lastScope: ArticleScope = ArticleScope.All,
     val lastFilter: ReadFilter = ReadFilter.ALL,
     val sortOrder: SortOrder = SortOrder.NEWEST,
@@ -111,6 +118,9 @@ data class AppSettings(
 ) {
     /** The keywords the list query applies: none while the filter is off. */
     val activeHiddenKeywords: List<String> get() = if (hiddenKeywordsEnabled) hiddenKeywords else emptyList()
+
+    /** The scope the list opens on at a start or after a restore. */
+    val startScope: ArticleScope get() = if (restoreLastScope) lastScope else ArticleScope.All
 
     companion object {
         /** Text size, in percent: 90..130 in steps of 5. The four values older versions offered (90, 100, 115, 130) are on this grid. */
@@ -166,6 +176,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val confirmHttpOpen = booleanPreferencesKey("confirm_http_open")
         val confirmMeteredRefresh = booleanPreferencesKey("confirm_metered_refresh")
         val onboardingDone = booleanPreferencesKey("onboarding_done")
+        val restoreLastScope = booleanPreferencesKey("restore_last_scope")
         val lastScope = stringPreferencesKey("last_scope")
         val lastFilter = stringPreferencesKey("last_filter")
         val sortOrder = stringPreferencesKey("sort_order")
@@ -198,6 +209,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             confirmHttpOpen = p[Keys.confirmHttpOpen] ?: defaults.confirmHttpOpen,
             confirmMeteredRefresh = p[Keys.confirmMeteredRefresh] ?: defaults.confirmMeteredRefresh,
             onboardingDone = p[Keys.onboardingDone] ?: defaults.onboardingDone,
+            restoreLastScope = p[Keys.restoreLastScope] ?: defaults.restoreLastScope,
             lastScope = ArticleScope.decode(p[Keys.lastScope]),
             lastFilter = enumOr(p[Keys.lastFilter], defaults.lastFilter),
             sortOrder = enumOr(p[Keys.sortOrder], defaults.sortOrder),
@@ -253,6 +265,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setConfirmHttpOpen(value: Boolean) = store.edit { it[Keys.confirmHttpOpen] = value }
     suspend fun setConfirmMeteredRefresh(value: Boolean) = store.edit { it[Keys.confirmMeteredRefresh] = value }
     suspend fun setOnboardingDone(value: Boolean) = store.edit { it[Keys.onboardingDone] = value }
+    suspend fun setRestoreLastScope(value: Boolean) = store.edit { it[Keys.restoreLastScope] = value }
     suspend fun setLastScope(value: ArticleScope) = store.edit { it[Keys.lastScope] = value.encode() }
     suspend fun setLastFilter(value: ReadFilter) = store.edit { it[Keys.lastFilter] = value.name }
     suspend fun setSortOrder(value: SortOrder) = store.edit { it[Keys.sortOrder] = value.name }
@@ -319,6 +332,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         p[Keys.confirmHttpOpen] = settings.confirmHttpOpen
         p[Keys.confirmMeteredRefresh] = settings.confirmMeteredRefresh
         p[Keys.onboardingDone] = true
+        p[Keys.restoreLastScope] = settings.restoreLastScope
         p[Keys.lastScope] = settings.lastScope.encode()
         p[Keys.lastFilter] = settings.lastFilter.name
         p[Keys.sortOrder] = settings.sortOrder.name

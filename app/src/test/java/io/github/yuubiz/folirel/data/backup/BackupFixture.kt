@@ -241,6 +241,7 @@ object RichState {
         s.setConfirmHttpOpen(false)
         s.setConfirmMeteredRefresh(false)
         s.setOnboardingDone(true)
+        s.setRestoreLastScope(true)
         s.setLastScope(ArticleScope.Category(catDomestic))
         s.setLastFilter(ReadFilter.UNREAD)
         s.setSortOrder(SortOrder.OLDEST)

@@ -168,6 +168,25 @@ class HomeViewModelFiltersTest {
         waitFor { odd.selection.value.period == PeriodFilter.ALL || odd.selection.value.period == PeriodFilter.DAYS_3 }
     }
 
+    /** A start opens All unless "open the last tab" is on; the read filter comes back either way, and process recreation keeps the tab. */
+    @Test
+    fun aStartOpensAllUnlessTheLastTabIsKept() {
+        val tech = ArticleScope.Category(runBlocking { env.db.subscriptionDao().categories(account) }.single().id)
+        vm.selectScope(tech)
+        vm.selectFilter(ReadFilter.UNREAD)
+        waitFor { runBlocking { settings.current() }.let { it.lastScope == tech && it.lastFilter == ReadFilter.UNREAD } }
+        val restarted = newViewModel()
+        waitFor { restarted.selection.value.filter == ReadFilter.UNREAD }
+        assertEquals(ArticleScope.All, restarted.selection.value.scope)
+        // Process recreation is not a start: the tab that was on screen comes back.
+        val recreated = newViewModel(SavedStateHandle(mapOf("scope" to tech.encode(), "filter" to "UNREAD")))
+        waitFor { recreated.selection.value.scope == tech }
+        runBlocking { settings.setRestoreLastScope(true) }
+        val kept = newViewModel()
+        waitFor { kept.selection.value.scope == tech }
+        assertEquals(ReadFilter.UNREAD, kept.selection.value.filter)
+    }
+
     @Test
     fun anOpenListLosesOldArticlesWhenTheAppReturnsAndAsTheClockTicks() {
         vm.selectPeriod(PeriodFilter.HOURS_24)

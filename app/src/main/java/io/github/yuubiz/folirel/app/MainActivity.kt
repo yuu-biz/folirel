@@ -85,6 +85,7 @@ class MainActivity : ComponentActivity() {
         val container = container
         // A recreated activity (rotation, process restart) gets its old intent back; that share was handled when it arrived.
         if (savedInstanceState == null) handleShare(intent)
+        container.trimImageCacheOnce()
         setContent {
             val settings by container.settings.settings.collectAsStateWithLifecycle(initialValue = null as AppSettings?)
             val current = settings ?: return@setContent // render nothing until preferences are loaded

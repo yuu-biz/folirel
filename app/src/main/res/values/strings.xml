@@ -174,6 +174,7 @@
     <string name="settings_browser">Open articles in</string>
     <string name="settings_cache_cleared">Image cache cleared.</string>
     <string name="settings_cache_size">Image cache: %1$s (max %2$d MB)</string>
+    <string name="settings_cache_size_pending">Image cache: %1$s (max %2$d MB now, %3$d MB from the next start)</string>
     <string name="settings_clear_cache">Clear image cache</string>
     <string name="settings_data">Data</string>
     <string name="settings_db_size">Database size: %1$s</string>
@@ -571,6 +572,8 @@
     <string name="nav_mode_auto">Auto</string>
     <string name="nav_mode_pane">Pane when possible</string>
     <string name="nav_mode_drawer">Drawer only</string>
+    <string name="settings_restore_last_scope">Open the last category at start</string>
+    <string name="settings_restore_last_scope_note">Off: the app starts on All. The read filter, period and order are kept either way.</string>
     <string name="settings_category_navigation_note">On a wide window the categories can stay open in a pane at the left; the tabs and swiping stay too. Auto shows the pane from 840 dp wide. Pane when possible shows it from 600 dp, if the articles keep enough room. Drawer only always uses the drawer behind the menu button. A narrow window always uses the drawer.</string>
     <string name="settings_group_refresh">Refresh &amp; network</string>
     <string name="settings_group_storage">Storage &amp; data</string>

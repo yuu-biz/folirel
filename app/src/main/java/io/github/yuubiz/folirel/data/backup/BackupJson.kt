@@ -94,6 +94,7 @@ internal object BackupJson {
         put("allowHttp", s.allowHttp)
         put("confirmHttpOpen", s.confirmHttpOpen)
         put("confirmMeteredRefresh", s.confirmMeteredRefresh)
+        put("restoreLastScope", s.restoreLastScope)
         put("lastScope", s.lastScope.encode())
         put("lastFilter", s.lastFilter.name)
         put("sortOrder", s.sortOrder.name)
@@ -250,6 +251,8 @@ internal object BackupJson {
             allowHttp = o.bool("allowHttp"),
             confirmHttpOpen = o.bool("confirmHttpOpen"),
             confirmMeteredRefresh = o.bool("confirmMeteredRefresh"),
+            // Added after format version 1 was first written (0.10.0 archives do not have it): absent reads as the default.
+            restoreLastScope = o.optionalBool("restoreLastScope", defaults.restoreLastScope),
             lastScope = readScope(o.string("lastScope")),
             lastFilter = o.enum<ReadFilter>("lastFilter"),
             sortOrder = o.enum<SortOrder>("sortOrder"),
@@ -427,6 +430,9 @@ internal object BackupJson {
                 else -> refuse(BackupProblem.DAMAGED, "$what.$name not a boolean")
             }
         }
+
+        /** A field a later version added: absent is [default], present it is checked like any other. */
+        fun optionalBool(name: String, default: Boolean): Boolean = if (name in o) bool(name) else default
 
         fun time(name: String): Long = long(name).also { checkTime(it, 0, "$what.$name") }
 

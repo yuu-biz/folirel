@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
@@ -119,6 +120,15 @@ class BackupArchiveSecurityTest {
         assertRefused(target, Zips.buildText(Zips.entries(bytes).apply { remove(BackupFormat.PRUNED_ENTRIES) }), BackupProblem.DAMAGED, "missing")
         assertRefused(target, editFirst(bytes, BackupFormat.SUBSCRIPTIONS) { JsonObject(it - "fetchUrl") }, BackupProblem.DAMAGED, "missing")
         assertRefused(target, Zips.edit(bytes, BackupFormat.SETTINGS) { JsonObject(json(it).jsonObject - "customDark").toString() }, BackupProblem.DAMAGED, "missing")
+    }
+
+    /** An archive of 0.10.0 has no restoreLastScope (it came later): it is read, the switch is off and the rest stays as written. */
+    @Test
+    fun settingAddedLaterIsOptional() = withBackup { bytes, target ->
+        val older = Zips.edit(bytes, BackupFormat.SETTINGS) { JsonObject(json(it).jsonObject - "restoreLastScope").toString() }
+        val written = target.inspect(bytes).settings
+        assertTrue(written.restoreLastScope)
+        assertEquals(written.copy(restoreLastScope = false), target.inspect(older).settings)
     }
 
     /** T17: a newer format version is refused as such, before anything else of it is read. */
@@ -305,6 +315,8 @@ class BackupArchiveSecurityTest {
             "customLight" to JsonObject(mapOf("accent" to JsonPrimitive("#000000"))),
             "customDark" to JsonObject(listOf("accent", "container", "secondary", "background", "text").associateWith { JsonPrimitive("#GGGGGG") }),
             "lastScope" to JsonPrimitive("somewhere"),
+            "restoreLastScope" to JsonPrimitive("yes"),
+            "restoreLastScope" to JsonNull,
             "hiddenKeywords" to JsonArray(List(33) { JsonPrimitive("k$it") }),
             "hiddenKeywords" to JsonArray(listOf(JsonPrimitive("a"), JsonPrimitive("A"))),
             "hiddenKeywords" to JsonArray(listOf(JsonPrimitive("x".repeat(65)))),

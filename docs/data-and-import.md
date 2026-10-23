@@ -322,9 +322,10 @@ bookkeeping (only `initialized` is carried, as `fetchedBefore`). OPML import (ad
 | `confirm_http_open` | Ask before opening an `http://` article | on |
 | `confirm_metered_refresh` | Ask before a manual update on a metered network | on |
 | `retention_limit` | 0 (no limit), 1,000 to 30,000 | 0 |
-| `image_cache_mb` | Thumbnail disk cache: 64, 128, 256, 512 (applied at next start) | 128 |
+| `image_cache_mb` | Thumbnail disk cache: 64, 128, 256, 512 (applied at next start; a cache over the new size is trimmed then, oldest used first) | 128 |
 | `onboarding_done` | First-run screen completed | off |
-| `last_scope`, `last_filter`, `sort_order` | Last selection | all / all / newest |
+| `restore_last_scope` | A start opens `last_scope` instead of All (no key, as in 0.10.0 and earlier, reads as off) | off |
+| `last_scope`, `last_filter`, `sort_order` | Last selection; `last_scope` is always stored but opened at a start only with `restore_last_scope` | all / all / newest |
 | `period_filter` | `ALL`, `HOURS_24`, `DAYS_3`, `DAYS_7`, `DAYS_30` | `ALL` |
 | `hidden_keywords` | Up to 32 words of at most 64 characters, one list for all scopes | empty |
 | `hidden_keywords_enabled` | Whether the hidden keywords are applied (switched on by the first word added) | off |

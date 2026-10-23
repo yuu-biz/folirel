@@ -75,7 +75,9 @@ pixels and skipped. `srcset`, Open Graph metadata and lazy-load attributes are n
 Image requests use Coil 3 with the shared network policy (section 6). The image client has its own dispatcher (4
 requests, 2 per host) and rejects any body over 8 MiB, whether declared or counted while reading; the count is taken after gzip is removed, so a small compressed body cannot expand past the limit (0.9.4). Coil's service-loader
 discovery is disabled, so no other fetchers exist, and no SVG decoder is installed. The disk cache is a setting (64,
-128, 256 or 512 MiB, default 128, applied at the next app start). Thumbnails are loaded only for rows that are
+128, 256 or 512 MiB, default 128, applied at the next app start). Coil trims the cache only after it writes an entry, so the
+first screen of each process also asks it to trim once when the cache holds more than its size (the least recently used images
+go first); within the size nothing happens. Thumbnails are loaded only for rows that are
 composed; there is no bulk prefetch, and the app does not pre-warm the browser for article links.
 
 With "show images" off, no thumbnail is requested and no source-icon lookup runs (stored icons are hidden, not

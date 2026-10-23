@@ -41,8 +41,8 @@ automatic backup stays disabled for the app.
   that still lists them does not bring them back as new unread articles after the restore.
 - Settings: theme, colour set, the Custom base colour and the Custom light and dark colours set by hand (five each),
   list layout, text size, columns, Magazine arrangement, thumbnails, category navigation, browser, update interval,
-  update on start, unmetered only, HTTP allowed, the two "ask before" switches, last selection (scope, filter, order,
-  period), hidden keywords and their switch, articles to keep, image cache size.
+  update on start, unmetered only, HTTP allowed, the two "ask before" switches, whether a start opens the last category,
+  last selection (scope, filter, order, period), hidden keywords and their switch, articles to keep, image cache size.
 
 **Not in it**: thumbnails and the image cache, source icons (looked up again), fetch diagnostics, validators (ETag,
 Last-Modified), failure counts, back-off and Retry-After waits, pending refresh requests, the time of the last refresh
@@ -56,7 +56,7 @@ The file is a ZIP named `folirel-backup-YYYYMMDD-HHmmss.zip` (local time). It ho
 | Entry | Content |
 |---|---|
 | `manifest.json` | Object: `format` = `"folirel-backup"`, `formatVersion` = `1`, `createdAt` (UTC epoch ms) and `createdAtUtc` (ISO 8601), `account` = `"local"`, `app` {`versionName`, `versionCode`}, `schemaVersion` (the Room schema of the writing app; informational), `counts` {`feeds`, `subscribedFeeds`, `categories`, `memberships`, `articles`, `readArticles`, `savedArticles`, `prunedEntries`, `hiddenKeywords`} |
-| `settings.json` | Object with the settings of section 2. Enums by name (`"DARK"`, `"CUSTOM"`, `"BENTO"`…), colours as `"#RRGGBB"`, `customLight` / `customDark` an object {`accent`, `container`, `secondary`, `background`, `text`} or `null`, text size as `textScalePercent`, `lastScope` as `"all"`, `"uncategorized"`, `"category:<id>"` or `"feed:<id>"` |
+| `settings.json` | Object with the settings of section 2. Enums by name (`"DARK"`, `"CUSTOM"`, `"BENTO"`…), colours as `"#RRGGBB"`, `customLight` / `customDark` an object {`accent`, `container`, `secondary`, `background`, `text`} or `null`, text size as `textScalePercent`, `lastScope` as `"all"`, `"uncategorized"`, `"category:<id>"` or `"feed:<id>"`, `restoreLastScope` a boolean (added after 0.10.0; an archive without it reads as `false`) |
 | `subscriptions.json` | Array of feeds: `id`, `subscriptionUrl`, `fetchUrl`, `siteUrl`, `feedTitle`, `userTitle`, `subscribed`, `paused`, `createdAt`, `fetchedBefore`, `httpsMigration` ({`httpUrl`, `httpsUrl`, `migratedAt`} or `null`), `urlMoves` ([{`id`, `fromUrl`, `toUrl`, `movedAt`}]) |
 | `categories.json` | Array: `id`, `path` (array of names), `feedIds`, `tabOrder`, `pinned`, `listMode`, `cardStyle`, `cardColumns` (`null` = inherit, `0` = automatic, `1`–`5`) |
 | `articles.json` | Array: `id`, `feedId`, `entryKey`, `externalEntryId`, `linkUrl`, `title`, `summaryText`, `author`, `publishedAt`, `firstSeenAt`, `sortAt`, `imageUrl`, `lastSeenAt` |
@@ -129,8 +129,9 @@ has seen what the backup holds and confirmed.
      checked again record by record and inserted. The transaction also stores a mark of this restore in the database
      header (`PRAGMA application_id`) in the same commit.
    - The note is deleted.
-6. **After.** Screens show the new data at once. The article list opens on the restored last selection (All when the
-   archive's selection names a category or feed it does not have), with the restored filter, order, period and hidden
+6. **After.** Screens show the new data at once. The article list opens as a start would with the restored settings: on the
+   restored last selection's scope when "open the last category at start" is on (All when it is off, or when the archive's
+   selection names a category or feed it does not have), with the restored filter, order, period and hidden
    keywords, no search and from the top. The theme, colour set and Custom colours apply at once.
 
 ### Failure safety

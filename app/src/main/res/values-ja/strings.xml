@@ -173,6 +173,7 @@
     <string name="settings_browser">記事を開く方法</string>
     <string name="settings_cache_cleared">画像キャッシュを削除しました。</string>
     <string name="settings_cache_size">画像キャッシュ: %1$s（上限%2$dMB）</string>
+    <string name="settings_cache_size_pending">画像キャッシュ: %1$s（現在の上限%2$dMB、次回の起動から%3$dMB）</string>
     <string name="settings_clear_cache">画像キャッシュを削除</string>
     <string name="settings_data">データ</string>
     <string name="settings_db_size">データベース容量: %1$s</string>
@@ -546,6 +547,8 @@
     <string name="nav_mode_auto">自動</string>
     <string name="nav_mode_pane">可能ならペイン表示</string>
     <string name="nav_mode_drawer">ドロワーのみ</string>
+    <string name="settings_restore_last_scope">起動時に前回のカテゴリを開く</string>
+    <string name="settings_restore_last_scope_note">オフのときは「すべて」から始まります。記事の範囲・期間・並び順はどちらの場合も前回のままです。</string>
     <string name="settings_category_navigation_note">広いウィンドウでは、カテゴリを左のペインに表示したままにできます。タブとスワイプはそのまま使えます。自動は幅840dp以上でペインを表示します。可能ならペイン表示は600dp以上で、記事の幅が十分に残る場合に表示します。ドロワーのみは常にメニューボタンから開くドロワーを使います。狭いウィンドウでは常にドロワーです。</string>
     <string name="settings_group_refresh">更新とネットワーク</string>
     <string name="settings_group_storage">保存とデータ</string>

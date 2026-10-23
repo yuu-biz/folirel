@@ -215,6 +215,14 @@ class AppContainer(context: Context) {
         }
         .build()
 
+    private val imageCacheTrimmed = AtomicBoolean(false)
+
+    /** Once per process, when the screen first opens: a cache size made smaller last time takes effect now (see [trimWhenOverSize]). */
+    fun trimImageCacheOnce() {
+        if (!imageCacheTrimmed.compareAndSet(false, true)) return
+        appScope.launch(Dispatchers.IO) { imageLoader.diskCache?.let(::trimWhenOverSize) }
+    }
+
     /** A restore that did not live to finish is resolved before anything reads the settings; archive copies of earlier runs go. */
     fun recoverInterruptedRestore() {
         runBlocking { backup.recoverInterruptedRestore() }
@@ -243,5 +251,16 @@ class AppContainer(context: Context) {
 
         /** How long a restore waits for running refreshes and icon lookups to stop before it gives up (changing nothing). */
         private const val PAUSE_WAIT_MS = 20_000L
+
+        private const val TRIM_KEY = "folirel:trim"
+
+        /**
+         * Coil trims its disk cache only after an entry is written, so a cache opened with a smaller size than it holds stays over it until
+         * the next new thumbnail, which may not come while every row is already cached. An edit that is opened and aborted runs the same
+         * trim (oldest used first, in Coil's own cleanup) without storing anything; nothing happens while the cache is within its size.
+         */
+        internal fun trimWhenOverSize(cache: DiskCache) {
+            if (cache.size > cache.maxSize) cache.openEditor(TRIM_KEY)?.abort()
+        }
     }
 }

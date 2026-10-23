@@ -90,6 +90,9 @@ class SettingsViewModel(
 
     fun imageCacheBytes(): Long = imageLoader.diskCache?.size ?: 0
 
+    /** The size the running cache was opened with; a changed setting applies at the next start, so until then the two differ. */
+    fun imageCacheActiveMb(): Int? = imageLoader.diskCache?.maxSize?.let { (it / (1024L * 1024L)).toInt() }
+
     fun databaseBytes(): Long = databaseFileBytes()
 
     /** Removes cached thumbnails only. Reading state, saved articles and categories are untouched. */

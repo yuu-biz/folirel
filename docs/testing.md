@@ -579,3 +579,12 @@ manual ([backup-format.md](backup-format.md) section 7).
 | BR-T47 | Debug backup → uninstall → differently signed install → restore → compare. | Manual, at the release candidate ([backup-format.md](backup-format.md) section 7) |
 | (§17) | 1,000 feeds and 30,000 articles with long Japanese summaries and JSON special characters round-trip exactly. | `largeInstallRoundTrips` |
 | (own data) | A category name stored untrimmed and not in NFC, and a very long feed name, are restored as they are (the reader's own backup is not refused by today's input rules). | `olderStoredNamesAreRestoredAsTheyAre` |
+| (later field) | An archive without `restoreLastScope` (written by 0.10.0) is read with the switch off; a non-boolean value is refused. | `BackupArchiveSecurityTest.settingAddedLaterIsOptional`, `t24_invalidValues` |
+
+### 4.15 Start tab and cache sizes (0.10.x)
+
+| ID | Scenario | Test |
+|---|---|---|
+| ST-T01 | A start opens All by default, also for a store of 0.10.0 or earlier that names a category; the read filter is restored. With "open the last category at start" on, the last tab opens. A screen restored after process death keeps its tab either way. | `HomeViewModelFiltersTest.aStartOpensAllUnlessTheLastTabIsKept`, `PeriodAndKeywordSettingTest` |
+| ST-T02 | A thumbnail cache opened with a smaller size than it holds is trimmed, least recently used first, without waiting for a new image; one within its size is left alone. | `ImageCacheTrimTest` |
+| ST-T03 | The article limit removes only read, unsaved articles (unchanged); unread and saved articles can keep the count above it. | `DataKeepingTest`, `ReviewFixesTest` (unchanged) |

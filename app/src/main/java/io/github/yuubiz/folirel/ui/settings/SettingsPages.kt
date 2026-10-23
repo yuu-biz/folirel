@@ -86,6 +86,12 @@ internal fun LayoutPage(s: AppSettings, vm: SettingsViewModel) {
             )
         }
         SettingNote(stringResource(R.string.settings_category_navigation_note))
+        SwitchRow(
+            stringResource(R.string.settings_restore_last_scope),
+            stringResource(R.string.settings_restore_last_scope_note),
+            s.restoreLastScope,
+            Modifier.testTag("restore_last_scope"),
+        ) { v -> vm.update { setRestoreLastScope(v) } }
         HorizontalDivider(Modifier.padding(top = 8.dp))
         SettingNote(stringResource(R.string.settings_display_default_note), Modifier.padding(top = 8.dp))
         GroupHeader(stringResource(R.string.display_layout))
@@ -259,6 +265,7 @@ internal fun StoragePage(
     val removedText = stringResource(R.string.retention_removed)
     val dbBytes = remember(articleCount) { vm.databaseBytes() }
     val cacheBytes = remember(cacheVersion) { vm.imageCacheBytes() }
+    val activeCacheMb = remember { vm.imageCacheActiveMb() }
     val cacheCleared = stringResource(R.string.settings_cache_cleared)
     val backupState by backup.backup.collectAsStateWithLifecycle()
     val written = (backupState as? BackupState.Written)?.counts
@@ -317,7 +324,12 @@ internal fun StoragePage(
         )
         SettingNote(stringResource(R.string.settings_image_cache_note))
         Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-            Text(stringResource(R.string.settings_cache_size, Formatter.formatShortFileSize(context, cacheBytes), s.imageCacheMb))
+            val used = Formatter.formatShortFileSize(context, cacheBytes)
+            Text(
+                if (activeCacheMb == null || activeCacheMb == s.imageCacheMb) stringResource(R.string.settings_cache_size, used, s.imageCacheMb)
+                else stringResource(R.string.settings_cache_size_pending, used, activeCacheMb, s.imageCacheMb),
+                Modifier.testTag("image_cache_size"),
+            )
             Row(Modifier.padding(top = 4.dp)) {
                 OutlinedButton(onClick = {
                     scope.launch {

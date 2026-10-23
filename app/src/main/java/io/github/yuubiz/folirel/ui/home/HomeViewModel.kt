@@ -180,7 +180,7 @@ class HomeViewModel(
             accountId.value = subscriptions.ensureLocalAccount()
         }
         viewModelScope.launch {
-            // Process restore: SavedStateHandle wins; otherwise the persisted last selection.
+            // Process restore: SavedStateHandle wins; otherwise the persisted last selection, on All unless the reader asked for the last tab.
             val restoredScope = savedState.get<String>(KEY_SCOPE)
             val initial = if (restoredScope != null) {
                 Selection(
@@ -192,7 +192,7 @@ class HomeViewModel(
                 )
             } else {
                 val s = settingsRepository.settings.first()
-                Selection(scope = s.lastScope, filter = s.lastFilter, sort = s.sortOrder, period = restoredPeriod() ?: s.periodFilter)
+                Selection(scope = s.startScope, filter = s.lastFilter, sort = s.sortOrder, period = restoredPeriod() ?: s.periodFilter)
             }
             _selection.value = initial
             periodNow.value = clock.millis()
@@ -227,8 +227,9 @@ class HomeViewModel(
             }
         }
         viewModelScope.launch {
-            // After a restore the list opens as the backup left it: its last selection (already All when it named nothing restored),
-            // filter, order and period; no search, no pending arrivals, every list from its top.
+            // After a restore the list opens as a start would with the backup's settings: its last selection (the scope only when it
+            // restores the last tab, and already All when it named nothing restored), filter, order and period; no search, no pending
+            // arrivals, every list from its top.
             dataReplaced.drop(1).collect {
                 val s = settingsRepository.settings.first()
                 notices.acknowledge(notices.pending.value)
@@ -239,7 +240,7 @@ class HomeViewModel(
                 anchors.clear()
                 savedState[KEY_ANCHORS] = emptyArray<String>()
                 periodNow.value = clock.millis()
-                updateSelection { Selection(scope = s.lastScope, filter = s.lastFilter, sort = s.sortOrder, period = s.periodFilter) }
+                updateSelection { Selection(scope = s.startScope, filter = s.lastFilter, sort = s.sortOrder, period = s.periodFilter) }
             }
         }
         viewModelScope.launch {
