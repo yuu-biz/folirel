@@ -170,7 +170,7 @@ Settings opens on a short list of six pages; each row shows the values it holds 
 
 The Storage & data page also shows the number of articles stored and the database size, and warns when the database is larger than 100 MB.
 
-**Articles to keep on the device** is not a limit on fetching: every article a feed returns is stored. If you choose a number, Folirel shows how many old, read, unsaved articles would be removed and asks for confirmation. After that the same cleanup runs after updates. Unread and saved articles are never removed. Removed articles that a feed delivers again do not return as unread.
+**Articles to keep on the device** is not a limit on fetching: every article a feed returns is stored. If you choose a number, Folirel shows how many old, read, unsaved articles would be removed and asks for confirmation. After that the same cleanup runs after updates (marking articles read does not remove them; the next update does). Unread and saved articles are never removed, so the count can stay above the number. Removed articles that a feed delivers again do not return as unread.
 
 ## Data, backup and uninstalling
 

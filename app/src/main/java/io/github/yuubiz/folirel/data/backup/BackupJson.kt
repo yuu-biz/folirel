@@ -251,7 +251,7 @@ internal object BackupJson {
             allowHttp = o.bool("allowHttp"),
             confirmHttpOpen = o.bool("confirmHttpOpen"),
             confirmMeteredRefresh = o.bool("confirmMeteredRefresh"),
-            // Added after format version 1 was first written (0.10.0 archives do not have it): absent reads as the default.
+            // Added in 0.10.1, after format version 1 was first written (0.10.0 archives do not have it): absent reads as the default.
             restoreLastScope = o.optionalBool("restoreLastScope", defaults.restoreLastScope),
             lastScope = readScope(o.string("lastScope")),
             lastFilter = o.enum<ReadFilter>("lastFilter"),

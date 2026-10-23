@@ -581,7 +581,7 @@ manual ([backup-format.md](backup-format.md) section 7).
 | (own data) | A category name stored untrimmed and not in NFC, and a very long feed name, are restored as they are (the reader's own backup is not refused by today's input rules). | `olderStoredNamesAreRestoredAsTheyAre` |
 | (later field) | An archive without `restoreLastScope` (written by 0.10.0) is read with the switch off; a non-boolean value is refused. | `BackupArchiveSecurityTest.settingAddedLaterIsOptional`, `t24_invalidValues` |
 
-### 4.15 Start tab and cache sizes (0.10.x)
+### 4.15 Start tab and cache sizes (0.10.1)
 
 | ID | Scenario | Test |
 |---|---|---|
