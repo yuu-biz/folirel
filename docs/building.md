@@ -130,7 +130,12 @@ On Git Bash for Windows, pass device paths such as `/sdcard/...` to `adb` with `
 
 ## Continuous integration
 
-`.github/workflows/android.yml` runs on every push to `main` and on every pull request:
+`.github/workflows/android.yml` runs only for a release, to keep within the free plan's Actions minutes and artifact storage: when a
+version tag (`v*`) is pushed, or when it is started by hand (Actions > android > Run workflow, or
+`gh workflow run android.yml --ref main`). Pushes to `main` and pull requests do not start it; run the same commands locally
+before pushing. A GitHub Release is created from a tag only after this run is green.
+
+What it does:
 
 - Runner: `ubuntu-24.04`, 45-minute timeout, read-only `contents` permission, no secrets.
 - Java: Temurin 21. Android SDK packages: `platform-tools`, `platforms;android-37.0`, `build-tools;36.0.0`. Gradle is set up with `gradle/actions/setup-gradle`.

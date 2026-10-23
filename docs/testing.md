@@ -12,7 +12,7 @@ Prerequisites (JDK, Android SDK platform and build-tools versions, `local.proper
 ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 
-On Windows use `.\gradlew.bat`. `tools/verify.sh` and `tools/verify.ps1` wrap the same command; pass `--device-tests` (shell) or `-DeviceTests` (PowerShell) to run the device tests after it. CI (`.github/workflows/android.yml`) runs this command and the helper-script tests below on every push and pull request.
+On Windows use `.\gradlew.bat`. `tools/verify.sh` and `tools/verify.ps1` wrap the same command; pass `--device-tests` (shell) or `-DeviceTests` (PowerShell) to run the device tests after it. CI (`.github/workflows/android.yml`) runs this command and the helper-script tests below for a release only (a pushed `v*` tag or a manual start; see [building.md](building.md)), so run them locally before pushing.
 
 Reports and results are written to:
 

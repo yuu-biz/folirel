@@ -1,9 +1,11 @@
 name: android
 
+# Only for a release: when a version tag (v*) is pushed, or started by hand (Actions > android > Run workflow). Not on every push
+# or pull request, so the free plan's Actions minutes and artifact storage are spent only where a release needs them.
 on:
   push:
-    branches: [main]
-  pull_request:
+    tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: read

@@ -38,7 +38,8 @@ say so in the pull request.
 ## Pull requests
 
 - One topic per pull request, with a short description of what changes and why.
-- CI (`.github/workflows/android.yml`) must pass.
+- Run the JVM tests, lint and the debug build locally (see [AGENTS.md](AGENTS.md)); CI (`.github/workflows/android.yml`) runs
+  only for releases, and a maintainer can start it by hand for a pull request.
 - By contributing you agree that your contribution is licensed under the [MIT License](LICENSE).
 
 ## Reporting security issues

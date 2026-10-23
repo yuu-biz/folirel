@@ -14,7 +14,8 @@ python3 -m unittest tools.test_compare_app_state   # helper script tests
 ```
 
 On Windows use `.\gradlew.bat`. Prerequisites and pinned versions: [docs/building.md](docs/building.md). CI runs the
-first and third command on every push and pull request.
+first and third command only for a release (a pushed `v*` tag or a manual start), not on every push: run them locally
+before pushing.
 
 ## Where things are
 
