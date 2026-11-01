@@ -360,6 +360,18 @@ class HomeViewModel(
         settingWrite { settingsRepository.setHiddenKeywordsEnabled(enabled) }
     }
 
+    /** The button of an empty list: takes away what emptied it (the search, the period and hidden keywords, or the read filter). */
+    fun leaveEmpty(exit: EmptyExit) {
+        when (exit) {
+            EmptyExit.CLEAR_SEARCH -> setSearchActive(false)
+            EmptyExit.CLEAR_FILTERS -> {
+                selectPeriod(PeriodFilter.ALL)
+                setHiddenKeywordsEnabled(false)
+            }
+            EmptyExit.SHOW_ALL -> selectFilter(ReadFilter.ALL)
+        }
+    }
+
     /** Returns what happened so the sheet can say why a keyword was not added. */
     suspend fun addHiddenKeyword(raw: String): HiddenKeywords.AddResult =
         runCatching { settingsRepository.addHiddenKeyword(raw) }.getOrElse { events.send(HomeEvent.UpdateFailed); HiddenKeywords.AddResult.Blank }

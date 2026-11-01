@@ -277,7 +277,13 @@ fun SubscriptionsScreen(
             }
             if (structure.loaded && structure.feeds.isEmpty()) {
                 item {
-                    Text(stringResource(R.string.empty_no_subscriptions), modifier = Modifier.padding(16.dp))
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(stringResource(R.string.empty_no_subscriptions))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = onAddFeed, modifier = Modifier.testTag("empty_add_feed")) { Text(stringResource(R.string.action_add_feed)) }
+                            OutlinedButton(onClick = onImport, modifier = Modifier.testTag("empty_import")) { Text(stringResource(R.string.action_import_opml)) }
+                        }
+                    }
                 }
             }
             if (structure.loaded && structure.feeds.isNotEmpty() && active.isEmpty() && activeAll.isNotEmpty()) {

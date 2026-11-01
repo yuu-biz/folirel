@@ -704,4 +704,8 @@
     <string name="restore_retry">もう一度試す</string>
     <string name="restore_failed">バックアップを復元できませんでした。データと設定は変更していません。</string>
     <string name="restore_failed_settings">バックアップを復元できませんでした。データは変更していません。以前の設定は次回Folirelを起動したときに元に戻ります。</string>
+
+    <!-- Phase 3 (motion and UX) -->
+    <string name="empty_action_clear_filters">絞り込みを外す</string>
+    <string name="empty_action_show_all">すべての記事を表示</string>
 </resources>

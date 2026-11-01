@@ -309,4 +309,42 @@ class HomeViewModelFiltersTest {
         vm.selectSort(io.github.yuubiz.folirel.model.SortOrder.NEWEST)
         assertEquals(ArticleScope.Uncategorized, vm.selection.value.scope)
     }
+
+    /** The button of an empty list names what emptied it and takes exactly that away, narrowest cause first. */
+    @Test
+    fun anEmptyListOffersTheWayOutOfWhatEmptiedIt() = runBlocking<Unit> {
+        fun reason() = EmptyReason.of(vm.selection.value, vm.settings.value.activeHiddenKeywords.isNotEmpty(), refreshing = false, offline = false)
+        assertEquals(5, titles().size)
+
+        vm.selectPeriod(PeriodFilter.HOURS_24)
+        vm.addHiddenKeyword("Fresh")
+        titles(expected = emptyList())
+        waitFor { vm.settings.value.activeHiddenKeywords.isNotEmpty() }
+        vm.selectFilter(ReadFilter.UNREAD)
+        assertEquals(EmptyReason.FILTERED, reason())
+        assertEquals(EmptyExit.CLEAR_FILTERS, reason().exit)
+        vm.leaveEmpty(EmptyExit.CLEAR_FILTERS)
+        waitFor { vm.settings.value.activeHiddenKeywords.isEmpty() }
+        assertEquals(PeriodFilter.ALL, vm.selection.value.period)
+        // The keyword is only switched off, not deleted; the read filter is a cause of its own.
+        assertEquals(listOf("Fresh"), runBlocking { settings.current().hiddenKeywords })
+        assertEquals(ReadFilter.UNREAD, vm.selection.value.filter)
+        assertEquals(5, titles(expected = listOf("Fresh about AI", "Fresh basics", "Three days old", "Ten days old AI", "Forty days old")).size)
+
+        vm.setSearchActive(true)
+        vm.setSearchText("nothing like this")
+        main.scheduler.advanceTimeBy(HomeViewModel.SEARCH_DEBOUNCE_MS + 1)
+        waitFor { vm.selection.value.search.isNotEmpty() }
+        assertEquals(EmptyReason.SEARCH, reason())
+        vm.leaveEmpty(EmptyExit.CLEAR_SEARCH)
+        assertEquals("", vm.selection.value.search)
+        assertEquals(EmptyReason.UNREAD, reason())
+
+        vm.leaveEmpty(EmptyExit.SHOW_ALL)
+        assertEquals(ReadFilter.ALL, vm.selection.value.filter)
+        assertEquals(EmptyReason.NOTHING, reason())
+        assertEquals(null, reason().exit)
+        vm.selectFilter(ReadFilter.SAVED)
+        assertEquals(EmptyExit.SHOW_ALL, reason().exit)
+    }
 }

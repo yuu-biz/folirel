@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -110,6 +111,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -763,7 +766,7 @@ private fun ScopePage(
     Box(Modifier.fillMaxSize().testTag("page_${pageScope.encode()}")) {
         when {
             !list.loaded -> Unit
-            list.items.isEmpty() -> EmptyList(selection, settings.activeHiddenKeywords.isNotEmpty(), refreshing, offline, onRefresh)
+            list.items.isEmpty() -> EmptyList(EmptyReason.of(selection, settings.activeHiddenKeywords.isNotEmpty(), refreshing, offline), selection.search, vm::leaveEmpty, onRefresh)
             else -> ArticleList(
                 host = vm,
                 state = list,
@@ -1200,31 +1203,48 @@ private fun NoSubscriptions(onImport: () -> Unit, onAdd: () -> Unit) {
 }
 
 @Composable
-private fun EmptyList(selection: Selection, hiddenActive: Boolean, refreshing: Boolean, offline: Boolean, onRefresh: () -> Unit) {
-    val message = when {
-        selection.search.isNotEmpty() -> stringResource(R.string.empty_search, selection.search)
+private fun EmptyList(reason: EmptyReason, search: String, onExit: (EmptyExit) -> Unit, onRefresh: () -> Unit) {
+    val message = when (reason) {
+        EmptyReason.SEARCH -> stringResource(R.string.empty_search, search)
         // A period or hidden keywords can be what empties the list: say so instead of "no articles".
-        selection.period != PeriodFilter.ALL || hiddenActive -> stringResource(R.string.empty_filtered)
-        selection.filter == ReadFilter.UNREAD -> stringResource(R.string.empty_unread)
-        selection.filter == ReadFilter.SAVED -> stringResource(R.string.empty_saved)
-        refreshing -> stringResource(R.string.empty_fetching)
-        offline -> stringResource(R.string.empty_offline)
-        else -> stringResource(R.string.empty_articles)
+        EmptyReason.FILTERED -> stringResource(R.string.empty_filtered)
+        EmptyReason.UNREAD -> stringResource(R.string.empty_unread)
+        EmptyReason.SAVED -> stringResource(R.string.empty_saved)
+        EmptyReason.FETCHING -> stringResource(R.string.empty_fetching)
+        EmptyReason.OFFLINE -> stringResource(R.string.empty_offline)
+        EmptyReason.NOTHING -> stringResource(R.string.empty_articles)
     }
-    CenteredMessage(message) {
+    val icon = when (reason) {
+        EmptyReason.SEARCH -> rememberVectorPainter(Icons.Filled.Search)
+        EmptyReason.FILTERED -> painterResource(R.drawable.ic_tune)
+        EmptyReason.UNREAD -> rememberVectorPainter(Icons.Filled.Check)
+        EmptyReason.SAVED -> painterResource(R.drawable.ic_bookmark_border)
+        EmptyReason.FETCHING, EmptyReason.NOTHING -> rememberVectorPainter(Icons.Filled.Refresh)
+        EmptyReason.OFFLINE -> painterResource(R.drawable.ic_cloud_off)
+    }
+    CenteredMessage(message, icon) {
+        reason.exit?.let { exit ->
+            val label = when (exit) {
+                EmptyExit.CLEAR_SEARCH -> R.string.action_clear_search
+                EmptyExit.CLEAR_FILTERS -> R.string.empty_action_clear_filters
+                EmptyExit.SHOW_ALL -> R.string.empty_action_show_all
+            }
+            Button(onClick = { onExit(exit) }, modifier = Modifier.testTag("empty_exit")) { Text(stringResource(label)) }
+        }
         // A refresh covers the scope's feeds; filter and search never narrow it, so it is offered on every empty list.
-        if (!refreshing) OutlinedButton(onClick = onRefresh, modifier = Modifier.testTag("empty_refresh")) { Text(stringResource(R.string.menu_refresh)) }
+        if (reason != EmptyReason.FETCHING) OutlinedButton(onClick = onRefresh, modifier = Modifier.testTag("empty_refresh")) { Text(stringResource(R.string.menu_refresh)) }
     }
 }
 
 @Composable
-private fun CenteredMessage(message: String, actions: @Composable () -> Unit) {
+private fun CenteredMessage(message: String, icon: Painter? = null, actions: @Composable () -> Unit) {
     // Scrollable so pull-to-refresh also works on empty states and nothing is clipped at 200% text.
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        if (icon != null) Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(32.dp))
         Text(message, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, modifier = Modifier.testTag("empty_message"))
         actions()
     }
