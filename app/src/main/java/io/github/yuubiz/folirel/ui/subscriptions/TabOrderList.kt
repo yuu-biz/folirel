@@ -35,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -82,6 +84,7 @@ internal fun TabOrderList(
     var dragOffset by remember { mutableFloatStateOf(0f) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
 
     fun groupOf(id: String) = if (id in pinned) pinned else others
 
@@ -136,9 +139,16 @@ internal fun TabOrderList(
             onPin = { vm.setCategoryPinned(id, !isPinned) },
             onMove = { delta -> vm.moveCategory(id, delta) },
             onDisplaySettings = { onDisplaySettings(id) },
-            onDragStart = { dragging = id; dragOffset = 0f },
+            onDragStart = {
+                haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+                dragging = id
+                dragOffset = 0f
+            },
             onDrag = { dy -> dragOffset += dy; swapIfPassed(id) },
-            onDragEnd = { finishDrag(id, save = true) },
+            onDragEnd = {
+                haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
+                finishDrag(id, save = true)
+            },
             onDragCancel = { finishDrag(id, save = false) },
             modifier = modifier.graphicsLayer { translationY = if (dragging == id) dragOffset else 0f }.zIndex(if (dragging == id) 1f else 0f),
         )

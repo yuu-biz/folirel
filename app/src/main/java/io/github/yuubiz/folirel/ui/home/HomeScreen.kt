@@ -107,7 +107,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
@@ -206,6 +208,7 @@ fun HomeScreen(
     val checkingHttps = https.running
 
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     // One pager state for the tabs and the pages: the tabs follow the finger instead of waiting for the page to settle.
@@ -262,7 +265,10 @@ fun HomeScreen(
     val actions = ArticleActions(
         open = { openUrl(it, settings.browserMode) },
         openExternal = { openUrl(it, BrowserMode.EXTERNAL) },
-        toggleSaved = { vm.toggleSaved(it) },
+        toggleSaved = {
+            haptics.performHapticFeedback(if (it.isSaved) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn)
+            vm.toggleSaved(it)
+        },
         setRead = { row, read -> vm.setRead(row, read) },
         share = { row -> context.startActivity(browser.shareIntent(row.title, row.linkUrl)) },
         showSummary = { summaryFor = it },
