@@ -109,6 +109,15 @@ Within one response, if a key occurs twice, the first item wins and later items 
    address, where `id:`/`url:`, `http`/`https` and a leading `www.` may differ (`EntryKeyAliases`). Only URL-shaped
    keys are related; opaque GUIDs, fallback digests and titles never match, nothing is compared across feeds, and
    case, trailing slash and query order still make keys different. Stored keys and GUIDs are never rewritten.
+4. a feed that gives the same items new GUIDs: for an `id:` key, the one stored article of the feed with an `id:` key
+   and the same link, title, `publishedAt` and summary, provided its own key is not in the same response and no other
+   entry of the response has that link. The entry needs a link and a date. Two articles that agree in all four cannot
+   be told apart, so nothing distinct is merged; a feed that links every item to its homepage still differs in date or
+   text per item. The stored key stays, so the article is found again only while its content is unchanged: an edit of
+   its text under the new GUID makes a new article. A GUID added to or dropped from an item (`url:` and `id:`) of a
+   feed without an address change is not matched (rule 3 covers moved feeds only). A `fallback:` item (no GUID, no
+   link) whose summary changes is still a new article: an edit and a new item with the same title and date look the
+   same.
 
 If no article matches, the key is checked against the retention record (section 6); an entry removed earlier by the
 retention cleanup is not inserted again. Otherwise the article is inserted.

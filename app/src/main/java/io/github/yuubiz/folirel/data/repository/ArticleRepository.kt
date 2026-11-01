@@ -11,6 +11,8 @@ import io.github.yuubiz.folirel.model.ArticleScope
 import io.github.yuubiz.folirel.model.ReadFilter
 import io.github.yuubiz.folirel.model.SortOrder
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.map
 import java.time.Clock
 
 /**
@@ -32,10 +34,17 @@ object ArticleQuery {
     private const val FROM =
         " FROM articles a JOIN article_states s ON s.articleId = a.id JOIN feeds f ON f.id = a.feedId"
 
-    fun rows(spec: ArticleQuerySpec): SimpleSQLiteQuery {
+    /** Rows in list order; with [after], only the rows that follow it, and with [limit], at most that many. */
+    fun rows(spec: ArticleQuerySpec, after: ArticleRow? = null, limit: Int? = null): SimpleSQLiteQuery {
         val (where, args) = where(spec, onlyUnread = false)
-        val order = if (spec.sort == SortOrder.NEWEST) "a.sortAt DESC, a.id DESC" else "a.sortAt ASC, a.id ASC"
-        return SimpleSQLiteQuery("SELECT $ROW_COLUMNS$FROM WHERE $where ORDER BY $order", args.toTypedArray())
+        val newest = spec.sort == SortOrder.NEWEST
+        val order = if (newest) "a.sortAt DESC, a.id DESC" else "a.sortAt ASC, a.id ASC"
+        val next = if (after == null) "" else " AND (a.sortAt, a.id) " + (if (newest) "<" else ">") + " (?, ?)"
+        val allArgs = if (after == null) args else args + listOf(after.sortAt, after.id)
+        return SimpleSQLiteQuery(
+            "SELECT $ROW_COLUMNS$FROM WHERE $where$next ORDER BY $order" + (limit?.let { " LIMIT $it" } ?: ""),
+            allArgs.toTypedArray(),
+        )
     }
 
     /** Unread ids matching scope/filter/search: the fixed target set of "mark all as read". */
@@ -114,9 +123,25 @@ class ArticleRepository(
 ) {
     private val dao = db.articleDao()
 
-    fun observe(spec: ArticleQuerySpec): Flow<List<ArticleRow>> = dao.observeRows(ArticleQuery.rows(spec))
+    /**
+     * Every row of the list again after each change of a table it reads. The chunks are not one snapshot: a write between two of them
+     * invalidates the tables again, so a complete emission follows.
+     */
+    fun observe(spec: ArticleQuerySpec): Flow<List<ArticleRow>> =
+        db.invalidationTracker.createFlow(*LIST_TABLES).conflate().map { rows(spec) }
 
-    suspend fun rows(spec: ArticleQuerySpec): List<ArticleRow> = dao.rows(ArticleQuery.rows(spec))
+    /**
+     * Read in chunks: one cursor costs more per row the more rows it holds (each further window steps the query again from its first
+     * row), so 30,000 rows in one query cost about three times as much as the same rows in chunks (ArticleListCostProbe).
+     */
+    suspend fun rows(spec: ArticleQuerySpec): List<ArticleRow> {
+        val rows = ArrayList<ArticleRow>()
+        do {
+            val chunk = dao.rows(ArticleQuery.rows(spec, after = rows.lastOrNull(), limit = CHUNK_ROWS))
+            rows += chunk
+        } while (chunk.size == CHUNK_ROWS)
+        return rows
+    }
 
     fun observeUnreadCount(spec: ArticleQuerySpec): Flow<Int> = dao.observeCount(ArticleQuery.unreadCount(spec))
 
@@ -137,4 +162,9 @@ class ArticleRepository(
     suspend fun setRead(articleId: String, read: Boolean): Boolean = dao.setRead(articleId, read, clock.millis()) == 1
 
     suspend fun setSaved(articleId: String, saved: Boolean): Boolean = dao.setSaved(articleId, saved, clock.millis()) == 1
+
+    private companion object {
+        const val CHUNK_ROWS = 1_000
+        val LIST_TABLES = arrayOf("articles", "article_states", "feeds", "feed_categories", "categories")
+    }
 }
