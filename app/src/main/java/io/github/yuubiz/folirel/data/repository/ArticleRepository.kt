@@ -125,7 +125,9 @@ class ArticleRepository(
 
     /**
      * Every row of the list again after each change of a table it reads. The chunks are not one snapshot: a write between two of them
-     * invalidates the tables again, so a complete emission follows.
+     * invalidates the tables again, so a complete emission follows. Each row is read by exactly one chunk query and its key
+     * (sortAt, id) never changes, so a row is in an emission if it matched when its chunk was read: a row no write touched is never
+     * missing from one emission and back in the next, and none is read twice.
      */
     fun observe(spec: ArticleQuerySpec): Flow<List<ArticleRow>> =
         db.invalidationTracker.createFlow(*LIST_TABLES).conflate().map { rows(spec) }
