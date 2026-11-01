@@ -1033,7 +1033,7 @@ private fun ArticleListBody(
                     ) { index, row ->
                         val plan = planOf(index)
                         ArticleItem(
-                            row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"),
+                            row, mode, showImages, imageLoader, now, actions, Modifier.animateItem().testTag("article_${row.id}"),
                             (if (rowHasImage.getOrElse(index) { true }) metricsBySpan else metricsNoImage).getValue(spans.getOrElse(index) { gridSpans }),
                             rowHeight = plan?.let { with(density) { it.heightPx.toDp() } },
                             summaryLines = plan?.summaryLines?.getOrNull(index - starts[index]) ?: MagazineCardStyle.SUMMARY_MAX_LINES,
@@ -1054,7 +1054,7 @@ private fun ArticleListBody(
             ) {
                 items(items, key = { it.id }) { row ->
                     ArticleItem(
-                        row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"),
+                        row, mode, showImages, imageLoader, now, actions, Modifier.animateItem().testTag("article_${row.id}"),
                         CardMetrics(
                             // One lane of the tile columns is one unit of a row of [tileColumns] units.
                             span = 1,
@@ -1079,7 +1079,7 @@ private fun ArticleListBody(
                 verticalArrangement = Arrangement.spacedBy(gap.dp),
             ) {
                 items(bentoBlocks, key = { "block-" + (items.getOrNull(it.first)?.id ?: it.first) }) { block ->
-                    Box(Modifier.fillMaxWidth().height((block.rows * cellH + (block.rows - 1) * gap).dp)) {
+                    Box(Modifier.animateItem().fillMaxWidth().height((block.rows * cellH + (block.rows - 1) * gap).dp)) {
                         for (tile in block.tiles) {
                             val row = items.getOrNull(tile.article) ?: continue
                             val w = tile.shape.colSpan * cellW + (tile.shape.colSpan - 1) * gap
@@ -1098,7 +1098,7 @@ private fun ArticleListBody(
         } else if (listState != null) {
             LazyColumn(state = listState!!, modifier = Modifier.fillMaxSize().testTag("article_list"), contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(items, key = { it.id }, contentType = { mode }) { row ->
-                    ArticleItem(row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"))
+                    ArticleItem(row, mode, showImages, imageLoader, now, actions, Modifier.animateItem().testTag("article_${row.id}"))
                 }
             }
         }

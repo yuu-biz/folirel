@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -143,6 +144,9 @@ internal fun TabOrderList(
         )
     }
 
+    // The row under the finger follows the finger; only the others slide into their new places.
+    fun LazyItemScope.rowMotion(id: String) = if (dragging == id) Modifier else Modifier.animateItem()
+
     LazyColumn(modifier.fillMaxWidth().testTag("tab_order_list"), state = listState) {
         item(key = "intro") {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -154,11 +158,11 @@ internal fun TabOrderList(
             }
         }
         if (pinned.isNotEmpty()) {
-            item(key = "header-pinned") { GroupHeader(stringResource(R.string.tab_order_pinned)) }
-            groupRows(pinned) { id, index -> RowFor(id, index > 0, index < pinned.lastIndex, Modifier) }
+            item(key = "header-pinned") { GroupHeader(stringResource(R.string.tab_order_pinned), Modifier.animateItem()) }
+            groupRows(pinned) { id, index -> RowFor(id, index > 0, index < pinned.lastIndex, rowMotion(id)) }
         }
-        item(key = "header-others") { GroupHeader(stringResource(R.string.tab_order_others)) }
-        groupRows(others) { id, index -> RowFor(id, index > 0, index < others.lastIndex, Modifier) }
+        item(key = "header-others") { GroupHeader(stringResource(R.string.tab_order_others), Modifier.animateItem()) }
+        groupRows(others) { id, index -> RowFor(id, index > 0, index < others.lastIndex, rowMotion(id)) }
     }
 }
 
@@ -174,12 +178,12 @@ private fun androidx.compose.foundation.lazy.LazyListScope.groupRows(
 }
 
 @Composable
-private fun GroupHeader(text: String) {
+private fun GroupHeader(text: String, modifier: Modifier) {
     Text(
         text,
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }
 

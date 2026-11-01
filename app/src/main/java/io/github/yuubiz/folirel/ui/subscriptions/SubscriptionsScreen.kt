@@ -287,18 +287,19 @@ fun SubscriptionsScreen(
                     selecting = selecting, checked = feed.id in selectedIds,
                     onClick = { if (selecting) vm.toggleSelected(feed.id) else onOpenFeed(feed.id) },
                     onLongClick = { if (!selecting) vm.startSelecting(feed.id) },
+                    modifier = Modifier.animateItem(),
                 )
             }
             if (inactive.isNotEmpty() && !selecting) {
-                item {
+                item(key = "header-unsubscribed") {
                     Text(
                         stringResource(R.string.subscriptions_unsubscribed_header),
                         style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        modifier = Modifier.animateItem().padding(horizontal = 16.dp, vertical = 12.dp),
                     )
                 }
                 items(inactive, key = { it.id }) {
-                    FeedRow(it, diagnostics[it.id], structure, now, selecting = false, checked = false, onClick = { onOpenFeed(it.id) }, onLongClick = {})
+                    FeedRow(it, diagnostics[it.id], structure, now, selecting = false, checked = false, onClick = { onOpenFeed(it.id) }, onLongClick = {}, modifier = Modifier.animateItem())
                 }
             }
         }
@@ -445,10 +446,11 @@ private fun FeedRow(
     checked: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     Row(
-        Modifier.fillMaxWidth()
+        modifier.fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .heightIn(min = 56.dp)
             .padding(horizontal = 16.dp, vertical = 8.dp)
