@@ -1,5 +1,11 @@
 package io.github.yuubiz.folirel.ui.subscriptions
 
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarDuration
@@ -80,6 +86,7 @@ import io.github.yuubiz.folirel.model.FeedDiagnostics
 import io.github.yuubiz.folirel.model.FeedNode
 import io.github.yuubiz.folirel.model.FetchError
 import io.github.yuubiz.folirel.model.Structure
+import kotlinx.coroutines.flow.collectLatest
 
 /** Collects one-shot events into a snackbar. */
 @Composable
@@ -102,7 +109,8 @@ fun SubscriptionEvents(vm: SubscriptionsViewModel, snackbar: SnackbarHostState) 
     val resources = LocalResources.current
     val undoLabel = stringResource(R.string.action_undo)
     LaunchedEffect(vm, context) {
-        vm.eventFlow.collect { event ->
+        // Latest only: a new message replaces the one on screen (and its Undo) instead of waiting behind it.
+        vm.eventFlow.collectLatest { event ->
             if (event is SubscriptionEvent.BulkUnsubscribed) {
                 val n = event.ids.size
                 val message = buildString {
@@ -112,11 +120,11 @@ fun SubscriptionEvents(vm: SubscriptionsViewModel, snackbar: SnackbarHostState) 
                 // The undo restores exactly the feeds this action changed.
                 val result = snackbar.showSnackbar(message, actionLabel = if (n > 0) undoLabel else null, duration = SnackbarDuration.Long)
                 if (result == SnackbarResult.ActionPerformed) vm.undoBulkUnsubscribe(event.ids)
-                return@collect
+                return@collectLatest
             }
             if (event is SubscriptionEvent.MoveConflict) {
                 snackbar.showSnackbar(resources.getString(R.string.msg_move_conflict, event.name))
-                return@collect
+                return@collectLatest
             }
             val key = when (event) {
                 is SubscriptionEvent.FeedAdded -> when (event.result) {
@@ -275,7 +283,13 @@ fun SubscriptionsScreen(
             }
             if (structure.loaded && structure.feeds.isEmpty()) {
                 item {
-                    Text(stringResource(R.string.empty_no_subscriptions), modifier = Modifier.padding(16.dp))
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(stringResource(R.string.empty_no_subscriptions))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = onAddFeed, modifier = Modifier.testTag("empty_add_feed")) { Text(stringResource(R.string.action_add_feed)) }
+                            OutlinedButton(onClick = onImport, modifier = Modifier.testTag("empty_import")) { Text(stringResource(R.string.action_import_opml)) }
+                        }
+                    }
                 }
             }
             if (structure.loaded && structure.feeds.isNotEmpty() && active.isEmpty() && activeAll.isNotEmpty()) {
@@ -287,18 +301,19 @@ fun SubscriptionsScreen(
                     selecting = selecting, checked = feed.id in selectedIds,
                     onClick = { if (selecting) vm.toggleSelected(feed.id) else onOpenFeed(feed.id) },
                     onLongClick = { if (!selecting) vm.startSelecting(feed.id) },
+                    modifier = Modifier.animateItem(),
                 )
             }
             if (inactive.isNotEmpty() && !selecting) {
-                item {
+                item(key = "header-unsubscribed") {
                     Text(
                         stringResource(R.string.subscriptions_unsubscribed_header),
                         style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        modifier = Modifier.animateItem().padding(horizontal = 16.dp, vertical = 12.dp),
                     )
                 }
                 items(inactive, key = { it.id }) {
-                    FeedRow(it, diagnostics[it.id], structure, now, selecting = false, checked = false, onClick = { onOpenFeed(it.id) }, onLongClick = {})
+                    FeedRow(it, diagnostics[it.id], structure, now, selecting = false, checked = false, onClick = { onOpenFeed(it.id) }, onLongClick = {}, modifier = Modifier.animateItem())
                 }
             }
         }
@@ -453,10 +468,11 @@ private fun FeedRow(
     checked: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     Row(
-        Modifier.fillMaxWidth()
+        modifier.fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .heightIn(min = 56.dp)
             .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -720,6 +736,9 @@ fun CategoriesScreen(vm: SubscriptionsViewModel, onBack: () -> Unit, initialOrde
 @Composable
 fun AddFeedDialog(onAdd: (String) -> Unit, onDismiss: () -> Unit) {
     var url by rememberSaveable { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    // The field takes the focus (and the keyboard opens) when the dialog opens; Done on the keyboard adds, like the button.
+    LaunchedEffect(Unit) { focus.requestFocus() }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.action_add_feed)) },
@@ -730,7 +749,9 @@ fun AddFeedDialog(onAdd: (String) -> Unit, onDismiss: () -> Unit) {
                     onValueChange = { url = it },
                     label = { Text(stringResource(R.string.add_feed_url_label)) },
                     singleLine = true,
-                    modifier = Modifier.testTag("add_feed_url"),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (url.isNotBlank()) onAdd(url) }),
+                    modifier = Modifier.focusRequester(focus).testTag("add_feed_url"),
                 )
                 Text(stringResource(R.string.add_feed_note), style = MaterialTheme.typography.bodySmall)
             }

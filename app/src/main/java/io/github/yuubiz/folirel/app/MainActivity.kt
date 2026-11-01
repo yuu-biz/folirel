@@ -2,38 +2,58 @@ package io.github.yuubiz.folirel.app
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.SeekableTransitionState
+import androidx.compose.animation.core.rememberTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.yuubiz.folirel.R
+import io.github.yuubiz.folirel.browser.BrowserLauncher
 import io.github.yuubiz.folirel.data.backup.BackupFormat
 import io.github.yuubiz.folirel.data.preferences.AppSettings
 import io.github.yuubiz.folirel.ui.home.FeedIconStore
@@ -60,6 +80,7 @@ import io.github.yuubiz.folirel.ui.subscriptions.SubscriptionsScreen
 import io.github.yuubiz.folirel.ui.subscriptions.SubscriptionsViewModel
 import io.github.yuubiz.folirel.ui.theme.FolirelTheme
 import io.github.yuubiz.folirel.ui.theme.isDarkTheme
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
@@ -86,7 +107,13 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // The splash stays until the first frame with the settings applied, so no blank or wrongly coloured frame comes first.
+        var settingsShown = false
+        installSplashScreen().setKeepOnScreenCondition { !settingsShown }
         super.onCreate(savedInstanceState)
+        // The theme's window background follows the system night mode; a recreated activity (rotation) has no splash, so it gets the
+        // colour of the app's own theme from the last run of this process instead.
+        lastWindowBackground?.let { window.setBackgroundDrawable(ColorDrawable(it)) }
         enableEdgeToEdge()
         val container = container
         // A recreated activity (rotation, process restart) gets its old intent back; that share was handled when it arrived.
@@ -95,9 +122,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings by container.settings.settings.collectAsStateWithLifecycle(initialValue = null as AppSettings?)
             val current = settings ?: return@setContent // render nothing until preferences are loaded
+            SideEffect { settingsShown = true }
             val dark = isDarkTheme(current.theme, isSystemInDarkTheme())
             LaunchedEffect(dark) { applySystemBars(dark) }
             FolirelTheme(current.theme, current.textScale, current.palette, current.customSeed, current.customLight, current.customDark) {
+                val background = MaterialTheme.colorScheme.surface.toArgb()
+                LaunchedEffect(background) {
+                    window.setBackgroundDrawable(ColorDrawable(background))
+                    lastWindowBackground = background
+                }
                 val iconStore = remember { FeedIconStore { feedId -> container.feedIcons.png(feedId) } }
                 val iconVersions = remember { flow { emit(container.subscriptions.ensureLocalAccount()) }.flatMapLatest { container.feedIcons.observeVersions(it) } }
                 ProvideFeedIcons(iconStore, iconVersions, enabled = current.showImages) {
@@ -129,13 +162,29 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings, subscr
     var stack by rememberSaveable { mutableStateOf(listOf(ROUTE_HOME)) }
     var addFeedOpen by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    fun push(route: String) {
-        stack = stack + route
+    // Each screen in the stack keeps its scroll position and inputs while another one is on top; a screen that leaves the stack forgets them.
+    val screens = rememberSaveableStateHolder()
+    fun setStack(next: List<String>) {
+        stack.filterNot { it in next }.forEach(screens::removeState)
+        stack = next
     }
+    fun push(route: String) = setStack(stack + route)
     fun pop() {
-        if (stack.size > 1) stack = stack.dropLast(1)
+        if (stack.size > 1) setStack(stack.dropLast(1))
     }
-    BackHandler(enabled = stack.size > 1) { pop() }
+    // The back gesture drags the transition towards the screen below; letting go completes it, cancelling plays it back.
+    val routeTransition = remember { SeekableTransitionState(stack) }
+    LaunchedEffect(stack) { routeTransition.animateTo(stack) }
+    PredictiveBackHandler(enabled = stack.size > 1) { progress ->
+        val below = stack.dropLast(1)
+        try {
+            progress.collect { routeTransition.seekTo(it.progress, targetState = below) }
+            pop()
+        } catch (e: CancellationException) {
+            scope.launch { routeTransition.animateTo(stack) }
+            throw e
+        }
+    }
 
     val homeVm: HomeViewModel = viewModel(
         factory = viewModelFactory {
@@ -205,6 +254,18 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings, subscr
     // Any type: some providers label a ZIP as octet-stream; the content decides, not the label.
     val pickBackup = { launchDocuments { openBackup.launch(arrayOf("*/*")) } }
     val settingsSaveFailed = stringResource(R.string.settings_save_failed)
+    val context = LocalContext.current
+    val noBrowser = stringResource(R.string.msg_no_browser)
+    val unsafeUrl = stringResource(R.string.msg_unsafe_url)
+    // A link outside the article list (a feed's site, the About page): checked each time it is used and opened like an article.
+    fun openLink(url: String) {
+        when (val check = container.browser.check(url)) {
+            is BrowserLauncher.LinkCheck.Ok -> if (container.browser.open(context, check.url, settings.browserMode) == BrowserLauncher.OpenResult.NO_BROWSER) {
+                scope.launch { rootSnackbar.showSnackbar(noBrowser) }
+            }
+            else -> scope.launch { rootSnackbar.showSnackbar(unsafeUrl) }
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
         if (!settings.onboardingDone) {
@@ -225,65 +286,75 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings, subscr
                     OnboardingNext.SKIP -> Unit
                 }
             }
-        } else {
-            val route = stack.last()
-            when {
-                route == ROUTE_HOME -> HomeScreen(
-                    vm = homeVm,
-                    imageLoader = container.imageLoader,
-                    browser = container.browser,
-                    httpsState = container.httpsUpgrade.state,
-                    nav = HomeNavigation(
-                        importOpml = pickOpml,
-                        addFeed = { addFeedOpen = true },
-                        subscriptions = { push(ROUTE_SUBSCRIPTIONS) },
-                        settings = { push(SettingsPage.TOP_ROUTE) },
-                        organizeTabs = { push(ROUTE_TAB_ORDER) },
-                        feedDetail = { push(ROUTE_FEED_PREFIX + it) },
-                    ),
-                )
-                route == ROUTE_IMPORT -> ImportScreen(
-                    importVm,
-                    onPickAgain = pickOpml,
-                    onClose = { importVm.reset(); pop() },
-                    onHttpsCheck = { start ->
-                        // "Check and change" in the consent dialog is the user's consent for the whole batch.
-                        if (start) subscriptionsVm.startHttpsUpgrade()
-                        push(ROUTE_HTTPS)
-                    },
-                )
-                route == ROUTE_SUBSCRIPTIONS -> SubscriptionsScreen(
-                    vm = subscriptionsVm,
-                    onBack = ::pop,
-                    onOpenFeed = { push(ROUTE_FEED_PREFIX + it) },
-                    onAddFeed = { addFeedOpen = true },
-                    onImport = pickOpml,
-                    onExport = exportOpml,
-                    onCategories = { push(ROUTE_CATEGORIES) },
-                    onHttpsCheck = { push(ROUTE_HTTPS) },
-                )
-                route == ROUTE_HTTPS -> HttpsUpgradeScreen(subscriptionsVm, onBack = ::pop)
-                route == ROUTE_CATEGORIES -> CategoriesScreen(subscriptionsVm, onBack = ::pop)
-                route == ROUTE_TAB_ORDER -> CategoriesScreen(subscriptionsVm, onBack = ::pop, initialOrder = true)
-                route.startsWith(ROUTE_FEED_PREFIX) -> FeedDetailScreen(subscriptionsVm, route.removePrefix(ROUTE_FEED_PREFIX), onBack = ::pop)
-                route == SettingsPage.TOP_ROUTE || SettingsPage.fromRoute(route) != null -> SettingsScreen(
-                    settingsVm,
-                    page = SettingsPage.fromRoute(route),
-                    onOpenPage = { push(it.route) },
-                    onBack = ::pop,
-                    onExport = exportOpml,
-                    onHttpsCheck = { push(ROUTE_HTTPS) },
-                    backup = backupVm,
-                    onCreateBackup = createBackup,
-                    onRestore = pickBackup,
-                )
-                route == ROUTE_RESTORE -> RestoreScreen(
-                    backupVm,
-                    onPickAgain = pickBackup,
-                    onClose = { backupVm.close(); pop() },
-                    // The data changed under every screen: start again from the article list.
-                    onFinished = { backupVm.close(); stack = listOf(ROUTE_HOME) },
-                )
+        } else rememberTransition(routeTransition, label = "route").AnimatedContent(
+            transitionSpec = { routeTransition(forward = targetState.size >= initialState.size) },
+            contentKey = { it.last() },
+        ) { shown ->
+            val route = shown.last()
+            screens.SaveableStateProvider(route) {
+                when {
+                    route == ROUTE_HOME -> HomeScreen(
+                        vm = homeVm,
+                        imageLoader = container.imageLoader,
+                        browser = container.browser,
+                        httpsState = container.httpsUpgrade.state,
+                        nav = HomeNavigation(
+                            importOpml = pickOpml,
+                            addFeed = { addFeedOpen = true },
+                            subscriptions = { push(ROUTE_SUBSCRIPTIONS) },
+                            settings = { push(SettingsPage.TOP_ROUTE) },
+                            organizeTabs = { push(ROUTE_TAB_ORDER) },
+                            feedDetail = { push(ROUTE_FEED_PREFIX + it) },
+                        ),
+                    )
+                    route == ROUTE_IMPORT -> ImportScreen(
+                        importVm,
+                        onPickAgain = pickOpml,
+                        onClose = { importVm.reset(); pop() },
+                        onHttpsCheck = { start ->
+                            // "Check and change" in the consent dialog is the user's consent for the whole batch.
+                            if (start) subscriptionsVm.startHttpsUpgrade()
+                            push(ROUTE_HTTPS)
+                        },
+                    )
+                    route == ROUTE_SUBSCRIPTIONS -> SubscriptionsScreen(
+                        vm = subscriptionsVm,
+                        onBack = ::pop,
+                        onOpenFeed = { push(ROUTE_FEED_PREFIX + it) },
+                        onAddFeed = { addFeedOpen = true },
+                        onImport = pickOpml,
+                        onExport = exportOpml,
+                        onCategories = { push(ROUTE_CATEGORIES) },
+                        onHttpsCheck = { push(ROUTE_HTTPS) },
+                    )
+                    route == ROUTE_HTTPS -> HttpsUpgradeScreen(subscriptionsVm, onBack = ::pop)
+                    route == ROUTE_CATEGORIES -> CategoriesScreen(subscriptionsVm, onBack = ::pop)
+                    route == ROUTE_TAB_ORDER -> CategoriesScreen(subscriptionsVm, onBack = ::pop, initialOrder = true)
+                    route.startsWith(ROUTE_FEED_PREFIX) -> FeedDetailScreen(subscriptionsVm, route.removePrefix(ROUTE_FEED_PREFIX), onBack = ::pop, onOpenLink = ::openLink)
+                    route == SettingsPage.TOP_ROUTE || SettingsPage.fromRoute(route) != null -> SettingsScreen(
+                        settingsVm,
+                        page = SettingsPage.fromRoute(route),
+                        onOpenPage = { push(it.route) },
+                        onBack = ::pop,
+                        onExport = exportOpml,
+                        onHttpsCheck = { push(ROUTE_HTTPS) },
+                        backup = backupVm,
+                        onCreateBackup = createBackup,
+                        onRestore = pickBackup,
+                        onOpenLink = ::openLink,
+                    )
+                    route == ROUTE_RESTORE -> RestoreScreen(
+                        backupVm,
+                        onPickAgain = pickBackup,
+                        onClose = { backupVm.close(); pop() },
+                        // The data changed under every screen: start again from the article list.
+                        onFinished = {
+                            backupVm.close()
+                            setStack(listOf(ROUTE_HOME))
+                            screens.removeState(ROUTE_HOME)
+                        },
+                    )
+                }
             }
         }
         SnackbarHost(rootSnackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
@@ -301,6 +372,25 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings, subscr
     }
 }
 
+/**
+ * Forward: the new screen comes in from the end over the old one. Back: the screen on top leaves towards the end and uncovers the one
+ * below, which is also what the back gesture previews.
+ */
+private fun AnimatedContentTransitionScope<List<String>>.routeTransition(forward: Boolean): ContentTransform {
+    val slide = tween<IntOffset>(ROUTE_MILLIS, easing = FastOutSlowInEasing)
+    val fade = tween<Float>(ROUTE_MILLIS)
+    return if (forward) {
+        slideIntoContainer(SlideDirection.Start, slide) { it / 5 } + fadeIn(fade) togetherWith fadeOut(fade)
+    } else {
+        (fadeIn(fade) togetherWith slideOutOfContainer(SlideDirection.End, slide) { it / 5 } + fadeOut(fade)).apply { targetContentZIndex = -1f }
+    }
+}
+
+/** The window colour of the app's theme, for an activity recreated in the same process (see [MainActivity.onCreate]). */
+@Volatile
+private var lastWindowBackground: Int? = null
+
+private const val ROUTE_MILLIS = 300
 private const val ROUTE_HOME = "home"
 private const val ROUTE_IMPORT = "import"
 private const val ROUTE_SUBSCRIPTIONS = "subscriptions"

@@ -144,10 +144,8 @@
     <string name="msg_feed_invalid">Enter a feed URL that starts with https:// or http://.</string>
     <string name="msg_feed_resubscribed">Subscribed again.</string>
     <string name="msg_marked_read">Marked as read.</string>
-    <string name="msg_marked_unread">Marked as unread.</string>
     <string name="msg_no_browser">No app can open this link.</string>
     <string name="msg_no_url">This article has no link. Long-press it to see the summary.</string>
-    <string name="msg_saved">Saved.</string>
     <string name="msg_unsafe_url">This link cannot be opened for safety reasons.</string>
     <string name="msg_unsaved">Removed from saved.</string>
     <string name="msg_update_failed">Could not save the change.</string>
@@ -730,4 +728,12 @@
     <string name="restore_failed">The backup could not be restored. Your data and settings were not changed.</string>
     <string name="restore_failed_settings">The backup could not be restored. Your data was not changed, and your previous settings come back the next time Folirel starts.</string>
     <string name="limit_json_depth">JSON depth</string>
+    <string name="empty_action_clear_filters">Turn off filters</string>
+    <string name="empty_action_show_all">Show all articles</string>
+    <string name="feed_open_site">Open site</string>
+    <string name="feed_details_section">Details</string>
+    <string name="settings_version_short">Version %1$s (%2$d)</string>
+    <string name="about_source_code">Source code</string>
+    <string name="about_privacy">Privacy policy</string>
+    <string name="about_licenses">Licenses</string>
 </resources>

@@ -7,10 +7,10 @@ import java.io.File
 
 /**
  * T29 (static guard): the only code that can set `isRead` is the explicit manual path.
- * - SQL writes to isRead exist only in ArticleDao (setRead / markReadByIds)
- * - those DAO methods are called only from ArticleRepository.setRead / markRead
- * - repository read-state calls come only from HomeViewModel.setRead / confirmMarkAllRead, which are wired
- *   to the explicit menu, accessibility action and mark-all confirmation.
+ * - SQL writes to isRead exist only in ArticleDao (setRead / markReadByIds / markUnreadByIds)
+ * - those DAO methods are called only from ArticleRepository.setRead / markRead / markUnread
+ * - repository read-state calls come only from HomeViewModel.setRead / confirmMarkAllRead / undo, which are wired
+ *   to the explicit menu, accessibility action, mark-all confirmation and the snackbar Undo.
  * Opening, scrolling, refreshing and time passing have no code path to these functions.
  */
 class NoAutomaticReadTest {
@@ -27,20 +27,20 @@ class NoAutomaticReadTest {
         val sqlWriters = files.filter { (_, text) -> Regex("SET\\s+isRead", RegexOption.IGNORE_CASE).containsMatchIn(text) }.keys
         assertEquals(setOf("io/github/yuubiz/folirel/data/db/ArticleDao.kt"), sqlWriters)
 
-        val daoCallers = files.filter { (_, text) -> Regex("dao\\.(setRead|markReadByIds)\\(").containsMatchIn(text) }.keys
+        val daoCallers = files.filter { (_, text) -> Regex("dao\\.(setRead|markReadByIds|markUnreadByIds)\\(").containsMatchIn(text) }.keys
         assertEquals(setOf("io/github/yuubiz/folirel/data/repository/ArticleRepository.kt"), daoCallers)
 
-        val repoCallers = files.filter { (_, text) -> Regex("articles\\.(setRead|markRead)\\(").containsMatchIn(text) }.keys
+        val repoCallers = files.filter { (_, text) -> Regex("articles\\.(setRead|markRead|markUnread)\\(").containsMatchIn(text) }.keys
         assertEquals(setOf("io/github/yuubiz/folirel/ui/home/HomeViewModel.kt"), repoCallers)
 
-        // Inside HomeViewModel, only the two explicit entry points touch read state.
+        // Inside HomeViewModel, only the explicit entry points touch read state (the menu, mark all, and the Undo of either).
         val vm = files.getValue("io/github/yuubiz/folirel/ui/home/HomeViewModel.kt")
         val functionsCalling = Regex("fun (\\w+)\\([^)]*\\)[^{]*\\{").findAll(vm).map { it.groupValues[1] to it.range.first }.toList()
-        val callSites = Regex("articles\\.(setRead|markRead)\\(").findAll(vm).map { m -> functionsCalling.last { it.second < m.range.first }.first }.toSet()
-        assertEquals(setOf("setRead", "confirmMarkAllRead"), callSites)
+        val callSites = Regex("articles\\.(setRead|markRead|markUnread)\\(").findAll(vm).map { m -> functionsCalling.last { it.second < m.range.first }.first }.toSet()
+        assertEquals(setOf("setRead", "confirmMarkAllRead", "undo"), callSites)
 
         // UI callers of the view-model entry points: the home screen's explicit actions only.
-        val uiCallers = files.filter { (_, text) -> Regex("vm\\.(setRead|confirmMarkAllRead)\\(").containsMatchIn(text) }.keys
+        val uiCallers = files.filter { (_, text) -> Regex("vm\\.(setRead|confirmMarkAllRead|undo)\\(").containsMatchIn(text) }.keys
         assertEquals(setOf("io/github/yuubiz/folirel/ui/home/HomeScreen.kt"), uiCallers)
 
         // The browser launcher has no data access at all.

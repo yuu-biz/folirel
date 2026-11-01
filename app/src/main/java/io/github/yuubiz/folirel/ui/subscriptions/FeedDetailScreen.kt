@@ -2,6 +2,7 @@ package io.github.yuubiz.folirel.ui.subscriptions
 
 import android.text.format.Formatter
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -40,7 +41,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -52,12 +57,13 @@ import io.github.yuubiz.folirel.model.FeedFetchInfo
 import io.github.yuubiz.folirel.model.FeedNode
 
 /**
- * Feed detail: URLs, what happened on the last request / HTTP attempt / applied body, what is stored, and the
- * actions "refresh this feed" and "revalidate and refetch". Nothing here is sent anywhere.
+ * Feed detail: name, categories, pause, the site and unsubscribe first; under Details the URLs, what happened on the last request /
+ * HTTP attempt / applied body, what is stored, "refresh this feed", "revalidate and refetch" and address discovery. Nothing here is
+ * sent anywhere.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun FeedDetailScreen(vm: SubscriptionsViewModel, feedId: String, onBack: () -> Unit) {
+fun FeedDetailScreen(vm: SubscriptionsViewModel, feedId: String, onBack: () -> Unit, onOpenLink: (String) -> Unit) {
     val structure by vm.structure.collectAsStateWithLifecycle()
     val feed = structure.feeds[feedId]
     val infoFlow = remember(feedId) { vm.feedInfo(feedId) }
@@ -68,6 +74,7 @@ fun FeedDetailScreen(vm: SubscriptionsViewModel, feedId: String, onBack: () -> U
     val running = refresh.requests.any { it.running && it.scope == RefreshScope.Feeds(listOf(feedId)) }
     var renaming by rememberSaveable { mutableStateOf(false) }
     var confirmUnsubscribe by remember { mutableStateOf(false) }
+    var detailsOpen by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -80,50 +87,42 @@ fun FeedDetailScreen(vm: SubscriptionsViewModel, feedId: String, onBack: () -> U
         },
     ) { padding ->
         if (feed == null) return@Scaffold
+        // What a reader changes comes first; addresses, refetching, diagnostics and address discovery are under Details.
         LazyColumn(Modifier.padding(padding).fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { LabeledValue(stringResource(R.string.feed_url), feed.url) }
-            info?.fetchUrl?.takeIf { it != feed.url }?.let { item { LabeledValue(stringResource(R.string.feed_fetch_url), it) } }
-            info?.httpsFromUrl?.let { item { LabeledValue(stringResource(R.string.feed_https_migrated), it) } }
-            info?.siteUrl?.let { item { LabeledValue(stringResource(R.string.feed_site_url), it) } }
             item {
-                val enabled = feed.subscribed && !feed.paused
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (running) LinearProgressIndicator(Modifier.fillMaxWidth())
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { vm.refreshFeed(feedId) }, enabled = enabled && !running, modifier = Modifier.testTag("refresh_feed")) {
-                            Text(stringResource(R.string.action_refresh_this_feed))
-                        }
-                        OutlinedButton(onClick = { vm.refreshFeed(feedId, force = true) }, enabled = enabled, modifier = Modifier.testTag("refetch_feed")) {
-                            Text(stringResource(R.string.action_refetch_revalidate))
-                        }
-                    }
-                    Text(stringResource(R.string.refetch_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (!feed.subscribed || feed.paused) {
-                        Text(stringResource(R.string.feed_inactive_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text(feed.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f).padding(end = 8.dp))
+                    OutlinedButton(onClick = { renaming = true }) { Text(stringResource(R.string.feed_rename)) }
                 }
             }
-            item { DiagnosticsSection(feed, info, diag) }
-            if (feed.subscribed) item { DiscoverySection(vm, feedId, feed.fetchUrl, info) }
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                    Text(stringResource(R.string.feed_pause), modifier = Modifier.weight(1f))
-                    Switch(checked = feed.paused, onCheckedChange = { vm.setPaused(feedId, it) }, enabled = feed.subscribed)
-                }
-            }
-            item { OutlinedButton(onClick = { renaming = true }) { Text(stringResource(R.string.feed_rename)) } }
             item { Text(stringResource(R.string.feed_categories), style = MaterialTheme.typography.titleSmall) }
             if (structure.categories.isEmpty()) item { Text(stringResource(R.string.feed_no_categories), style = MaterialTheme.typography.bodySmall) }
             items(structure.categories, key = { it.id }) { category ->
                 val checked = category.id in feed.categoryIds
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable {
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(value = checked, role = Role.Checkbox) {
                         vm.setCategories(feedId, if (checked) feed.categoryIds - category.id else feed.categoryIds + category.id)
                     },
                 ) {
                     Checkbox(checked = checked, onCheckedChange = null)
                     Text(category.display, modifier = Modifier.padding(start = 8.dp))
+                }
+            }
+            item {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                        .toggleable(value = feed.paused, enabled = feed.subscribed, role = Role.Switch) { vm.setPaused(feedId, it) },
+                ) {
+                    Text(stringResource(R.string.feed_pause), modifier = Modifier.weight(1f))
+                    Switch(checked = feed.paused, onCheckedChange = null, enabled = feed.subscribed)
+                }
+            }
+            // Only an https site opens from here: an http one would need the article list's "open over http?" question.
+            info?.siteUrl?.takeIf { it.startsWith("https://") }?.let { site ->
+                item {
+                    OutlinedButton(onClick = { onOpenLink(site) }, modifier = Modifier.testTag("open_site")) { Text(stringResource(R.string.feed_open_site)) }
                 }
             }
             item {
@@ -135,7 +134,42 @@ fun FeedDetailScreen(vm: SubscriptionsViewModel, feedId: String, onBack: () -> U
                 } else {
                     TextButton(onClick = { vm.resubscribe(feedId) }) { Text(stringResource(R.string.feed_resubscribe)) }
                 }
-                Text(stringResource(R.string.feed_url_change_note), style = MaterialTheme.typography.bodySmall)
+                if (!feed.subscribed || feed.paused) {
+                    Text(stringResource(R.string.feed_inactive_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+            }
+            item {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { detailsOpen = !detailsOpen }.semantics { heading() }.testTag("feed_details_toggle"),
+                ) {
+                    Text(stringResource(R.string.feed_details_section), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                    Icon(painterResource(if (detailsOpen) R.drawable.ic_expand_less else R.drawable.ic_expand_more), contentDescription = null)
+                }
+            }
+            if (detailsOpen) {
+                item { LabeledValue(stringResource(R.string.feed_url), feed.url) }
+                info?.fetchUrl?.takeIf { it != feed.url }?.let { item { LabeledValue(stringResource(R.string.feed_fetch_url), it) } }
+                info?.httpsFromUrl?.let { item { LabeledValue(stringResource(R.string.feed_https_migrated), it) } }
+                info?.siteUrl?.let { item { LabeledValue(stringResource(R.string.feed_site_url), it) } }
+                item {
+                    val enabled = feed.subscribed && !feed.paused
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        if (running) LinearProgressIndicator(Modifier.fillMaxWidth())
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { vm.refreshFeed(feedId) }, enabled = enabled && !running, modifier = Modifier.testTag("refresh_feed")) {
+                                Text(stringResource(R.string.action_refresh_this_feed))
+                            }
+                            OutlinedButton(onClick = { vm.refreshFeed(feedId, force = true) }, enabled = enabled, modifier = Modifier.testTag("refetch_feed")) {
+                                Text(stringResource(R.string.action_refetch_revalidate))
+                            }
+                        }
+                        Text(stringResource(R.string.refetch_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                item { DiagnosticsSection(feed, info, diag) }
+                if (feed.subscribed) item { DiscoverySection(vm, feedId, feed.fetchUrl, info) }
+                item { Text(stringResource(R.string.feed_url_change_note), style = MaterialTheme.typography.bodySmall) }
             }
         }
     }
@@ -272,6 +306,7 @@ private fun detailLabel(detail: String): String = when (detail) {
     "ENTRY_COUNT" -> stringResource(R.string.limit_entry_count)
     "XML_DEPTH" -> stringResource(R.string.limit_xml_depth)
     "XML_ELEMENTS" -> stringResource(R.string.limit_xml_elements)
+    "JSON_DEPTH" -> stringResource(R.string.limit_json_depth)
     "DOCTYPE_RSS091" -> stringResource(R.string.detail_doctype_rss091)
     else -> detail
 }

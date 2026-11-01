@@ -162,7 +162,11 @@ class SubscriptionsViewModel(
         if (feedId != null) refreshSafely(RefreshScope.Feeds(listOf(feedId)))
     }
 
-    fun unsubscribe(feedId: String) = guarded { subscriptions.unsubscribe(feedId) }
+    /** One feed, from its detail screen: reported like a bulk unsubscribe of that feed, so the same Undo subscribes it again. */
+    fun unsubscribe(feedId: String) = viewModelScope.launch {
+        val changed = runCatching { subscriptions.unsubscribeAll(listOf(feedId)) }.getOrNull()
+        events.send(if (changed == null) SubscriptionEvent.OperationFailed else SubscriptionEvent.BulkUnsubscribed(changed, skippedRecovered = 0))
+    }
 
     fun resubscribe(feedId: String) = guarded {
         subscriptions.resubscribe(feedId)

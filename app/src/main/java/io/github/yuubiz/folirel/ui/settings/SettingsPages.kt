@@ -4,6 +4,7 @@ import android.text.format.Formatter
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -43,6 +44,7 @@ import io.github.yuubiz.folirel.ui.common.BrandLogo
 import io.github.yuubiz.folirel.ui.common.Choice
 import io.github.yuubiz.folirel.ui.common.GroupHeader
 import io.github.yuubiz.folirel.ui.common.LayoutPicker
+import io.github.yuubiz.folirel.ui.common.NavRow
 import io.github.yuubiz.folirel.ui.common.SelectionRow
 import io.github.yuubiz.folirel.ui.common.SettingNote
 import io.github.yuubiz.folirel.ui.common.SwitchRow
@@ -384,12 +386,26 @@ internal fun StoragePage(
 }
 
 @Composable
-internal fun AboutPage() {
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-        // Fixed brand picture (never tinted or taken from the colour set); small, so the version below stays in view at large text.
-        BrandLogo(Modifier.testTag("about_logo").padding(bottom = 12.dp))
-        Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE, BuildConfig.GIT_COMMIT), modifier = Modifier.testTag("about_version"))
-        Text(stringResource(R.string.settings_local_note), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
-        Text(stringResource(R.string.settings_licenses), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+internal fun AboutPage(onOpenLink: (String) -> Unit) {
+    Column {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            // Fixed brand picture (never tinted or taken from the colour set); small, so the version below stays in view at large text.
+            BrandLogo(Modifier.testTag("about_logo").padding(bottom = 12.dp))
+            Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE, BuildConfig.GIT_COMMIT), modifier = Modifier.testTag("about_version"))
+            Text(stringResource(R.string.settings_local_note), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+        }
+        HorizontalDivider()
+        NavRow(stringResource(R.string.about_source_code), SOURCE_URL.removePrefix("https://"), { onOpenLink(SOURCE_URL) }, Modifier.testTag("about_source"))
+        HorizontalDivider()
+        NavRow(stringResource(R.string.about_privacy), PRIVACY_URL.removePrefix("https://"), { onOpenLink(PRIVACY_URL) }, Modifier.testTag("about_privacy"))
+        HorizontalDivider()
+        // A licence screen with the full texts comes later; until then the list of what is included.
+        Column(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 8.dp).testTag("about_licenses")) {
+            Text(stringResource(R.string.about_licenses), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.settings_licenses), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
+
+private const val SOURCE_URL = "https://github.com/yuu-biz/folirel"
+private const val PRIVACY_URL = "https://github.com/yuu-biz/folirel/blob/main/docs/privacy.md"

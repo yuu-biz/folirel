@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -34,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -81,6 +84,7 @@ internal fun TabOrderList(
     var dragOffset by remember { mutableFloatStateOf(0f) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
 
     fun groupOf(id: String) = if (id in pinned) pinned else others
 
@@ -135,13 +139,23 @@ internal fun TabOrderList(
             onPin = { vm.setCategoryPinned(id, !isPinned) },
             onMove = { delta -> vm.moveCategory(id, delta) },
             onDisplaySettings = { onDisplaySettings(id) },
-            onDragStart = { dragging = id; dragOffset = 0f },
+            onDragStart = {
+                haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+                dragging = id
+                dragOffset = 0f
+            },
             onDrag = { dy -> dragOffset += dy; swapIfPassed(id) },
-            onDragEnd = { finishDrag(id, save = true) },
+            onDragEnd = {
+                haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
+                finishDrag(id, save = true)
+            },
             onDragCancel = { finishDrag(id, save = false) },
             modifier = modifier.graphicsLayer { translationY = if (dragging == id) dragOffset else 0f }.zIndex(if (dragging == id) 1f else 0f),
         )
     }
+
+    // The row under the finger follows the finger; only the others slide into their new places.
+    fun LazyItemScope.rowMotion(id: String) = if (dragging == id) Modifier else Modifier.animateItem()
 
     LazyColumn(modifier.fillMaxWidth().testTag("tab_order_list"), state = listState) {
         item(key = "intro") {
@@ -154,11 +168,11 @@ internal fun TabOrderList(
             }
         }
         if (pinned.isNotEmpty()) {
-            item(key = "header-pinned") { GroupHeader(stringResource(R.string.tab_order_pinned)) }
-            groupRows(pinned) { id, index -> RowFor(id, index > 0, index < pinned.lastIndex, Modifier) }
+            item(key = "header-pinned") { GroupHeader(stringResource(R.string.tab_order_pinned), Modifier.animateItem()) }
+            groupRows(pinned) { id, index -> RowFor(id, index > 0, index < pinned.lastIndex, rowMotion(id)) }
         }
-        item(key = "header-others") { GroupHeader(stringResource(R.string.tab_order_others)) }
-        groupRows(others) { id, index -> RowFor(id, index > 0, index < others.lastIndex, Modifier) }
+        item(key = "header-others") { GroupHeader(stringResource(R.string.tab_order_others), Modifier.animateItem()) }
+        groupRows(others) { id, index -> RowFor(id, index > 0, index < others.lastIndex, rowMotion(id)) }
     }
 }
 
@@ -174,12 +188,12 @@ private fun androidx.compose.foundation.lazy.LazyListScope.groupRows(
 }
 
 @Composable
-private fun GroupHeader(text: String) {
+private fun GroupHeader(text: String, modifier: Modifier) {
     Text(
         text,
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }
 

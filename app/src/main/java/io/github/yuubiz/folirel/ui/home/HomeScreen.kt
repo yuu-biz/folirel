@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -71,7 +72,6 @@ import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -107,10 +107,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -153,6 +157,7 @@ import io.github.yuubiz.folirel.model.CardLayoutStyle
 import io.github.yuubiz.folirel.model.CategoryDisplay
 import io.github.yuubiz.folirel.model.ResolvedLayout
 import io.github.yuubiz.folirel.ui.common.LayoutPicker
+import io.github.yuubiz.folirel.ui.common.rememberLatestSnackbar
 import io.github.yuubiz.folirel.ui.common.SectionTitle
 import io.github.yuubiz.folirel.model.FetchError
 import io.github.yuubiz.folirel.model.ListMode
@@ -203,6 +208,7 @@ fun HomeScreen(
     val checkingHttps = https.running
 
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     // One pager state for the tabs and the pages: the tabs follow the finger instead of waiting for the page to settle.
@@ -212,7 +218,7 @@ fun HomeScreen(
     }
     // Bumped to send the list on screen back to its top (tapping the selected tab); lists compare it with the value they started with.
     var scrollToTopTick by remember { mutableIntStateOf(0) }
-    val snackbar = remember { SnackbarHostState() }
+    val snackbar = rememberLatestSnackbar()
 
     var markAllRequest by remember { mutableStateOf<MarkAllReadRequest?>(null) }
     var meteredConfirm by remember { mutableStateOf(false) }
@@ -232,23 +238,26 @@ fun HomeScreen(
     BackHandler(enabled = selection.scope is ArticleScope.Feed && returnScope != null) { vm.leaveFeed() }
     LaunchedEffect(vm) {
         vm.eventFlow.collect { event ->
-            val text = when (event) {
-                is HomeEvent.BulkMarked -> messages.bulkMarked(event.count)
-                is HomeEvent.Message -> messages.of(event.kind)
+            when (event) {
+                HomeEvent.UpdateFailed -> snackbar.show(messages.updateFailed)
+                is HomeEvent.AllMarkedRead -> if (event.ids.isEmpty()) snackbar.show(messages.bulkMarked(0)) else {
+                    snackbar.show(messages.bulkMarked(event.ids.size), messages.undo) { vm.undo(event) }
+                }
+                is HomeEvent.LeftUnread -> snackbar.show(messages.markedRead, messages.undo) { vm.undo(event) }
+                is HomeEvent.LeftSaved -> snackbar.show(messages.unsaved, messages.undo) { vm.undo(event) }
             }
-            snackbar.showSnackbar(text)
         }
     }
 
     fun openUrl(row: ArticleRow, mode: BrowserMode) {
         when (val check = browser.check(row.linkUrl)) {
-            BrowserLauncher.LinkCheck.Missing -> scope.launch { snackbar.showSnackbar(messages.noUrl) }
-            BrowserLauncher.LinkCheck.Unsafe -> scope.launch { snackbar.showSnackbar(messages.unsafeUrl) }
+            BrowserLauncher.LinkCheck.Missing -> snackbar.show(messages.noUrl)
+            BrowserLauncher.LinkCheck.Unsafe -> snackbar.show(messages.unsafeUrl)
             is BrowserLauncher.LinkCheck.Ok -> if (!check.isHttps && settings.confirmHttpOpen) {
                 httpConfirmUrl = check.url
                 httpConfirmMode = mode
             } else if (browser.open(context, check.url, mode) == BrowserLauncher.OpenResult.NO_BROWSER) {
-                scope.launch { snackbar.showSnackbar(messages.noBrowser) }
+                snackbar.show(messages.noBrowser)
             }
         }
     }
@@ -256,7 +265,10 @@ fun HomeScreen(
     val actions = ArticleActions(
         open = { openUrl(it, settings.browserMode) },
         openExternal = { openUrl(it, BrowserMode.EXTERNAL) },
-        toggleSaved = { vm.toggleSaved(it) },
+        toggleSaved = {
+            haptics.performHapticFeedback(if (it.isSaved) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn)
+            vm.toggleSaved(it)
+        },
         setRead = { row, read -> vm.setRead(row, read) },
         share = { row -> context.startActivity(browser.shareIntent(row.title, row.linkUrl)) },
         showSummary = { summaryFor = it },
@@ -323,7 +335,7 @@ fun HomeScreen(
         val narrow = maxWidth < NARROW_BAR_DP.dp
         val bigText = LocalDensity.current.fontScale > 1.3f
         Scaffold(
-            snackbarHost = { SnackbarHost(snackbar) },
+            snackbarHost = { SnackbarHost(snackbar.host) },
             topBar = {
                 TopAppBar(
                     colors = appBarColors(),
@@ -453,8 +465,10 @@ fun HomeScreen(
                     // The strip is the bar's colour in a colour set; Classic keeps drawing it on the plain background.
                     if (LocalTintedBars.current) Surface(color = barContainerColor(), contentColor = barContentColor()) { tabs() } else tabs()
                 }
+                // The pull only starts the refresh: its indicator goes back at once and the progress bar under the toolbar is the
+                // one display of the running refresh. A pull while it runs joins it.
                 PullToRefreshBox(
-                    isRefreshing = refresh.runningFor(target) != null,
+                    isRefreshing = false,
                     onRefresh = { requestRefresh() },
                     modifier = Modifier.fillMaxSize(),
                 ) {
@@ -600,7 +614,7 @@ fun HomeScreen(
                 httpConfirmUrl = null
                 if (dontAskAgain) vm.stopAskingBeforeHttpOpen()
                 if (browser.open(context, url, httpConfirmMode) == BrowserLauncher.OpenResult.NO_BROWSER) {
-                    scope.launch { snackbar.showSnackbar(messages.noBrowser) }
+                    snackbar.show(messages.noBrowser)
                 }
             },
             onDismiss = { httpConfirmUrl = null },
@@ -758,7 +772,7 @@ private fun ScopePage(
     Box(Modifier.fillMaxSize().testTag("page_${pageScope.encode()}")) {
         when {
             !list.loaded -> Unit
-            list.items.isEmpty() -> EmptyList(selection, settings.activeHiddenKeywords.isNotEmpty(), refreshing, offline, onRefresh)
+            list.items.isEmpty() -> EmptyList(EmptyReason.of(selection, settings.activeHiddenKeywords.isNotEmpty(), refreshing, offline), selection.search, vm::leaveEmpty, onRefresh)
             else -> ArticleList(
                 host = vm,
                 state = list,
@@ -1033,7 +1047,7 @@ private fun ArticleListBody(
                     ) { index, row ->
                         val plan = planOf(index)
                         ArticleItem(
-                            row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"),
+                            row, mode, showImages, imageLoader, now, actions, Modifier.animateItem().testTag("article_${row.id}"),
                             (if (rowHasImage.getOrElse(index) { true }) metricsBySpan else metricsNoImage).getValue(spans.getOrElse(index) { gridSpans }),
                             rowHeight = plan?.let { with(density) { it.heightPx.toDp() } },
                             summaryLines = plan?.summaryLines?.getOrNull(index - starts[index]) ?: MagazineCardStyle.SUMMARY_MAX_LINES,
@@ -1054,7 +1068,7 @@ private fun ArticleListBody(
             ) {
                 items(items, key = { it.id }) { row ->
                     ArticleItem(
-                        row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"),
+                        row, mode, showImages, imageLoader, now, actions, Modifier.animateItem().testTag("article_${row.id}"),
                         CardMetrics(
                             // One lane of the tile columns is one unit of a row of [tileColumns] units.
                             span = 1,
@@ -1079,7 +1093,7 @@ private fun ArticleListBody(
                 verticalArrangement = Arrangement.spacedBy(gap.dp),
             ) {
                 items(bentoBlocks, key = { "block-" + (items.getOrNull(it.first)?.id ?: it.first) }) { block ->
-                    Box(Modifier.fillMaxWidth().height((block.rows * cellH + (block.rows - 1) * gap).dp)) {
+                    Box(Modifier.animateItem().fillMaxWidth().height((block.rows * cellH + (block.rows - 1) * gap).dp)) {
                         for (tile in block.tiles) {
                             val row = items.getOrNull(tile.article) ?: continue
                             val w = tile.shape.colSpan * cellW + (tile.shape.colSpan - 1) * gap
@@ -1098,7 +1112,7 @@ private fun ArticleListBody(
         } else if (listState != null) {
             LazyColumn(state = listState!!, modifier = Modifier.fillMaxSize().testTag("article_list"), contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(items, key = { it.id }, contentType = { mode }) { row ->
-                    ArticleItem(row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"))
+                    ArticleItem(row, mode, showImages, imageLoader, now, actions, Modifier.animateItem().testTag("article_${row.id}"))
                 }
             }
         }
@@ -1151,7 +1165,7 @@ private fun NewArticlesBanner(count: Int, toTop: Boolean, onClick: () -> Unit, o
             ) {
                 Text(pluralStringResource(if (toTop) R.plurals.new_articles_banner_top else R.plurals.new_articles_banner_position, count, count))
             }
-            IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp).testTag("new_articles_dismiss")) {
+            IconButton(onClick = onDismiss, modifier = Modifier.testTag("new_articles_dismiss")) {
                 Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.new_articles_dismiss), modifier = Modifier.size(18.dp))
             }
         }
@@ -1195,31 +1209,48 @@ private fun NoSubscriptions(onImport: () -> Unit, onAdd: () -> Unit) {
 }
 
 @Composable
-private fun EmptyList(selection: Selection, hiddenActive: Boolean, refreshing: Boolean, offline: Boolean, onRefresh: () -> Unit) {
-    val message = when {
-        selection.search.isNotEmpty() -> stringResource(R.string.empty_search, selection.search)
+private fun EmptyList(reason: EmptyReason, search: String, onExit: (EmptyExit) -> Unit, onRefresh: () -> Unit) {
+    val message = when (reason) {
+        EmptyReason.SEARCH -> stringResource(R.string.empty_search, search)
         // A period or hidden keywords can be what empties the list: say so instead of "no articles".
-        selection.period != PeriodFilter.ALL || hiddenActive -> stringResource(R.string.empty_filtered)
-        selection.filter == ReadFilter.UNREAD -> stringResource(R.string.empty_unread)
-        selection.filter == ReadFilter.SAVED -> stringResource(R.string.empty_saved)
-        refreshing -> stringResource(R.string.empty_fetching)
-        offline -> stringResource(R.string.empty_offline)
-        else -> stringResource(R.string.empty_articles)
+        EmptyReason.FILTERED -> stringResource(R.string.empty_filtered)
+        EmptyReason.UNREAD -> stringResource(R.string.empty_unread)
+        EmptyReason.SAVED -> stringResource(R.string.empty_saved)
+        EmptyReason.FETCHING -> stringResource(R.string.empty_fetching)
+        EmptyReason.OFFLINE -> stringResource(R.string.empty_offline)
+        EmptyReason.NOTHING -> stringResource(R.string.empty_articles)
     }
-    CenteredMessage(message) {
+    val icon = when (reason) {
+        EmptyReason.SEARCH -> rememberVectorPainter(Icons.Filled.Search)
+        EmptyReason.FILTERED -> painterResource(R.drawable.ic_tune)
+        EmptyReason.UNREAD -> rememberVectorPainter(Icons.Filled.Check)
+        EmptyReason.SAVED -> painterResource(R.drawable.ic_bookmark_border)
+        EmptyReason.FETCHING, EmptyReason.NOTHING -> rememberVectorPainter(Icons.Filled.Refresh)
+        EmptyReason.OFFLINE -> painterResource(R.drawable.ic_cloud_off)
+    }
+    CenteredMessage(message, icon) {
+        reason.exit?.let { exit ->
+            val label = when (exit) {
+                EmptyExit.CLEAR_SEARCH -> R.string.action_clear_search
+                EmptyExit.CLEAR_FILTERS -> R.string.empty_action_clear_filters
+                EmptyExit.SHOW_ALL -> R.string.empty_action_show_all
+            }
+            Button(onClick = { onExit(exit) }, modifier = Modifier.testTag("empty_exit")) { Text(stringResource(label)) }
+        }
         // A refresh covers the scope's feeds; filter and search never narrow it, so it is offered on every empty list.
-        if (!refreshing) OutlinedButton(onClick = onRefresh, modifier = Modifier.testTag("empty_refresh")) { Text(stringResource(R.string.menu_refresh)) }
+        if (reason != EmptyReason.FETCHING) OutlinedButton(onClick = onRefresh, modifier = Modifier.testTag("empty_refresh")) { Text(stringResource(R.string.menu_refresh)) }
     }
 }
 
 @Composable
-private fun CenteredMessage(message: String, actions: @Composable () -> Unit) {
+private fun CenteredMessage(message: String, icon: Painter? = null, actions: @Composable () -> Unit) {
     // Scrollable so pull-to-refresh also works on empty states and nothing is clipped at 200% text.
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        if (icon != null) Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(32.dp))
         Text(message, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, modifier = Modifier.testTag("empty_message"))
         actions()
     }
@@ -1268,13 +1299,15 @@ fun scopeTitle(scope: ArticleScope, structure: Structure): String = when (scope)
 
 /** Snackbar texts resolved in composition. */
 private class HomeMessages(
-    private val texts: Map<HomeEvent.Message.Kind, String>,
+    val markedRead: String,
+    val unsaved: String,
+    val updateFailed: String,
+    val undo: String,
     private val bulk: (Int) -> String,
     val noUrl: String,
     val unsafeUrl: String,
     val noBrowser: String,
 ) {
-    fun of(kind: HomeEvent.Message.Kind) = texts.getValue(kind)
     fun bulkMarked(count: Int) = bulk(count)
 
     companion object {
@@ -1282,14 +1315,10 @@ private class HomeMessages(
         fun load(): HomeMessages {
             val resources = LocalResources.current
             return HomeMessages(
-                texts = mapOf(
-                    HomeEvent.Message.Kind.SAVED to stringResource(R.string.msg_saved),
-                    HomeEvent.Message.Kind.UNSAVED to stringResource(R.string.msg_unsaved),
-                    HomeEvent.Message.Kind.MARKED_READ to stringResource(R.string.msg_marked_read),
-                    HomeEvent.Message.Kind.MARKED_UNREAD to stringResource(R.string.msg_marked_unread),
-                    HomeEvent.Message.Kind.BULK_MARKED to stringResource(R.string.msg_marked_read),
-                    HomeEvent.Message.Kind.UPDATE_FAILED to stringResource(R.string.msg_update_failed),
-                ),
+                markedRead = stringResource(R.string.msg_marked_read),
+                unsaved = stringResource(R.string.msg_unsaved),
+                updateFailed = stringResource(R.string.msg_update_failed),
+                undo = stringResource(R.string.action_undo),
                 bulk = { n -> resources.getQuantityString(R.plurals.msg_bulk_marked, n, n) },
                 noUrl = stringResource(R.string.msg_no_url),
                 unsafeUrl = stringResource(R.string.msg_unsafe_url),

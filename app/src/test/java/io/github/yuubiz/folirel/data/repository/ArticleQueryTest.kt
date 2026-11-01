@@ -113,7 +113,7 @@ class ArticleQueryTest {
         assertEquals(3, snapshot.size)
         // An article arriving after the confirmation opened is not included.
         store(feeds.getValue("ai"), entry("late", "後から届いた記事", "", 0))
-        assertEquals(3, env.articles.markRead(snapshot))
+        assertEquals(snapshot.toSet(), env.articles.markRead(snapshot).toSet())
         assertEquals(listOf("後から届いた記事"), titles(techSpec))
         // Other scopes untouched.
         assertEquals(2, titles(spec(ArticleScope.Uncategorized, ReadFilter.UNREAD)).size)
@@ -123,7 +123,7 @@ class ArticleQueryTest {
         store(feeds.getValue("loose"), *many)
         val all = env.articles.unreadIdsSnapshot(spec(filter = ReadFilter.UNREAD))
         assertEquals(1203, all.size)
-        assertEquals(1203, env.articles.markRead(all))
+        assertEquals(1203, env.articles.markRead(all).size)
         assertEquals(0, titles(spec(filter = ReadFilter.UNREAD)).size)
     }
 

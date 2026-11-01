@@ -26,3 +26,30 @@ data class MarkAllReadRequest(
     /** Hidden keywords were part of the set (the count above already leaves their articles out). */
     val hiddenKeywordsActive: Boolean = false,
 )
+
+/** The button that undoes what empties a list. */
+enum class EmptyExit { CLEAR_SEARCH, CLEAR_FILTERS, SHOW_ALL }
+
+/** Why a list is empty, narrowest cause first, and the way out of it ([exit]; null when only a refresh can help). */
+enum class EmptyReason(val exit: EmptyExit?) {
+    SEARCH(EmptyExit.CLEAR_SEARCH),
+    FILTERED(EmptyExit.CLEAR_FILTERS),
+    UNREAD(EmptyExit.SHOW_ALL),
+    SAVED(EmptyExit.SHOW_ALL),
+    FETCHING(null),
+    OFFLINE(null),
+    NOTHING(null),
+    ;
+
+    companion object {
+        fun of(selection: Selection, hiddenActive: Boolean, refreshing: Boolean, offline: Boolean): EmptyReason = when {
+            selection.search.isNotEmpty() -> SEARCH
+            selection.period != PeriodFilter.ALL || hiddenActive -> FILTERED
+            selection.filter == ReadFilter.UNREAD -> UNREAD
+            selection.filter == ReadFilter.SAVED -> SAVED
+            refreshing -> FETCHING
+            offline -> OFFLINE
+            else -> NOTHING
+        }
+    }
+}

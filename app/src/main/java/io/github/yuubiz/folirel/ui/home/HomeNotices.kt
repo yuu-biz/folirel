@@ -27,6 +27,9 @@ import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.yuubiz.folirel.R
 import io.github.yuubiz.folirel.backend.RefreshScope
@@ -82,7 +85,11 @@ internal fun HomeNotices(
             if (notice != null) NoticeCard(notice, onDismissNotice, onOpenSubscriptions, onRetry)
             val running = runningText(own, other, structure, checkingHttps)
             if (running != null) {
-                Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.testTag("refresh_running")) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }.testTag("refresh_running"),
+                ) {
                     Text(
                         running,
                         style = MaterialTheme.typography.labelMedium,
@@ -140,7 +147,7 @@ private fun NoticeCard(notice: RefreshNotice, onDismiss: (Long) -> Unit, onOpenS
         color = MaterialTheme.colorScheme.inverseSurface,
         contentColor = MaterialTheme.colorScheme.inverseOnSurface,
         shadowElevation = 3.dp,
-        modifier = Modifier.widthIn(max = 560.dp).testTag("refresh_notice"),
+        modifier = Modifier.widthIn(max = 560.dp).semantics { liveRegion = LiveRegionMode.Polite }.testTag("refresh_notice"),
     ) {
         Column(Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 2.dp)) {
             Row(verticalAlignment = Alignment.Top) {
@@ -149,7 +156,7 @@ private fun NoticeCard(notice: RefreshNotice, onDismiss: (Long) -> Unit, onOpenS
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f).padding(top = 8.dp, end = 4.dp).testTag("refresh_notice_text"),
                 )
-                IconButton(onClick = { onDismiss(notice.requestId) }, modifier = Modifier.size(40.dp).testTag("refresh_notice_dismiss")) {
+                IconButton(onClick = { onDismiss(notice.requestId) }, modifier = Modifier.testTag("refresh_notice_dismiss")) {
                     Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.notice_dismiss), modifier = Modifier.size(18.dp))
                 }
             }

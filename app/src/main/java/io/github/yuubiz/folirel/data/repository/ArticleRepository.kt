@@ -125,7 +125,9 @@ class ArticleRepository(
 
     /**
      * Every row of the list again after each change of a table it reads. The chunks are not one snapshot: a write between two of them
-     * invalidates the tables again, so a complete emission follows.
+     * invalidates the tables again, so a complete emission follows. Each row is read by exactly one chunk query and its key
+     * (sortAt, id) never changes, so a row is in an emission if it matched when its chunk was read: a row no write touched is never
+     * missing from one emission and back in the next, and none is read twice.
      */
     fun observe(spec: ArticleQuerySpec): Flow<List<ArticleRow>> =
         db.invalidationTracker.createFlow(*LIST_TABLES).conflate().map { rows(spec) }
@@ -152,10 +154,16 @@ class ArticleRepository(
     /** Snapshot of unread ids at confirmation time; later arrivals are not included. */
     suspend fun unreadIdsSnapshot(spec: ArticleQuerySpec): List<String> = dao.ids(ArticleQuery.unreadIds(spec))
 
-    /** Marks exactly [ids] as read in one transaction. Returns the number of rows changed. */
-    suspend fun markRead(ids: List<String>): Int = db.withTransaction {
+    /** Marks exactly [ids] as read in one transaction. Returns the ids it changed (those that were still unread), for an exact undo. */
+    suspend fun markRead(ids: List<String>): List<String> = db.withTransaction {
         val now = clock.millis()
-        ids.chunked(500).sumOf { dao.markReadByIds(it, now) }
+        ids.chunked(500).flatMap { chunk -> dao.unreadAmong(chunk).also { if (it.isNotEmpty()) dao.markReadByIds(it, now) } }
+    }
+
+    /** The undo of [markRead]: exactly [ids] unread again, in one transaction. Returns the number of rows changed. */
+    suspend fun markUnread(ids: List<String>): Int = db.withTransaction {
+        val now = clock.millis()
+        ids.chunked(500).sumOf { dao.markUnreadByIds(it, now) }
     }
 
     /** Returns false when nothing was changed (e.g. the article does not exist). */

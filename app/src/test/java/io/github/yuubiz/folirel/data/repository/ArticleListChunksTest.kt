@@ -17,6 +17,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -93,6 +94,42 @@ class ArticleListChunksTest {
         val arrived = next { rows -> rows.firstOrNull()?.id == "z-new" }
         assertEquals(listOf("z-new") + expected(SortOrder.NEWEST), arrived.map { it.id })
         assertTrue(arrived.last().isRead != wasRead)
+        job.cancel()
+    }
+
+    /**
+     * Writes land between the chunks of a read while rows leave and come back under Unread. A row no write touches is in every
+     * emission exactly once and in order: a list never loses a row for one emission (which would animate it out and in again) and
+     * never repeats one (the lists are keyed by article id).
+     */
+    @Test
+    fun rowsNoWriteTouchesStayInEveryEmissionWhileOthersChange() = runBlocking(Dispatchers.IO) {
+        val account = seed()
+        env.db.openHelper.writableDatabase.execSQL("UPDATE article_states SET isRead = 0")
+        val touched = seeded.filter { it.id.endsWith("3") }.map { it.id }
+        val touchedSet = touched.toSet()
+        val stable = expected(SortOrder.NEWEST) { it.id !in touchedSet }
+        val emissions = Channel<List<ArticleRow>>(Channel.UNLIMITED)
+        val job = launch { env.articles.observe(spec(account, SortOrder.NEWEST, filter = ReadFilter.UNREAD)).collect { emissions.send(it) } }
+        assertEquals(expected(SortOrder.NEWEST), withTimeout(30_000) { emissions.receive() }.map { it.id })
+
+        val writer = launch {
+            for (id in touched) env.articles.setRead(id, true)
+            for (id in touched) env.articles.setRead(id, false)
+        }
+        var seen = 0
+        var last = emptyList<String>()
+        while (true) {
+            // Once the writer is done, the emission after its last write is the last one.
+            val rows = if (writer.isCompleted) withTimeoutOrNull(2_000) { emissions.receive() } else withTimeout(30_000) { emissions.receive() }
+            val ids = rows?.map { it.id } ?: break
+            seen++
+            assertEquals("emission $seen repeats a row", ids.size, ids.toSet().size)
+            assertEquals("emission $seen lost or reordered an untouched row", stable, ids.filter { it !in touchedSet })
+            last = ids
+        }
+        assertTrue("only $seen emissions", seen > 1)
+        assertEquals(expected(SortOrder.NEWEST), last)
         job.cancel()
     }
 }
