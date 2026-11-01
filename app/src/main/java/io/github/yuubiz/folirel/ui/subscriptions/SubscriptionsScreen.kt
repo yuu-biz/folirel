@@ -1,5 +1,11 @@
 package io.github.yuubiz.folirel.ui.subscriptions
 
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarDuration
@@ -722,6 +728,9 @@ fun CategoriesScreen(vm: SubscriptionsViewModel, onBack: () -> Unit, initialOrde
 @Composable
 fun AddFeedDialog(onAdd: (String) -> Unit, onDismiss: () -> Unit) {
     var url by rememberSaveable { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    // The field takes the focus (and the keyboard opens) when the dialog opens; Done on the keyboard adds, like the button.
+    LaunchedEffect(Unit) { focus.requestFocus() }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.action_add_feed)) },
@@ -732,7 +741,9 @@ fun AddFeedDialog(onAdd: (String) -> Unit, onDismiss: () -> Unit) {
                     onValueChange = { url = it },
                     label = { Text(stringResource(R.string.add_feed_url_label)) },
                     singleLine = true,
-                    modifier = Modifier.testTag("add_feed_url"),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (url.isNotBlank()) onAdd(url) }),
+                    modifier = Modifier.focusRequester(focus).testTag("add_feed_url"),
                 )
                 Text(stringResource(R.string.add_feed_note), style = MaterialTheme.typography.bodySmall)
             }
