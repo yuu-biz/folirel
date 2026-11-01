@@ -22,7 +22,7 @@ avoid the words in the last column.
 | What "Mark all as read" applies to | Scope | 対象 | 範囲 |
 | Light, dark or system | Theme | テーマ | Light or dark, 明暗モード |
 | Classic, Leaf, Sand and the other sets | Color | 配色 | |
-| Metered and unmetered networks | metered network, unmetered network | 従量制ネットワーク、従量制ではないネットワーク | 非従量制 |
+| Metered and unmetered networks | metered network, unmetered network | 従量制ネットワーク、従量制ではないネットワーク（短い要約では従量制以外） | 非従量制 |
 | Bypass caches for one feed | Force refresh | 強制的に更新 | Revalidate and refetch |
 | The file with everything | Folirel backup | Folirelのバックアップ | |
 
@@ -34,7 +34,7 @@ avoid the words in the last column.
   unsubscribe dialog and in the HTTPS check use words.
 - English headers and labels use "and", never "&".
 - English counts use `<plurals>`, never "(s)".
-- Japanese labels have no です/ます. A sentence ends in です/ます.
+- Japanese buttons, headers, chips and setting names have no です/ます. A sentence ends in です/ます. A status shown on a list row may be a short phrase such as 見つかりません.
 - Japanese punctuation: "・" (never "·"), "%d件" with no space, すでに (never 既に), half-width ": " after a label,
   full-width （） around a remark.
 - A reassurance ("Saved articles are kept") is written only where the reader could fear data loss, and once.
