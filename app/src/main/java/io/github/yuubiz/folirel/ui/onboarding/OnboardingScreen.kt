@@ -1,6 +1,6 @@
 package io.github.yuubiz.folirel.ui.onboarding
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -52,7 +52,7 @@ fun OnboardingScreen(onFinish: (autoUpdate: Boolean, next: OnboardingNext) -> Un
             ).forEach { Text("・" + stringResource(it), style = MaterialTheme.typography.bodyLarge) }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Switch) { autoUpdate = !autoUpdate },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).toggleable(value = autoUpdate, role = Role.Switch) { autoUpdate = it },
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.onboarding_auto_update))

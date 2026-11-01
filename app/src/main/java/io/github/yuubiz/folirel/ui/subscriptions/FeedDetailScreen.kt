@@ -1,7 +1,7 @@
 package io.github.yuubiz.folirel.ui.subscriptions
 
 import android.text.format.Formatter
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -106,9 +107,13 @@ fun FeedDetailScreen(vm: SubscriptionsViewModel, feedId: String, onBack: () -> U
             item { DiagnosticsSection(feed, info, diag) }
             if (feed.subscribed) item { DiscoverySection(vm, feedId, feed.fetchUrl, info) }
             item {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                        .toggleable(value = feed.paused, enabled = feed.subscribed, role = Role.Switch) { vm.setPaused(feedId, it) },
+                ) {
                     Text(stringResource(R.string.feed_pause), modifier = Modifier.weight(1f))
-                    Switch(checked = feed.paused, onCheckedChange = { vm.setPaused(feedId, it) }, enabled = feed.subscribed)
+                    Switch(checked = feed.paused, onCheckedChange = null, enabled = feed.subscribed)
                 }
             }
             item { OutlinedButton(onClick = { renaming = true }) { Text(stringResource(R.string.feed_rename)) } }
@@ -118,7 +123,7 @@ fun FeedDetailScreen(vm: SubscriptionsViewModel, feedId: String, onBack: () -> U
                 val checked = category.id in feed.categoryIds
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable {
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(value = checked, role = Role.Checkbox) {
                         vm.setCategories(feedId, if (checked) feed.categoryIds - category.id else feed.categoryIds + category.id)
                     },
                 ) {

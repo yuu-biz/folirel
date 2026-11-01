@@ -1159,7 +1159,7 @@ private fun NewArticlesBanner(count: Int, toTop: Boolean, onClick: () -> Unit, o
             ) {
                 Text(pluralStringResource(if (toTop) R.plurals.new_articles_banner_top else R.plurals.new_articles_banner_position, count, count))
             }
-            IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp).testTag("new_articles_dismiss")) {
+            IconButton(onClick = onDismiss, modifier = Modifier.testTag("new_articles_dismiss")) {
                 Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.new_articles_dismiss), modifier = Modifier.size(18.dp))
             }
         }
