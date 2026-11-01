@@ -456,8 +456,10 @@ fun HomeScreen(
                     // The strip is the bar's colour in a colour set; Classic keeps drawing it on the plain background.
                     if (LocalTintedBars.current) Surface(color = barContainerColor(), contentColor = barContentColor()) { tabs() } else tabs()
                 }
+                // The pull only starts the refresh: its indicator goes back at once and the progress bar under the toolbar is the
+                // one display of the running refresh. A pull while it runs joins it.
                 PullToRefreshBox(
-                    isRefreshing = refresh.runningFor(target) != null,
+                    isRefreshing = false,
                     onRefresh = { requestRefresh() },
                     modifier = Modifier.fillMaxSize(),
                 ) {
