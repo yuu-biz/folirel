@@ -23,6 +23,7 @@ The tests never fetch these paths from a real site. They are served from a local
 | `feeds/rss1-basic.xml` | RSS 1.0 (RDF) with Dublin Core fields. | `T13` |
 | `feeds/malformed.xml` | A broken RSS document. | Failure keeps previously stored articles (`T23`) |
 | `feeds/rss2-xxe.xml` | Contains a DOCTYPE with an external entity. **Rejection test only.** | `T40` |
+| `feeds/rss2-html-entities.xml` | RSS 2.0 that writes HTML named character references (`&nbsp;`, `&copy;`, `&mdash;`, `&rsquo;`, `&hellip;` and others) straight into the XML, with no DTD. | Entity decoding (`T40`) |
 | `expected/*.json` | Expected normalised results for the matching input, as subset assertions (the `assertions` object). `expected/rss2-idless.json` also has `contractInput`, the inputs of the fallback-ID digest (title, date, author, summary). `expected/subscriptions.json` and `expected/warnings.json` describe the OPML results. | Parser and importer tests |
 | `url-identity.json` | URL pairs that must compare equal, pairs that must stay distinct, and inputs that must be rejected (`file:`, `content:`, `javascript:`, user-info). | URL normalisation (`T06`) |
 | `icons/` | Synthetic images for source-icon decoding: `icon-32.png`, `icon-png-entry.ico` (ICO with a PNG entry), `icon-bmp.ico` (ICO with a BMP entry), `banner-300x50.png` (wide logo), `big-512.png` (large image), `not-an-image.html` and `vector.svg` (things that are not decodable bitmaps). No real site's images. | `IconDecoderTest` on a device (`U08`) |

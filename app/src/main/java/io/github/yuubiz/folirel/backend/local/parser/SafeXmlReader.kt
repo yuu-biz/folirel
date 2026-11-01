@@ -2,6 +2,7 @@ package io.github.yuubiz.folirel.backend.local.parser
 
 import android.util.Xml
 import io.github.yuubiz.folirel.network.UrlNormalizer
+import org.jsoup.nodes.Entities
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
 import java.io.StringReader
@@ -79,12 +80,12 @@ class XmlElement(
 /**
  * Reads already-decoded XML text into an [XmlElement] tree using the platform pull parser in
  * `nextToken()` mode, so a DOCTYPE is seen as a token and rejected (not silently skipped).
- * External entities, DTDs and XInclude are never resolved; unknown entity references are refused.
+ * External entities, DTDs and XInclude are never resolved. HTML named character references are decoded from a fixed table;
+ * unknown names are refused as malformed.
  */
 object SafeXmlReader {
     const val XML_NS = "http://www.w3.org/XML/1998/namespace"
     const val XINCLUDE_NS = "http://www.w3.org/2001/XInclude"
-    private val BUILTIN_ENTITIES = setOf("amp", "lt", "gt", "quot", "apos")
 
     fun read(text: String, limits: XmlLimits, documentBase: String? = null): XmlElement {
         val parser = Xml.newPullParser()
@@ -145,10 +146,16 @@ object SafeXmlReader {
                         stack.lastOrNull()?.appendText(parser.text)
                     XmlPullParser.ENTITY_REF -> {
                         val name = parser.name.orEmpty()
-                        if (name !in BUILTIN_ENTITIES && !name.startsWith("#")) {
-                            throw XmlRejectedException(XmlRejectedException.Kind.SECURITY, "Undeclared entity reference")
+                        // Feeds often write HTML names such as &nbsp; without any DTD. They come from a fixed table,
+                        // never from the document (a DOCTYPE is refused above), so this is decoding, not expansion.
+                        val value = if (name.startsWith("#")) {
+                            parser.text.orEmpty()
+                        } else {
+                            Entities.getByName(name).ifEmpty {
+                                throw XmlRejectedException(XmlRejectedException.Kind.MALFORMED, "Unknown entity reference")
+                            }
                         }
-                        stack.lastOrNull()?.appendText(parser.text.orEmpty())
+                        stack.lastOrNull()?.appendText(value)
                     }
                     else -> Unit // comments and processing instructions are ignored
                 }

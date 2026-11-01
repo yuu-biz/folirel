@@ -157,6 +157,38 @@ class FeedParserFixtureTest {
     }
 
     @Test
+    fun htmlNamedEntitiesAreDecodedWithoutReadingAnyDtd() {
+        val feed = parseFixture("feeds/rss2-html-entities.xml")
+        // The no-break space is ordinary whitespace once the text is normalised; it still separates the words.
+        assertEquals("Fictional Notes © 2026", feed.title)
+        val entry = feed.entries.single()
+        assertEquals("Draft one — it’s here…", entry.title)
+        assertEquals("Plain text “quoted” & done… © ½", entry.summaryText)
+    }
+
+    @Test
+    fun nbspIsReadAsANoBreakSpace() {
+        val root = SafeXmlReader.read(Fixtures.text("feeds/rss2-html-entities.xml"), XmlLimits(maxDepth = 64))
+        assertEquals("Fictional Notes © 2026", root.child("", "channel")!!.childText("", "title"))
+    }
+
+    @Test
+    fun anUnknownEntityIsAFormatErrorNotASecurityOne() {
+        val xml = """<rss version="2.0"><channel><title>a &notarealentity; b</title></channel></rss>"""
+        val e = runCatching { FeedParser.parse(xml, null) }.exceptionOrNull() as FeedParseException
+        assertEquals(FetchError.FORMAT, e.error)
+    }
+
+    @Test
+    fun anHtmlNameInsideAnAttributeIsLeftAsLiteralText() {
+        // Attribute values are resolved by the platform parser, which knows only the XML built-ins and keeps any other
+        // reference as it was written (docs/fetch-and-security.md). Known limit, unchanged by the decoding of text.
+        val xml = """<rss version="2.0"><channel><title>t</title><item><guid>1</guid><enclosure url="https://example.com/a&nbsp;b.jpg" type="image/jpeg"/></item></channel></rss>"""
+        val v = SafeXmlReader.read(xml, XmlLimits(maxDepth = 64)).descendants().first { it.name == "enclosure" }.attr("url")
+        assertEquals("https://example.com/a&nbsp;b.jpg", v)
+    }
+
+    @Test
     fun utf16DoctypeCannotBypassCheck() {
         val xml = """<?xml version="1.0" encoding="UTF-16"?><!DOCTYPE rss [<!ENTITY x SYSTEM "file:///etc/passwd">]><rss version="2.0"><channel><title>&x;</title></channel></rss>"""
         for (charset in listOf(Charsets.UTF_16LE, Charsets.UTF_16BE)) {

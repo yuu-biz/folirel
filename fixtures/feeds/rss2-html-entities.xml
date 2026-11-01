@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+<title>Fictional&nbsp;Notes &copy; 2026</title>
+<link>https://example.com/</link>
+<description>A synthetic feed with raw HTML named entities and no DTD</description>
+<item>
+<guid isPermaLink="false">entity-001</guid>
+<title>Draft&nbsp;one &mdash; it&rsquo;s here&hellip;</title>
+<link>https://example.com/entity-001</link>
+<description>Plain&nbsp;text &ldquo;quoted&rdquo; &amp; done&hellip; &#169; &frac12;</description>
+</item>
+</channel>
+</rss>

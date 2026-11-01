@@ -245,9 +245,14 @@ exists only in test code.
 **Untrusted XML.** Feeds and OPML files are parsed by `SafeXmlReader`, which uses the platform pull parser in
 `nextToken()` mode so that a DOCTYPE is visible as a token and is rejected rather than skipped:
 
-- DOCTYPE (and therefore any entity or external DTD declaration) is refused. XInclude elements are refused. An
-  entity reference other than the five built-ins and numeric character references is refused. Nothing from the network
-  or the file system is ever resolved by the parser.
+- DOCTYPE (and therefore any entity or external DTD declaration) is refused. XInclude elements are refused. Nothing
+  from the network or the file system is ever resolved by the parser.
+- Besides the five XML built-ins and numeric character references, HTML named character references in text (`&nbsp;`,
+  `&copy;`, `&mdash;` and the rest of the HTML5 list, which many feeds write without declaring them) are decoded from
+  the fixed table in jsoup. This is a lookup, not entity expansion: no declaration from the document is ever used. An
+  unknown name makes the document malformed (`FORMAT`), not a security problem. Attribute values are resolved by the
+  platform parser itself, which knows only the XML built-ins: an HTML name there is kept as the literal text
+  (`&nbsp;`), not decoded.
 - Limits: 5 MiB input (feeds and OPML), XML depth 64 for feeds and 32 for OPML, 500,000 elements, 256 attributes per
   element, 64 KiB per attribute value, 2,000 feed entries, 10,000 OPML outlines.
 - Decompression is bounded because the 5 MiB limit is counted after decompression.
