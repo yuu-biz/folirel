@@ -104,14 +104,6 @@ interface ArticleDao {
     @Query("SELECT COUNT(*) FROM articles WHERE accountId = :accountId")
     fun observeArticleCount(accountId: String): Flow<Int>
 
-    @RawQuery(
-        observedEntities = [
-            ArticleEntity::class, ArticleStateEntity::class, FeedEntity::class,
-            FeedCategoryEntity::class, CategoryEntity::class,
-        ],
-    )
-    fun observeRows(query: SupportSQLiteQuery): Flow<List<ArticleRow>>
-
     @RawQuery
     suspend fun rows(query: SupportSQLiteQuery): List<ArticleRow>
 
