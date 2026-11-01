@@ -5,6 +5,7 @@ import io.github.yuubiz.folirel.data.preferences.BrowserMode
 import io.github.yuubiz.folirel.data.preferences.CategoryNavigation
 import io.github.yuubiz.folirel.data.preferences.ColorPalette
 import io.github.yuubiz.folirel.data.preferences.CustomColors
+import io.github.yuubiz.folirel.data.preferences.SwipeActions
 import io.github.yuubiz.folirel.data.preferences.ThemeMode
 import io.github.yuubiz.folirel.model.ArticleScope
 import io.github.yuubiz.folirel.model.CardLayoutStyle
@@ -88,6 +89,7 @@ internal object BackupJson {
         put("showImages", s.showImages)
         put("categoryNavigation", s.categoryNavigation.name)
         put("browserMode", s.browserMode.name)
+        put("swipeActions", s.swipeActions.name)
         put("refreshIntervalMinutes", s.refreshIntervalMinutes)
         put("startupRefresh", s.startupRefresh)
         put("unmeteredOnly", s.unmeteredOnly)
@@ -245,6 +247,8 @@ internal object BackupJson {
             showImages = o.bool("showImages"),
             categoryNavigation = o.enum<CategoryNavigation>("categoryNavigation"),
             browserMode = o.enum<BrowserMode>("browserMode"),
+            // Added in 0.14, after format version 1 was first written: absent reads as the default.
+            swipeActions = o.optionalEnum("swipeActions", defaults.swipeActions),
             refreshIntervalMinutes = o.int("refreshIntervalMinutes").also { if (it !in AppSettings.REFRESH_INTERVALS_MINUTES) invalid("refreshIntervalMinutes $it") },
             startupRefresh = o.bool("startupRefresh"),
             unmeteredOnly = o.bool("unmeteredOnly"),
@@ -455,6 +459,9 @@ internal object BackupJson {
             nullableString(name)?.let { v -> enumValues<E>().firstOrNull { it.name == v } ?: invalid("$what.$name unknown value $v") }
 
         inline fun <reified E : Enum<E>> enum(name: String): E = nullableEnum<E>(name) ?: refuse(BackupProblem.DAMAGED, "$what.$name null")
+
+        /** An enum field a later version added: absent is [default], present it is checked like any other. */
+        inline fun <reified E : Enum<E>> optionalEnum(name: String, default: E): E = if (name in o) enum<E>(name) else default
 
         fun obj(name: String): Obj = Obj(field(name), "$what.$name")
 

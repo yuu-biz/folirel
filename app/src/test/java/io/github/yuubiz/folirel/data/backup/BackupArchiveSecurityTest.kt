@@ -3,6 +3,7 @@ package io.github.yuubiz.folirel.data.backup
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.yuubiz.folirel.backend.local.opml.OpmlParser
 import io.github.yuubiz.folirel.backend.local.opml.OpmlRejectedException
+import io.github.yuubiz.folirel.data.preferences.SwipeActions
 import io.github.yuubiz.folirel.testutil.TestEnv
 import io.github.yuubiz.folirel.testutil.literalUrl
 import kotlinx.coroutines.CoroutineScope
@@ -129,6 +130,15 @@ class BackupArchiveSecurityTest {
         val written = target.inspect(bytes).settings
         assertTrue(written.restoreLastScope)
         assertEquals(written.copy(restoreLastScope = false), target.inspect(older).settings)
+    }
+
+    /** An archive written before 0.14 has no swipeActions: it is read with swipe actions on (the default) and the rest as written. */
+    @Test
+    fun swipeActionsAddedLaterAreOptional() = withBackup { bytes, target ->
+        val older = Zips.edit(bytes, BackupFormat.SETTINGS) { JsonObject(json(it).jsonObject - "swipeActions").toString() }
+        val written = target.inspect(bytes).settings
+        assertEquals(SwipeActions.OFF, written.swipeActions)
+        assertEquals(written.copy(swipeActions = SwipeActions.RIGHT_READ_LEFT_SAVED), target.inspect(older).settings)
     }
 
     /** T17: a newer format version is refused as such, before anything else of it is read. */
@@ -317,6 +327,9 @@ class BackupArchiveSecurityTest {
             "lastScope" to JsonPrimitive("somewhere"),
             "restoreLastScope" to JsonPrimitive("yes"),
             "restoreLastScope" to JsonNull,
+            "swipeActions" to JsonPrimitive("UP_DOWN"),
+            "swipeActions" to JsonPrimitive(true),
+            "swipeActions" to JsonNull,
             "hiddenKeywords" to JsonArray(List(33) { JsonPrimitive("k$it") }),
             "hiddenKeywords" to JsonArray(listOf(JsonPrimitive("a"), JsonPrimitive("A"))),
             "hiddenKeywords" to JsonArray(listOf(JsonPrimitive("x".repeat(65)))),

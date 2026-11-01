@@ -8,6 +8,7 @@ import io.github.yuubiz.folirel.data.db.FeedEntity
 import io.github.yuubiz.folirel.data.db.FeedFetchStateEntity
 import io.github.yuubiz.folirel.data.preferences.AppSettings
 import io.github.yuubiz.folirel.data.preferences.ColorPalette
+import io.github.yuubiz.folirel.data.preferences.SwipeActions
 import io.github.yuubiz.folirel.data.repository.FetchMetadata
 import io.github.yuubiz.folirel.model.ArticleScope
 import io.github.yuubiz.folirel.model.NormalizedEntry
@@ -91,6 +92,7 @@ class BackupRoundTripTest {
             assertTrue(s.hiddenKeywordsEnabled)
             assertEquals(ArticleScope.Category(ids.categories.getValue("domestic")), s.lastScope)
             assertTrue(s.restoreLastScope)
+            assertEquals(SwipeActions.OFF, s.swipeActions)
             assertTrue("a restored install is set up", s.onboardingDone)
             val prefs = b.env.db.subscriptionDao().categoryPreferences(b.account()).associateBy { it.categoryId }
             assertEquals(5, prefs.getValue(ids.categories.getValue("tech")).cardColumnsOverride)

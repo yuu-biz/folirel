@@ -40,7 +40,7 @@ automatic backup stays disabled for the app.
 - Pruned entries: the record of read articles the cleanup ("Articles to keep on the device") removed, so that a feed
   that still lists them does not bring them back as new unread articles after the restore.
 - Settings: theme, colour set, the Custom base colour and the Custom light and dark colours set by hand (five each),
-  list layout, text size, columns, Magazine arrangement, thumbnails, category navigation, browser, update interval,
+  list layout, text size, columns, Magazine arrangement, thumbnails, category navigation, swipe actions, browser, update interval,
   update on start, unmetered only, HTTP allowed, the two "ask before" switches, whether a start opens the last category,
   last selection (scope, filter, order, period), hidden keywords and their switch, articles to keep, image cache size.
 
@@ -56,7 +56,7 @@ The file is a ZIP named `folirel-backup-YYYYMMDD-HHmmss.zip` (local time). It ho
 | Entry | Content |
 |---|---|
 | `manifest.json` | Object: `format` = `"folirel-backup"`, `formatVersion` = `1`, `createdAt` (UTC epoch ms) and `createdAtUtc` (ISO 8601), `account` = `"local"`, `app` {`versionName`, `versionCode`}, `schemaVersion` (the Room schema of the writing app; informational), `counts` {`feeds`, `subscribedFeeds`, `categories`, `memberships`, `articles`, `readArticles`, `savedArticles`, `prunedEntries`, `hiddenKeywords`} |
-| `settings.json` | Object with the settings of section 2. Enums by name (`"DARK"`, `"CUSTOM"`, `"BENTO"`…), colours as `"#RRGGBB"`, `customLight` / `customDark` an object {`accent`, `container`, `secondary`, `background`, `text`} or `null`, text size as `textScalePercent`, `lastScope` as `"all"`, `"uncategorized"`, `"category:<id>"` or `"feed:<id>"`, `restoreLastScope` a boolean (0.10.1; an archive of 0.10.0 has none, which reads as `false`) |
+| `settings.json` | Object with the settings of section 2. Enums by name (`"DARK"`, `"CUSTOM"`, `"BENTO"`…), colours as `"#RRGGBB"`, `customLight` / `customDark` an object {`accent`, `container`, `secondary`, `background`, `text`} or `null`, text size as `textScalePercent`, `lastScope` as `"all"`, `"uncategorized"`, `"category:<id>"` or `"feed:<id>"`, `restoreLastScope` a boolean (0.10.1; an archive of 0.10.0 has none, which reads as `false`), `swipeActions` `"RIGHT_READ_LEFT_SAVED"`, `"RIGHT_SAVED_LEFT_READ"` or `"OFF"` (0.14; an archive written before has none, which reads as `"RIGHT_READ_LEFT_SAVED"`) |
 | `subscriptions.json` | Array of feeds: `id`, `subscriptionUrl`, `fetchUrl`, `siteUrl`, `feedTitle`, `userTitle`, `subscribed`, `paused`, `createdAt`, `fetchedBefore`, `httpsMigration` ({`httpUrl`, `httpsUrl`, `migratedAt`} or `null`), `urlMoves` ([{`id`, `fromUrl`, `toUrl`, `movedAt`}]) |
 | `categories.json` | Array: `id`, `path` (array of names), `feedIds`, `tabOrder`, `pinned`, `listMode`, `cardStyle`, `cardColumns` (`null` = inherit, `0` = automatic, `1`–`5`) |
 | `articles.json` | Array: `id`, `feedId`, `entryKey`, `externalEntryId`, `linkUrl`, `title`, `summaryText`, `author`, `publishedAt`, `firstSeenAt`, `sortAt`, `imageUrl`, `lastSeenAt` |

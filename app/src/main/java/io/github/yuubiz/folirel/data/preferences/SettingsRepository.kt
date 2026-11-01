@@ -54,6 +54,27 @@ enum class BrowserMode { CUSTOM_TABS, EXTERNAL }
  */
 enum class CategoryNavigation { AUTO, PANE, DRAWER }
 
+/** What a swipe on a list row toggles. */
+enum class SwipeAction { READ, SAVED }
+
+/**
+ * Swipe actions on the rows of the List and Compact list layouts: off, or the action each direction toggles. "Right" is toward the end
+ * of the line (left to right in English and Japanese). Default [RIGHT_READ_LEFT_SAVED], also for a store written before 0.14.
+ */
+enum class SwipeActions(private val towardEnd: SwipeAction?, private val towardStart: SwipeAction?) {
+    RIGHT_READ_LEFT_SAVED(SwipeAction.READ, SwipeAction.SAVED),
+    RIGHT_SAVED_LEFT_READ(SwipeAction.SAVED, SwipeAction.READ),
+    OFF(null, null);
+
+    val enabled: Boolean get() = this != OFF
+
+    /** The action a swipe toward the end (right) or the start carries, whatever its distance. */
+    fun action(towardEnd: Boolean): SwipeAction? = if (towardEnd) this.towardEnd else towardStart
+
+    /** The action a row released at [offset] (positive toward the end) carries out: none until the swipe has passed [threshold]. */
+    fun actionAt(offset: Float, threshold: Float): SwipeAction? = if (kotlin.math.abs(offset) < threshold) null else action(offset > 0f)
+}
+
 /** Display/update preferences and the last selection. Reading state and subscriptions live in Room only. */
 data class AppSettings(
     val theme: ThemeMode = ThemeMode.SYSTEM,
@@ -75,6 +96,8 @@ data class AppSettings(
     /** Category navigation of a wide window (pane or drawer); a compact window has the drawer whatever this says. */
     val categoryNavigation: CategoryNavigation = CategoryNavigation.AUTO,
     val browserMode: BrowserMode = BrowserMode.CUSTOM_TABS,
+    /** Swiping a list row toggles read or saved; absent in a store written before 0.14, which reads as the default (on). */
+    val swipeActions: SwipeActions = SwipeActions.RIGHT_READ_LEFT_SAVED,
     /** Periodic update interval in minutes; 0 = off. Default 2 hours. */
     val refreshIntervalMinutes: Int = 120,
     /** Refresh once when the app comes to the foreground (at most every 30 minutes, same network rule). */
@@ -167,6 +190,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val showImages = booleanPreferencesKey("show_images")
         val categoryNavigation = stringPreferencesKey("category_navigation")
         val browserMode = stringPreferencesKey("browser_mode")
+        val swipeActions = stringPreferencesKey("swipe_actions")
         val refreshMinutes = intPreferencesKey("refresh_interval_minutes")
         val startupRefresh = booleanPreferencesKey("startup_refresh")
         val retentionLimit = intPreferencesKey("retention_limit")
@@ -201,6 +225,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             showImages = p[Keys.showImages] ?: defaults.showImages,
             categoryNavigation = enumOr(p[Keys.categoryNavigation], defaults.categoryNavigation),
             browserMode = enumOr(p[Keys.browserMode], defaults.browserMode),
+            swipeActions = enumOr(p[Keys.swipeActions], defaults.swipeActions),
             refreshIntervalMinutes = intervalMinutes(p),
             // Until the user chooses, startup refresh follows the automatic-update switch.
             startupRefresh = p[Keys.startupRefresh] ?: (intervalMinutes(p) > 0),
@@ -256,6 +281,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setShowImages(value: Boolean) = store.edit { it[Keys.showImages] = value }
     suspend fun setCategoryNavigation(value: CategoryNavigation) = store.edit { it[Keys.categoryNavigation] = value.name }
     suspend fun setBrowserMode(value: BrowserMode) = store.edit { it[Keys.browserMode] = value.name }
+    suspend fun setSwipeActions(value: SwipeActions) = store.edit { it[Keys.swipeActions] = value.name }
     suspend fun setRefreshIntervalMinutes(minutes: Int) = store.edit { it[Keys.refreshMinutes] = minutes }
     suspend fun setStartupRefresh(value: Boolean) = store.edit { it[Keys.startupRefresh] = value }
     suspend fun setRetentionLimit(value: Int) = store.edit { it[Keys.retentionLimit] = value }
@@ -323,6 +349,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         p[Keys.showImages] = settings.showImages
         p[Keys.categoryNavigation] = settings.categoryNavigation.name
         p[Keys.browserMode] = settings.browserMode.name
+        p[Keys.swipeActions] = settings.swipeActions.name
         p[Keys.refreshMinutes] = settings.refreshIntervalMinutes
         p[Keys.startupRefresh] = settings.startupRefresh
         p[Keys.retentionLimit] = settings.retentionLimit

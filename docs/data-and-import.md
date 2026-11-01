@@ -324,6 +324,7 @@ bookkeeping (only `initialized` is carried, as `fetchedBefore`). OPML import (ad
 | `text_scale` | 0.90 to 1.30 in steps of 0.05 (the slider; the four older values are on the grid; any other value reads as 1.0) | 1.0 |
 | `show_images` | Thumbnails and source icons | on |
 | `browser_mode` | `CUSTOM_TABS` or `EXTERNAL` | `CUSTOM_TABS` |
+| `swipe_actions` | Swipe on a List or Compact list row: `RIGHT_READ_LEFT_SAVED`, `RIGHT_SAVED_LEFT_READ` or `OFF` (added in 0.14; no key or an unknown name reads as the default) | `RIGHT_READ_LEFT_SAVED` |
 | `refresh_interval_minutes` | 0 (off), 15, 30, 60, 120, 360, 720, 1440 | 120 |
 | `startup_refresh` | Refresh when the app is opened | on |
 | `unmetered_only` | Automatic refresh and icon lookups only on unmetered networks | on |

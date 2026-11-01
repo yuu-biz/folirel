@@ -10,6 +10,7 @@ import io.github.yuubiz.folirel.data.preferences.CategoryNavigation
 import io.github.yuubiz.folirel.data.preferences.ColorPalette
 import io.github.yuubiz.folirel.data.preferences.CustomColors
 import io.github.yuubiz.folirel.data.preferences.SettingsRepository
+import io.github.yuubiz.folirel.data.preferences.SwipeActions
 import io.github.yuubiz.folirel.data.preferences.ThemeMode
 import io.github.yuubiz.folirel.data.repository.AddFeedResult
 import io.github.yuubiz.folirel.data.repository.FetchMetadata
@@ -234,6 +235,7 @@ object RichState {
         s.setShowImages(false)
         s.setCategoryNavigation(CategoryNavigation.PANE)
         s.setBrowserMode(BrowserMode.EXTERNAL)
+        s.setSwipeActions(SwipeActions.OFF)
         s.setRefreshIntervalMinutes(360)
         s.setStartupRefresh(false)
         s.setUnmeteredOnly(false)

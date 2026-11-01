@@ -583,6 +583,7 @@ manual ([backup-format.md](backup-format.md) section 7).
 | (§17) | 1,000 feeds and 30,000 articles with long Japanese summaries and JSON special characters round-trip exactly. | `largeInstallRoundTrips` |
 | (own data) | A category name stored untrimmed and not in NFC, and a very long feed name, are restored as they are (the reader's own backup is not refused by today's input rules). | `olderStoredNamesAreRestoredAsTheyAre` |
 | (later field) | An archive without `restoreLastScope` (written by 0.10.0) is read with the switch off; a non-boolean value is refused. | `BackupArchiveSecurityTest.settingAddedLaterIsOptional`, `t24_invalidValues` |
+| (later field) | An archive without `swipeActions` (written before 0.14) is read with swipe actions on; an unknown name, a boolean or `null` is refused; the choice round-trips. | `BackupArchiveSecurityTest.swipeActionsAddedLaterAreOptional`, `t24_invalidValues`, `BackupRoundTripTest.t43_richStateRestoresIdenticallyIntoAFreshInstall` |
 
 ### 4.15 Start tab and cache sizes (0.10.1)
 
