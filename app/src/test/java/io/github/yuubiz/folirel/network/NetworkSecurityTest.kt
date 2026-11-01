@@ -222,7 +222,7 @@ class NetworkSecurityTest {
 
     @Test
     fun linkCheckForBrowserOpening() {
-        val launcher = io.github.yuubiz.folirel.browser.BrowserLauncher()
+        val launcher = io.github.yuubiz.folirel.browser.BrowserLauncher(android.content.ComponentName("io.github.yuubiz.folirel", "io.github.yuubiz.folirel.app.MainActivity"))
         assertEquals(io.github.yuubiz.folirel.browser.BrowserLauncher.LinkCheck.Missing, launcher.check(null))
         for (bad in listOf("javascript:alert(1)", "file:///sdcard/x", "intent://x#Intent;end", "content://a/b", "http://127.0.0.1/", "https://localhost/a", "https://user:p@example.com/")) {
             assertEquals(bad, io.github.yuubiz.folirel.browser.BrowserLauncher.LinkCheck.Unsafe, launcher.check(bad))

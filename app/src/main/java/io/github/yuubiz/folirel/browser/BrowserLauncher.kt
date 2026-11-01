@@ -1,6 +1,7 @@
 package io.github.yuubiz.folirel.browser
 
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import androidx.core.net.toUri
@@ -14,8 +15,9 @@ import java.net.InetAddress
 /**
  * Opens the original article outside the app: Custom Tabs by default, ACTION_VIEW as fallback or when the
  * user prefers an external browser. Never marks anything as read. No WebView, no cookie access.
+ * [ownShareTarget] is this app's own "share text" activity, left out of the share sheet (it would only offer to subscribe).
  */
-class BrowserLauncher {
+class BrowserLauncher(private val ownShareTarget: ComponentName) {
     sealed interface LinkCheck {
         data class Ok(val url: String, val isHttps: Boolean) : LinkCheck
         data object Missing : LinkCheck
@@ -71,7 +73,7 @@ class BrowserLauncher {
             putExtra(Intent.EXTRA_TEXT, text)
             if (title.isNotBlank()) putExtra(Intent.EXTRA_SUBJECT, title)
         }
-        return Intent.createChooser(send, null)
+        return Intent.createChooser(send, null).putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, arrayOf(ownShareTarget))
     }
 
     private companion object {

@@ -1,5 +1,6 @@
 package io.github.yuubiz.folirel.app
 
+import android.content.ComponentName
 import android.content.Context
 import androidx.datastore.preferences.preferencesDataStore
 import coil3.ImageLoader
@@ -157,7 +158,7 @@ class AppContainer(context: Context) {
 
     val scheduler = RefreshScheduler(appContext)
 
-    val browser = BrowserLauncher()
+    val browser = BrowserLauncher(ComponentName(appContext, MainActivity::class.java))
 
     val documents = DocumentIo(appContext)
 
