@@ -38,4 +38,13 @@ class HtmlRootElementTest {
         assertFalse(HtmlLinks.isFeedDocument("<?xml version=\"1.0\"?><html xmlns=\"x\"></html>".toByteArray()))
         assertTrue(HtmlLinks.isFeedDocument("<?xml version=\"1.0\"?><feed xmlns=\"x\"></feed>".toByteArray()))
     }
+
+    @Test
+    fun aJsonObjectIsAFeedDocumentEvenWithHtmlInIt() {
+        assertTrue(HtmlLinks.isFeedDocument("{\"version\":\"https://jsonfeed.org/version/1.1\"}".toByteArray()))
+        val withBomAndHeader = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + " \r\n\t{\"items\":[{\"content_html\":\"<header><html>\"}]}".toByteArray()
+        assertTrue(HtmlLinks.isFeedDocument(withBomAndHeader))
+        assertFalse(HtmlLinks.isFeedDocument("[{\"version\":\"https://jsonfeed.org/version/1.1\"}]".toByteArray()))
+        assertFalse(HtmlLinks.isFeedDocument("x{}".toByteArray()))
+    }
 }

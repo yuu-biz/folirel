@@ -23,7 +23,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 
 /**
- * The part of feed discovery that does not care why it runs: read one address (a site page, or a feed), take the RSS/Atom
+ * The part of feed discovery that does not care why it runs: read one address (a site page, or a feed), take the feed
  * links the page itself declares, fetch every one of them and check that it parses as a feed. Both "find where this feed
  * moved" ([FeedDiscovery]) and "subscribe to a shared address" (the share flow) are built on it, so the HTTP policy
  * (address rules, cleartext opt-in, TLS, redirects), the HTML link reading and the feed parser exist once.
@@ -48,7 +48,7 @@ class FeedProbe(
         val url: String,
         val via: CandidateVia,
         val titleOnPage: String?,
-        /** True only for a body that parsed as RSS/Atom/RDF. */
+        /** True only for a body that parsed as RSS/Atom/RDF/JSON Feed. */
         val fetchable: Boolean,
         val failure: FetchError? = null,
         val feedTitle: String? = null,
@@ -162,7 +162,7 @@ class FeedProbe(
     companion object {
         /** Feed addresses looked at per page. */
         const val MAX_FEEDS = 8
-        private const val PAGE_ACCEPT = "text/html,application/xhtml+xml;q=0.9,application/rss+xml;q=0.8,*/*;q=0.1"
+        private const val PAGE_ACCEPT = "text/html,application/xhtml+xml;q=0.9,application/rss+xml;q=0.8,application/feed+json;q=0.8,*/*;q=0.1"
         private val CHARSET = Regex("charset=([^;\\s]+)", RegexOption.IGNORE_CASE)
 
         /** `scheme://host[:port]/` of [url]; null when it is not a plain http(s) address. */

@@ -9,7 +9,7 @@ import kotlin.math.abs
 import kotlin.math.ln
 
 /**
- * What a site's HTML page points to: icon links and feed (RSS/Atom) alternates. jsoup only parses markup into a
+ * What a site's HTML page points to: icon links and feed (RSS/Atom/JSON Feed) alternates. jsoup only parses markup into a
  * tree; nothing is rendered, no script runs, no resource is loaded from here. URLs are resolved against the
  * response URL and `<base href>`, then validated like every other URL (http/https only, no userinfo).
  */
@@ -94,10 +94,20 @@ object HtmlLinks {
         return null
     }
 
-    /** Whether the document is an RSS, Atom or RDF feed by its root element (and not an XHTML page that begins with `<?xml`). */
-    fun isFeedDocument(bytes: ByteArray): Boolean = rootElement(bytes) in FEED_ROOTS
+    /**
+     * Whether the document is an RSS, Atom or RDF feed by its root element (and not an XHTML page that begins with `<?xml`), or a JSON
+     * object. Any JSON object counts: no page starts with `{`, and the parser tells a JSON Feed from other JSON.
+     */
+    fun isFeedDocument(bytes: ByteArray): Boolean = rootElement(bytes) in FEED_ROOTS || isJsonObject(bytes)
+
+    private fun isJsonObject(bytes: ByteArray): Boolean {
+        var i = if (bytes.size >= 3 && bytes[0] == 0xEF.toByte() && bytes[1] == 0xBB.toByte() && bytes[2] == 0xBF.toByte()) 3 else 0
+        while (i < bytes.size && bytes[i].toInt().toChar() in JSON_SPACE) i++
+        return i < bytes.size && bytes[i] == '{'.code.toByte()
+    }
 
     private const val ROOT_SCAN_BYTES = 64 * 1024
+    private const val JSON_SPACE = " \t\r\n"
     private const val NO_QUOTE = '\u0000'
     private val BOM_BYTES = setOf(0xEF, 0xBB, 0xBF)
     private val FEED_ROOTS = setOf("rss", "feed", "rdf")
@@ -116,7 +126,7 @@ object HtmlLinks {
             IconLink(url, sizeOf(el.attr("sizes")), apple)
         }.distinctBy { it.url }.sortedBy { score(it) }
 
-    /** RSS / Atom / RDF `rel=alternate` links. The page's own order is kept (the first is usually the main feed). */
+    /** RSS / Atom / RDF / JSON Feed `rel=alternate` links. The page's own order is kept (the first is usually the main feed). */
     fun feedLinks(doc: Document): List<FeedLink> =
         doc.select("link[href]").mapNotNull { el ->
             val rels = el.attr("rel").lowercase().split(Regex("\\s+"))
@@ -127,7 +137,8 @@ object HtmlLinks {
             FeedLink(url, el.attr("title").trim().ifEmpty { null }, type)
         }.distinctBy { it.url }
 
-    private val FEED_TYPES = setOf("application/rss+xml", "application/atom+xml", "application/rdf+xml")
+    // Not plain application/json: WordPress declares its REST API that way on every page.
+    private val FEED_TYPES = setOf("application/rss+xml", "application/atom+xml", "application/rdf+xml", "application/feed+json")
 
     private fun valid(raw: String): String? = if (raw.isBlank()) null else UrlNormalizer.normalizedOrNull(raw)
 

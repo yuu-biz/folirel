@@ -86,7 +86,7 @@ class FeedFetcher(
         val request = Request.Builder()
             .url(httpUrl)
             .get()
-            .header("Accept", "application/rss+xml, application/atom+xml, application/rdf+xml, application/xml;q=0.9, text/xml;q=0.9, */*;q=0.5")
+            .header("Accept", "application/rss+xml, application/atom+xml, application/rdf+xml, application/feed+json, application/xml;q=0.9, text/xml;q=0.9, application/json;q=0.9, */*;q=0.5")
             .tag(RedirectTrace::class.java, trace)
             .apply { if (revalidate) header("Cache-Control", "no-cache") }
             .apply { if (validators != null) tag(ConditionalValidators::class.java, validators) }

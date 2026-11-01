@@ -88,6 +88,22 @@ class FetchPipelineTest {
     }
 
     @Test
+    fun jsonFeedRefreshStoresParsedArticles() = runTest {
+        server.enqueue(xml("feeds/jsonfeed-1.1-full.json", contentType = "application/feed+json"))
+        val account = env.subscriptions.ensureLocalAccount()
+        env.subscriptions.commitImport(account, OpmlParser.parse(opmlFor(server.url("/feeds/feed.json").toString())))
+
+        val report = env.backend.refresh(account, RefreshScope.All, RefreshReason.MANUAL) {}
+        assertEquals(1, report.updated)
+        assertEquals(3, report.newArticles)
+        assertTrue(server.takeRequest().headers["Accept"]!!.contains("application/feed+json"))
+        val first = env.articles.rows(spec(account)).first { it.title == "JSON 日本語" }
+        assertEquals("https://example.org/posts/1", first.linkUrl)
+        assertEquals("概要です", first.summaryText)
+        assertEquals("架空の JSON Feed", env.db.subscriptionDao().feeds(account).single().feedTitle)
+    }
+
+    @Test
     fun updatedEntryKeepsIdentityAndManualState() = runTest {
         val feedUrl = server.url("/alpha.xml").toString()
         server.enqueue(xml("feeds/rss2-basic.xml"))

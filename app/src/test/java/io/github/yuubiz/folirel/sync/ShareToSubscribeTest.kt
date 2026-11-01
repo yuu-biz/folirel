@@ -182,6 +182,42 @@ class ShareToSubscribeTest {
         assertEquals(0, feedRows().size)
     }
 
+    private fun jsonFeed(title: String, contentType: String = "application/feed+json", contentHtml: String = "<p>e1</p>"): () -> MockResponse = {
+        MockResponse.Builder().code(200).setHeader("Content-Type", contentType).body(
+            """{"version":"https://jsonfeed.org/version/1.1","title":"$title","home_page_url":"https://site.example/",""" +
+                """"items":[{"id":"e1","url":"https://site.example/e1","content_html":"$contentHtml","date_published":"2026-10-03T00:00:00Z"}]}""",
+        ).build()
+    }
+
+    @Test
+    fun directJsonFeedIsACandidate() = runBlocking<Unit> {
+        routes["/feed.json"] = jsonFeed("JSON Blog")
+        val c = found(service.discover(url("/feed.json"))).candidates.single()
+        assertEquals(url("/feed.json"), c.url)
+        assertEquals("JSON Blog", c.feedTitle)
+        assertEquals("https://site.example/", c.siteUrl)
+        assertEquals(1, c.entryCount)
+        assertEquals(1, count("/feed.json"))
+        assertEquals(0, feedRows().size)
+    }
+
+    @Test
+    fun aLargeJsonFeedServedAsPlainTextWithHtmlInsideIsStillAFeed() = runBlocking<Unit> {
+        // Above the 512 KiB page limit, and "<head" in the first bytes: only the JSON sniff keeps it from being read as a page.
+        routes["/feed.json"] = jsonFeed("Big JSON", contentType = "text/plain", contentHtml = "<header>top</header>" + "x".repeat(600 * 1024))
+        assertEquals("Big JSON", found(service.discover(url("/feed.json"))).candidates.single().feedTitle)
+    }
+
+    @Test
+    fun aPageDeclaringAJsonFeedGivesThatFeedButNotItsPlainJsonLinks() = runBlocking<Unit> {
+        routes["/post/1"] = page(feedLink("/wp-json/wp/v2/posts/1", type = "application/json"), feedLink("/feed.json", type = "application/feed+json", title = "JSON"))
+        routes["/feed.json"] = jsonFeed("JSON Blog")
+        val c = found(service.discover(url("/post/1"))).candidates.single()
+        assertEquals(url("/feed.json"), c.url)
+        assertEquals("JSON", c.titleOnPage)
+        assertEquals("a plain application/json alternate is never fetched", 0, count("/wp-json/wp/v2/posts/1"))
+    }
+
     @Test
     fun anHtmlPageAtADeclaredFeedAddressIsNeverACandidate() = runBlocking<Unit> {
         routes["/"] = page(feedLink("/fake.xml"))
