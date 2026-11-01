@@ -1,7 +1,9 @@
 package io.github.yuubiz.folirel.ui.theme
 
+import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
@@ -41,7 +43,17 @@ fun FolirelTheme(
     val drawn = palette.effective(Build.VERSION.SDK_INT)
     CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale * textScale)) {
         CompositionLocalProvider(LocalTintedBars provides usesTintedBars(drawn)) {
-            MaterialTheme(colorScheme = Palettes.scheme(drawn, dark, context, customSeed, if (dark) customDark else customLight), typography = Typography(), content = content)
+            MaterialTheme(colorScheme = appColorScheme(context, drawn, dark, customSeed, customLight, customDark), typography = Typography(), content = content)
         }
     }
 }
+
+/** The colours [FolirelTheme] draws with; also what the window behind the composition is painted with (see MainActivity). */
+fun appColorScheme(
+    context: Context,
+    palette: ColorPalette,
+    dark: Boolean,
+    customSeed: Int = CustomPalette.DEFAULT_SEED,
+    customLight: CustomColors? = null,
+    customDark: CustomColors? = null,
+): ColorScheme = Palettes.scheme(palette.effective(Build.VERSION.SDK_INT), dark, context, customSeed, if (dark) customDark else customLight)
