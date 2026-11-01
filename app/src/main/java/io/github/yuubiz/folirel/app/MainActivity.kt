@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -52,6 +53,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.yuubiz.folirel.R
+import io.github.yuubiz.folirel.browser.BrowserLauncher
 import io.github.yuubiz.folirel.data.backup.BackupFormat
 import io.github.yuubiz.folirel.data.preferences.AppSettings
 import io.github.yuubiz.folirel.ui.home.FeedIconStore
@@ -252,6 +254,18 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings, subscr
     // Any type: some providers label a ZIP as octet-stream; the content decides, not the label.
     val pickBackup = { launchDocuments { openBackup.launch(arrayOf("*/*")) } }
     val settingsSaveFailed = stringResource(R.string.settings_save_failed)
+    val context = LocalContext.current
+    val noBrowser = stringResource(R.string.msg_no_browser)
+    val unsafeUrl = stringResource(R.string.msg_unsafe_url)
+    // A link outside the article list (a feed's site, the About page): checked each time it is used and opened like an article.
+    fun openLink(url: String) {
+        when (val check = container.browser.check(url)) {
+            is BrowserLauncher.LinkCheck.Ok -> if (container.browser.open(context, check.url, settings.browserMode) == BrowserLauncher.OpenResult.NO_BROWSER) {
+                scope.launch { rootSnackbar.showSnackbar(noBrowser) }
+            }
+            else -> scope.launch { rootSnackbar.showSnackbar(unsafeUrl) }
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
         if (!settings.onboardingDone) {
@@ -316,7 +330,7 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings, subscr
                     route == ROUTE_HTTPS -> HttpsUpgradeScreen(subscriptionsVm, onBack = ::pop)
                     route == ROUTE_CATEGORIES -> CategoriesScreen(subscriptionsVm, onBack = ::pop)
                     route == ROUTE_TAB_ORDER -> CategoriesScreen(subscriptionsVm, onBack = ::pop, initialOrder = true)
-                    route.startsWith(ROUTE_FEED_PREFIX) -> FeedDetailScreen(subscriptionsVm, route.removePrefix(ROUTE_FEED_PREFIX), onBack = ::pop)
+                    route.startsWith(ROUTE_FEED_PREFIX) -> FeedDetailScreen(subscriptionsVm, route.removePrefix(ROUTE_FEED_PREFIX), onBack = ::pop, onOpenLink = ::openLink)
                     route == SettingsPage.TOP_ROUTE || SettingsPage.fromRoute(route) != null -> SettingsScreen(
                         settingsVm,
                         page = SettingsPage.fromRoute(route),

@@ -708,4 +708,6 @@
     <!-- Phase 3 (motion and UX) -->
     <string name="empty_action_clear_filters">絞り込みを外す</string>
     <string name="empty_action_show_all">すべての記事を表示</string>
+    <string name="feed_open_site">サイトを開く</string>
+    <string name="feed_details_section">詳細</string>
 </resources>

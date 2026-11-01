@@ -733,4 +733,6 @@
     <!-- Phase 3 (motion and UX) -->
     <string name="empty_action_clear_filters">Turn off filters</string>
     <string name="empty_action_show_all">Show all articles</string>
+    <string name="feed_open_site">Open site</string>
+    <string name="feed_details_section">Details</string>
 </resources>
