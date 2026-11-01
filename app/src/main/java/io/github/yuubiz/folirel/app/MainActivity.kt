@@ -2,6 +2,7 @@ package io.github.yuubiz.folirel.app
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.PredictiveBackHandler
@@ -10,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
@@ -25,11 +27,13 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +43,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -100,7 +105,13 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // The splash stays until the first frame with the settings applied, so no blank or wrongly coloured frame comes first.
+        var settingsShown = false
+        installSplashScreen().setKeepOnScreenCondition { !settingsShown }
         super.onCreate(savedInstanceState)
+        // The theme's window background follows the system night mode; a recreated activity (rotation) has no splash, so it gets the
+        // colour of the app's own theme from the last run of this process instead.
+        lastWindowBackground?.let { window.setBackgroundDrawable(ColorDrawable(it)) }
         enableEdgeToEdge()
         val container = container
         // A recreated activity (rotation, process restart) gets its old intent back; that share was handled when it arrived.
@@ -109,9 +120,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings by container.settings.settings.collectAsStateWithLifecycle(initialValue = null as AppSettings?)
             val current = settings ?: return@setContent // render nothing until preferences are loaded
+            SideEffect { settingsShown = true }
             val dark = isDarkTheme(current.theme, isSystemInDarkTheme())
             LaunchedEffect(dark) { applySystemBars(dark) }
             FolirelTheme(current.theme, current.textScale, current.palette, current.customSeed, current.customLight, current.customDark) {
+                val background = MaterialTheme.colorScheme.surface.toArgb()
+                LaunchedEffect(background) {
+                    window.setBackgroundDrawable(ColorDrawable(background))
+                    lastWindowBackground = background
+                }
                 val iconStore = remember { FeedIconStore { feedId -> container.feedIcons.png(feedId) } }
                 val iconVersions = remember { flow { emit(container.subscriptions.ensureLocalAccount()) }.flatMapLatest { container.feedIcons.observeVersions(it) } }
                 ProvideFeedIcons(iconStore, iconVersions, enabled = current.showImages) {
@@ -353,6 +370,10 @@ private fun AnimatedContentTransitionScope<List<String>>.routeTransition(forward
         (fadeIn(fade) togetherWith slideOutOfContainer(SlideDirection.End, slide) { it / 5 } + fadeOut(fade)).apply { targetContentZIndex = -1f }
     }
 }
+
+/** The window colour of the app's theme, for an activity recreated in the same process (see [MainActivity.onCreate]). */
+@Volatile
+private var lastWindowBackground: Int? = null
 
 private const val ROUTE_MILLIS = 300
 private const val ROUTE_HOME = "home"
