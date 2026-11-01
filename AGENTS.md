@@ -48,7 +48,7 @@ Read the document that matches the area you change before editing it.
 - Database changes need an explicit, tested migration and an exported schema. Destructive migration fallback is forbidden.
 - A network error is never reported as an empty success. If not every feed was processed, the UI says so.
 - User-visible text lives in `res/values/strings.xml` (English, the default) and `res/values-ja/strings.xml` (Japanese).
-  Add both together; lint fails on a missing translation.
+  Add both together; lint fails on a missing translation. Use the terms in [docs/terminology.md](docs/terminology.md).
 - Match the surrounding code: naming, comment density and idiom. Comments explain why, in English.
 
 ## Security rules
