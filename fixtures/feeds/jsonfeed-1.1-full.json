@@ -1,0 +1,41 @@
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "架空の  JSON Feed",
+  "home_page_url": "https://example.org/",
+  "feed_url": "https://elsewhere.example.net/feed.json",
+  "description": "Synthetic test feed",
+  "favicon": "/favicon-64.png",
+  "icon": "https://example.org/icon-512.png",
+  "authors": [{"name": "フィードの著者", "url": "https://example.org/about"}],
+  "language": "ja",
+  "items": [
+    {
+      "id": "json-001",
+      "url": "https://example.org/posts/1",
+      "title": "JSON  日本語",
+      "summary": "概要です",
+      "content_html": "<p>本文</p><img src=\"/img/inline.png\">",
+      "image": "/img/main.png",
+      "banner_image": "https://example.org/img/banner.png",
+      "date_published": "2026-10-02T19:00:00+09:00",
+      "date_modified": "2026-10-03T00:00:00Z",
+      "authors": [{"name": "記事の著者"}],
+      "tags": ["fiction"]
+    },
+    {
+      "id": 42,
+      "external_url": "https://example.net/elsewhere",
+      "content_html": "<p>HTML only <b>bold</b><script>NEVER_EXECUTE()</script></p><img src=\"pics/a.png\" width=\"600\">",
+      "date_modified": "2026-10-03T08:00:00Z"
+    },
+    {
+      "id": "json-003",
+      "url": "javascript:alert(1)",
+      "title": "Unsafe link",
+      "content_text": "plain <b>not a tag</b> & more",
+      "image": "data:image/png;base64,AAAA",
+      "banner_image": "https://example.org/img/banner-3.png"
+    },
+    "not an item object"
+  ]
+}

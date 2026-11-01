@@ -25,11 +25,11 @@ enum class FetchError {
     HTTP_STATUS,
     REDIRECT_LOOP,
     TOO_MANY_REDIRECTS,
-    /** Syntactically broken XML. */
+    /** Syntactically broken XML or JSON. */
     FORMAT,
     /** HTML page instead of a feed. */
     NOT_A_FEED,
-    /** Well-formed XML but not RSS 2.0 / Atom 1.0 / RSS 1.0. */
+    /** Well-formed XML or JSON but not RSS 2.0 / Atom 1.0 / RSS 1.0 / JSON Feed 1.x. */
     UNSUPPORTED_FORMAT,
     /** Response size / entry count / XML depth above the fixed limits. Nothing stored. */
     LIMIT_EXCEEDED,

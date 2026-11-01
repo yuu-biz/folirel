@@ -25,6 +25,11 @@ The tests never fetch these paths from a real site. They are served from a local
 | `feeds/rss2-xxe.xml` | Contains a DOCTYPE with an external entity. **Rejection test only.** | `T40` |
 | `feeds/rss2-html-entities.xml` | RSS 2.0 that writes HTML named character references (`&nbsp;`, `&copy;`, `&mdash;`, `&rsquo;`, `&hellip;` and others) straight into the XML, with no DTD. | Entity decoding (`T40`) |
 | `feeds/rss091-netscape-doctype.xml` | RSS 0.91 with the Netscape `DOCTYPE` (its system id points at `example.invalid`). **Rejection test only.** | Refused, with an old-format detail (`T40`) |
+| `feeds/jsonfeed-1.0-minimal.json` | JSON Feed 1.0: escaped slashes (`https:\/\/`), the 1.0 `author` object, one item. | `T49` |
+| `feeds/jsonfeed-1.1-full.json` | JSON Feed 1.1: `authors`, `favicon` and `icon`, `summary`/`content_html`/`content_text`, `image`/`banner_image`, a numeric `id`, `external_url`, a `javascript:` link, a `data:` image and an item that is not an object. Its `feed_url` points elsewhere and must be ignored. | `T49` |
+| `feeds/jsonfeed-idless.json` | JSON Feed items without `id`: one with a `url`, one with neither (same fallback digest inputs as `rss2-idless.xml`). | `T49` |
+| `feeds/jsonfeed-invalid.json` | JSON cut off in the middle. | `FORMAT` (`T49`) |
+| `feeds/jsonfeed-wrong-version.json` | A JSON Feed with a `version` this app does not know. | `UNSUPPORTED_FORMAT` (`T49`) |
 | `expected/*.json` | Expected normalised results for the matching input, as subset assertions (the `assertions` object). `expected/rss2-idless.json` also has `contractInput`, the inputs of the fallback-ID digest (title, date, author, summary). `expected/subscriptions.json` and `expected/warnings.json` describe the OPML results. | Parser and importer tests |
 | `url-identity.json` | URL pairs that must compare equal, pairs that must stay distinct, and inputs that must be rejected (`file:`, `content:`, `javascript:`, user-info). | URL normalisation (`T06`) |
 | `icons/` | Synthetic images for source-icon decoding: `icon-32.png`, `icon-png-entry.ico` (ICO with a PNG entry), `icon-bmp.ico` (ICO with a BMP entry), `banner-300x50.png` (wide logo), `big-512.png` (large image), `not-an-image.html` and `vector.svg` (things that are not decodable bitmaps). No real site's images. | `IconDecoderTest` on a device (`U08`) |

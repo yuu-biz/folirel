@@ -1,0 +1,34 @@
+{
+  "assertions": {
+    "articleCount": 3,
+    "feedTitle": "架空の JSON Feed",
+    "articles": [
+      {
+        "entryKey": "id:json-001",
+        "title": "JSON 日本語",
+        "linkUrl": "https://example.org/posts/1",
+        "summaryText": "概要です",
+        "imageUrl": "https://example.org/img/main.png",
+        "author": "記事の著者",
+        "publishedAtIso": "2026-10-02T10:00:00Z"
+      },
+      {
+        "entryKey": "id:42",
+        "title": "",
+        "linkUrl": "https://example.net/elsewhere",
+        "summaryText": "HTML only bold",
+        "imageUrl": "https://example.org/feeds/pics/a.png",
+        "author": "フィードの著者",
+        "publishedAtIso": "2026-10-03T08:00:00Z"
+      },
+      {
+        "entryKey": "id:json-003",
+        "title": "Unsafe link",
+        "linkUrl": null,
+        "summaryText": "plain <b>not a tag</b> & more",
+        "imageUrl": "https://example.org/img/banner-3.png",
+        "publishedAt": null
+      }
+    ]
+  }
+}

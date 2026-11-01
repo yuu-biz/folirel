@@ -10,9 +10,9 @@ import io.github.yuubiz.folirel.network.UrlNormalizer
 class FeedParseException(val error: FetchError, message: String, val detail: String? = null) : Exception(message)
 
 /**
- * RSS 2.0 / Atom 1.0 / RSS 1.0 (RDF) parser. Elements are matched by namespace URI + local name, never by
- * prefix. Input is already-decoded text (see [XmlCharset]); [responseUrl] is the final response URL used as
- * the base when no xml:base applies.
+ * RSS 2.0 / Atom 1.0 / RSS 1.0 (RDF) parser; a JSON object goes to [JsonFeedParser]. Elements are matched by namespace
+ * URI + local name, never by prefix. Input is already-decoded text (see [XmlCharset]); [responseUrl] is the final
+ * response URL used as the base when no xml:base applies.
  */
 object FeedParser {
     const val ATOM = "http://www.w3.org/2005/Atom"
@@ -28,6 +28,7 @@ object FeedParser {
     private val LIMITS = XmlLimits(maxDepth = Limits.FEED_MAX_DEPTH)
 
     fun parse(text: String, responseUrl: String?): NormalizedFeed {
+        if (text.firstOrNull { !it.isWhitespace() } == '{') return JsonFeedParser.parse(text, responseUrl)
         if (HTML_START.containsMatchIn(text.take(4096))) {
             throw FeedParseException(FetchError.NOT_A_FEED, "HTML page, not a feed")
         }
@@ -189,7 +190,7 @@ object FeedParser {
             .firstNotNullOfOrNull { img -> imageUrl(img.base, img.attr("src"), img.attr("width"), img.attr("height")) }
     }
 
-    private fun escapeForHtml(text: String): String =
+    internal fun escapeForHtml(text: String): String =
         text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     // Shared
@@ -264,19 +265,19 @@ object FeedParser {
         return resolveUrl(base, url)
     }
 
-    private fun resolveUrl(base: String?, raw: String?): String? {
+    internal fun resolveUrl(base: String?, raw: String?): String? {
         if (raw.isNullOrBlank()) return null
         return (UrlNormalizer.resolve(base, raw) as? UrlNormalizer.Result.Valid)?.url
     }
 
-    private fun checkCount(count: Int) {
+    internal fun checkCount(count: Int) {
         if (count > Limits.FEED_MAX_ENTRIES) {
             throw FeedParseException(FetchError.LIMIT_EXCEEDED, "More than ${Limits.FEED_MAX_ENTRIES} entries", "ENTRY_COUNT")
         }
     }
 
     /** Same key twice in one response: the first wins, later items only fill missing fields. */
-    private fun dedupe(entries: List<NormalizedEntry>): List<NormalizedEntry> {
+    internal fun dedupe(entries: List<NormalizedEntry>): List<NormalizedEntry> {
         val byKey = LinkedHashMap<String, NormalizedEntry>()
         for (e in entries) {
             val existing = byKey[e.entryKey]

@@ -1,0 +1,16 @@
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "No ids",
+  "items": [
+    {
+      "url": "https://example.com/posts/no-id",
+      "title": "Link only",
+      "content_text": "Has a link but no id."
+    },
+    {
+      "title": "IDのない 記事",
+      "content_text": "同じ 概要",
+      "authors": [{"name": "編集部"}]
+    }
+  ]
+}

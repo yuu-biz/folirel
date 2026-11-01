@@ -1,0 +1,17 @@
+{
+  "assertions": {
+    "articleCount": 1,
+    "feedTitle": "Fictional JSON Feed 1.0",
+    "articles": [
+      {
+        "entryKey": "id:https://example.com/posts/first",
+        "title": "First post",
+        "linkUrl": "https://example.com/posts/first",
+        "summaryText": "A short summary.",
+        "author": "Editors",
+        "publishedAtIso": "2026-10-01T09:00:00Z",
+        "imageUrl": null
+      }
+    ]
+  }
+}

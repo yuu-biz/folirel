@@ -1,0 +1,15 @@
+{
+  "version": "https:\/\/jsonfeed.org\/version\/1",
+  "title": "Fictional JSON Feed 1.0",
+  "home_page_url": "https:\/\/example.com\/",
+  "author": {"name": "Editors"},
+  "items": [
+    {
+      "id": "https:\/\/example.com\/posts\/first",
+      "url": "https:\/\/example.com\/posts\/first",
+      "title": "First post",
+      "summary": "A short summary.",
+      "date_published": "2026-10-01T09:00:00Z"
+    }
+  ]
+}

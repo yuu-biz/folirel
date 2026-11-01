@@ -330,4 +330,69 @@ class FeedParserFixtureTest {
         assertEquals("DC作者", entry.author)
         assertNotNull(entry.entryKey)
     }
+
+    @Test
+    fun jsonFeed10Minimal() {
+        val feed = parseFixture("feeds/jsonfeed-1.0-minimal.json")
+        assertArticles(feed, expected("jsonfeed-1.0-minimal.json"))
+        assertEquals("https://example.com/", feed.siteUrl)
+    }
+
+    @Test
+    fun jsonFeed11Full() {
+        val feed = parseFixture("feeds/jsonfeed-1.1-full.json", responseUrl = "https://example.org/feeds/feed.json")
+        assertArticles(feed, expected("jsonfeed-1.1-full.json"))
+        assertEquals("https://example.org/", feed.siteUrl)
+        assertEquals("https://example.org/favicon-64.png", feed.iconUrl)
+        assertFalse("script text must never reach the summary", feed.entries.any { it.summaryText.contains("NEVER_EXECUTE") })
+        assertEquals("a non-object item is skipped", 3, feed.rawEntryCount)
+    }
+
+    @Test
+    fun jsonFeedWithoutIdsUsesLinkThenFallbackKey() {
+        assertArticles(parseFixture("feeds/jsonfeed-idless.json"), expected("jsonfeed-idless.json"))
+    }
+
+    @Test
+    fun brokenJsonIsFormatErrorAndOtherJsonIsUnsupported() {
+        val broken = runCatching { parseFixture("feeds/jsonfeed-invalid.json") }.exceptionOrNull() as FeedParseException
+        assertEquals(FetchError.FORMAT, broken.error)
+        val future = runCatching { parseFixture("feeds/jsonfeed-wrong-version.json") }.exceptionOrNull() as FeedParseException
+        assertEquals(FetchError.UNSUPPORTED_FORMAT, future.error)
+        val cases = mapOf(
+            """{"items": []}""" to FetchError.UNSUPPORTED_FORMAT,
+            """{"version": 1, "items": []}""" to FetchError.UNSUPPORTED_FORMAT,
+            """{"version": "https://jsonfeed.org/version/1.1", "items": {}}""" to FetchError.FORMAT,
+        )
+        for ((json, error) in cases) {
+            assertEquals(json, error, (runCatching { FeedParser.parse(json, null) }.exceptionOrNull() as FeedParseException).error)
+        }
+    }
+
+    @Test
+    fun jsonFeedWithByteOrderMarkAndHeaderCharset() {
+        val bytes = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + Fixtures.bytes("feeds/jsonfeed-1.0-minimal.json")
+        assertEquals(1, FeedParser.parse(XmlCharset.decode(bytes, "utf-8").text, null).entries.size)
+    }
+
+    @Test
+    fun jsonEntryLimitAndDepthLimit() {
+        fun json(items: Int, title: String = "x") = buildString {
+            append("""{"version":"https://jsonfeed.org/version/1.1","title":"$title","items":[""")
+            append((0 until items).joinToString(",") { """{"id":"g$it","title":"x"}""" })
+            append("]}")
+        }
+        assertEquals(2000, FeedParser.parse(json(2000), null).entries.size)
+        val tooMany = runCatching { FeedParser.parse(json(2001), null) }.exceptionOrNull() as FeedParseException
+        assertEquals(FetchError.LIMIT_EXCEEDED, tooMany.error)
+        assertEquals("ENTRY_COUNT", tooMany.detail)
+
+        val deep = """{"version":"https://jsonfeed.org/version/1.1","x":""" + "[".repeat(10_000) + "]".repeat(10_000) + "}"
+        val tooDeep = runCatching { FeedParser.parse(deep, null) }.exceptionOrNull() as FeedParseException
+        assertEquals(FetchError.LIMIT_EXCEEDED, tooDeep.error)
+        assertEquals("JSON_DEPTH", tooDeep.detail)
+
+        val bracketsInText = "[{\\\"".repeat(100)
+        assertEquals("brackets inside strings are text", bracketsInText.replace("\\", ""), FeedParser.parse(json(1, bracketsInText), null).title)
+    }
 }
