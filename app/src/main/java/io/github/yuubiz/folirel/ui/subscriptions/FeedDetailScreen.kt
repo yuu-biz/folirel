@@ -199,7 +199,7 @@ private fun DiagnosticsSection(feed: FeedNode, info: FeedFetchInfo?, d: FeedDiag
         val error = d?.error ?: feed.lastError
         LabeledValue(
             stringResource(R.string.feed_last_error),
-            error?.let { e -> errorLabel(e) + (d?.errorDetail?.let { " (${limitLabel(it)})" } ?: "") } ?: stringResource(R.string.none),
+            error?.let { e -> errorLabel(e) + (d?.errorDetail?.let { " (${detailLabel(it)})" } ?: "") } ?: stringResource(R.string.none),
         )
         info?.retryAfterUntil?.takeIf { it > System.currentTimeMillis() }?.let { LabeledValue(stringResource(R.string.diag_retry_after), time(it)) }
             ?: info?.nextEligibleAt?.takeIf { it > System.currentTimeMillis() }?.let { LabeledValue(stringResource(R.string.diag_backoff_until), time(it)) }
@@ -267,10 +267,11 @@ private fun scopeLabel(scope: String?): String = when {
 }
 
 @Composable
-private fun limitLabel(detail: String): String = when (detail) {
+private fun detailLabel(detail: String): String = when (detail) {
     "BODY_SIZE" -> stringResource(R.string.limit_body_size)
     "ENTRY_COUNT" -> stringResource(R.string.limit_entry_count)
     "XML_DEPTH" -> stringResource(R.string.limit_xml_depth)
     "XML_ELEMENTS" -> stringResource(R.string.limit_xml_elements)
+    "DOCTYPE_RSS091" -> stringResource(R.string.detail_doctype_rss091)
     else -> detail
 }

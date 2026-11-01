@@ -308,6 +308,7 @@
     <string name="limit_entry_count">記事数</string>
     <string name="limit_xml_depth">XML深度</string>
     <string name="limit_xml_elements">XML要素数</string>
+    <string name="detail_doctype_rss091">DTDを宣言する古いRSS 0.91形式。FolirelはDTDを読みません</string>
     <string name="list_mode_magazine">マガジン</string>
     <string name="no">いいえ</string>
     <string name="reason_backoff">失敗後の待機、またはサーバー指定の待機中です。通常の失敗は手動更新ですぐ再試行します。サーバー指定の待機は守ります。</string>

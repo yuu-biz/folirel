@@ -98,7 +98,11 @@ object SafeXmlReader {
             while (true) {
                 when (parser.nextToken()) {
                     XmlPullParser.END_DOCUMENT -> break
-                    XmlPullParser.DOCDECL -> throw XmlRejectedException(XmlRejectedException.Kind.SECURITY, "DOCTYPE is not allowed")
+                    XmlPullParser.DOCDECL -> throw XmlRejectedException(
+                        XmlRejectedException.Kind.SECURITY,
+                        "DOCTYPE is not allowed",
+                        if (isPlainRss091Doctype(parser.text.orEmpty())) "DOCTYPE_RSS091" else null,
+                    )
                     XmlPullParser.START_TAG -> {
                         if (parser.namespace == XINCLUDE_NS) {
                             throw XmlRejectedException(XmlRejectedException.Kind.SECURITY, "XInclude is not allowed")
@@ -168,4 +172,11 @@ object SafeXmlReader {
         if (stack.isNotEmpty()) throw XmlRejectedException(XmlRejectedException.Kind.MALFORMED, "Unclosed element")
         return root ?: throw XmlRejectedException(XmlRejectedException.Kind.MALFORMED, "Empty document")
     }
+
+    /**
+     * The Netscape DTD that old RSS 0.91 feeds declare. It is refused like any DOCTYPE; the detail only lets diagnostics
+     * say that this is an old format rather than an attack. A declaration with its own internal subset gets no such label.
+     */
+    private fun isPlainRss091Doctype(doctype: String): Boolean =
+        doctype.contains("-//Netscape Communications//DTD RSS 0.91//EN") && '[' !in doctype
 }

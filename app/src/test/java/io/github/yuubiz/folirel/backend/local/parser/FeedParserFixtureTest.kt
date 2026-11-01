@@ -154,6 +154,7 @@ class FeedParserFixtureTest {
         val xml = """<?xml version="1.0"?><!DOCTYPE rss><rss version="2.0"><channel><title>t</title></channel></rss>"""
         val e = runCatching { FeedParser.parse(xml, null) }.exceptionOrNull() as FeedParseException
         assertEquals(FetchError.SECURITY, e.error)
+        assertNull(e.detail)
     }
 
     @Test
@@ -186,6 +187,21 @@ class FeedParserFixtureTest {
         val xml = """<rss version="2.0"><channel><title>t</title><item><guid>1</guid><enclosure url="https://example.com/a&nbsp;b.jpg" type="image/jpeg"/></item></channel></rss>"""
         val v = SafeXmlReader.read(xml, XmlLimits(maxDepth = 64)).descendants().first { it.name == "enclosure" }.attr("url")
         assertEquals("https://example.com/a&nbsp;b.jpg", v)
+    }
+
+    @Test
+    fun netscapeRss091DoctypeIsRejectedAndSaysWhy() {
+        val e = runCatching { parseFixture("feeds/rss091-netscape-doctype.xml") }.exceptionOrNull() as FeedParseException
+        assertEquals(FetchError.SECURITY, e.error)
+        assertEquals("DOCTYPE_RSS091", e.detail)
+    }
+
+    @Test
+    fun aNetscapeDoctypeWithItsOwnDeclarationsGetsNoSpecialLabel() {
+        val xml = """<?xml version="1.0"?><!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//EN" "https://example.invalid/rss-0.91.dtd" [<!ENTITY x SYSTEM "https://example.invalid/x">]><rss version="0.91"><channel><title>&x;</title></channel></rss>"""
+        val e = runCatching { FeedParser.parse(xml, null) }.exceptionOrNull() as FeedParseException
+        assertEquals(FetchError.SECURITY, e.error)
+        assertNull(e.detail)
     }
 
     @Test

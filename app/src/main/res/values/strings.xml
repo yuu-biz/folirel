@@ -318,6 +318,7 @@
     <string name="limit_entry_count">number of entries</string>
     <string name="limit_xml_depth">XML depth</string>
     <string name="limit_xml_elements">number of XML elements</string>
+    <string name="detail_doctype_rss091">old RSS 0.91 feed that declares a DTD, which Folirel does not read</string>
     <string name="list_mode_magazine">Magazine</string>
     <string name="no">No</string>
     <string name="reason_backoff">Waiting after a failure or for the server\'s Retry-After. A manual refresh retries an ordinary failure now; a server wait is respected.</string>

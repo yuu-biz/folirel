@@ -24,6 +24,7 @@ The tests never fetch these paths from a real site. They are served from a local
 | `feeds/malformed.xml` | A broken RSS document. | Failure keeps previously stored articles (`T23`) |
 | `feeds/rss2-xxe.xml` | Contains a DOCTYPE with an external entity. **Rejection test only.** | `T40` |
 | `feeds/rss2-html-entities.xml` | RSS 2.0 that writes HTML named character references (`&nbsp;`, `&copy;`, `&mdash;`, `&rsquo;`, `&hellip;` and others) straight into the XML, with no DTD. | Entity decoding (`T40`) |
+| `feeds/rss091-netscape-doctype.xml` | RSS 0.91 with the Netscape `DOCTYPE` (its system id points at `example.invalid`). **Rejection test only.** | Refused, with an old-format detail (`T40`) |
 | `expected/*.json` | Expected normalised results for the matching input, as subset assertions (the `assertions` object). `expected/rss2-idless.json` also has `contractInput`, the inputs of the fallback-ID digest (title, date, author, summary). `expected/subscriptions.json` and `expected/warnings.json` describe the OPML results. | Parser and importer tests |
 | `url-identity.json` | URL pairs that must compare equal, pairs that must stay distinct, and inputs that must be rejected (`file:`, `content:`, `javascript:`, user-info). | URL normalisation (`T06`) |
 | `icons/` | Synthetic images for source-icon decoding: `icon-32.png`, `icon-png-entry.ico` (ICO with a PNG entry), `icon-bmp.ico` (ICO with a BMP entry), `banner-300x50.png` (wide logo), `big-512.png` (large image), `not-an-image.html` and `vector.svg` (things that are not decodable bitmaps). No real site's images. | `IconDecoderTest` on a device (`U08`) |
@@ -34,7 +35,7 @@ The expected files assert the fields a test needs, not the whole parser output. 
 
 - Keep every value fictional. Do not add real feeds, real OPML exports, real subscription URLs (or their query strings), cookies or tokens. Personal data belongs in `local-data/`, which is not committed.
 - `feeds/rss2-shiftjis.xml` must stay Shift_JIS bytes. Do not re-save it as UTF-8 or let an editor or line-ending conversion touch it; `.gitattributes` marks it as `-text` so Git leaves the bytes alone.
-- The DOCTYPE and external-entity files (`opml/doctype.opml`, `feeds/rss2-xxe.xml`) exist so that tests can check they are **rejected**. They point at `example.invalid`, which must never be resolved. Do not feed them to a parser that resolves entities, and do not open or process them with tools that do.
+- The DOCTYPE and external-entity files (`opml/doctype.opml`, `feeds/rss2-xxe.xml`, `feeds/rss091-netscape-doctype.xml`) exist so that tests can check they are **rejected**. They point at `example.invalid`, which must never be resolved. Do not feed them to a parser that resolves entities, and do not open or process them with tools that do.
 - Do not change expected values to make a test pass. If behaviour changes on purpose, change the fixture's expectation and the test together and say why.
 - The small set does not cover every scenario. HTTP status codes, redirects, DNS rules, compression and size limits, database races and 5,000-article data sets are generated inside the tests.
 

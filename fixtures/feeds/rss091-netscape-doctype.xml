@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//EN" "https://example.invalid/rss-0.91.dtd">
+<rss version="0.91">
+<channel>
+<title>Old fictional feed</title>
+<link>https://example.com/</link>
+<description>RSS 0.91 that declares the Netscape DTD</description>
+<language>en</language>
+<item><title>Item one</title><link>https://example.com/old-001</link></item>
+</channel>
+</rss>

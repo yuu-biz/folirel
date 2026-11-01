@@ -246,7 +246,8 @@ exists only in test code.
 `nextToken()` mode so that a DOCTYPE is visible as a token and is rejected rather than skipped:
 
 - DOCTYPE (and therefore any entity or external DTD declaration) is refused. XInclude elements are refused. Nothing
-  from the network or the file system is ever resolved by the parser.
+  from the network or the file system is ever resolved by the parser. Old RSS 0.91 feeds that declare the Netscape DTD
+  are refused the same way; the feed's diagnostics name that old format instead of leaving a bare security refusal.
 - Besides the five XML built-ins and numeric character references, HTML named character references in text (`&nbsp;`,
   `&copy;`, `&mdash;` and the rest of the HTML5 list, which many feeds write without declaring them) are decoded from
   the fixed table in jsoup. This is a lookup, not entity expansion: no declaration from the document is ever used. An
