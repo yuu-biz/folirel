@@ -186,7 +186,8 @@ private fun SettingsTop(s: AppSettings, onOpenPage: (SettingsPage) -> Unit) {
         intervalName(s.refreshIntervalMinutes) + dash + stringResource(if (s.unmeteredOnly) R.string.settings_summary_unmetered else R.string.settings_summary_any_network)
     }
     val storage = retentionSummary(s.retentionLimit) + dash + stringResource(R.string.settings_summary_images_mb, s.imageCacheMb)
-    val about = stringResource(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE, BuildConfig.GIT_COMMIT)
+    // The build (git hash) is for bug reports and is shown in About only.
+    val about = stringResource(R.string.settings_version_short, BuildConfig.VERSION_NAME)
     listOf(
         SettingsPage.APPEARANCE to appearance,
         SettingsPage.LAYOUT to layout,

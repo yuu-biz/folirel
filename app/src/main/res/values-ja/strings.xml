@@ -710,4 +710,5 @@
     <string name="empty_action_show_all">すべての記事を表示</string>
     <string name="feed_open_site">サイトを開く</string>
     <string name="feed_details_section">詳細</string>
+    <string name="settings_version_short">バージョン %1$s</string>
 </resources>

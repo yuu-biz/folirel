@@ -735,4 +735,5 @@
     <string name="empty_action_show_all">Show all articles</string>
     <string name="feed_open_site">Open site</string>
     <string name="feed_details_section">Details</string>
+    <string name="settings_version_short">Version %1$s</string>
 </resources>
