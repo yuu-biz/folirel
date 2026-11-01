@@ -47,6 +47,8 @@ android {
             isIncludeAndroidResources = true
             all { test ->
                 test.maxHeapSize = "2g"
+                // *Probe classes are timing measurements, not checks; run them with -Pfolirel.probe.
+                if (!project.hasProperty("folirel.probe")) test.exclude("**/*Probe.class")
                 // Robolectric 4.17 on JDK 17+ needs access to FileDescriptor internals.
                 test.jvmArgs(
                     "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
