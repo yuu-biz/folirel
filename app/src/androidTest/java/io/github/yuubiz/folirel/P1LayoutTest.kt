@@ -274,7 +274,7 @@ class P1LayoutTest {
         launch()
         compose.onNodeWithTag("display_open").performClick()
         compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("layout_details")).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("layout_details").performClick()
+        compose.onNodeWithTag("layout_details").performScrollTo().performClick()
         compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("category_layout_sheet")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("cl_list_MAGAZINE").performClick()
         compose.waitForIdle()

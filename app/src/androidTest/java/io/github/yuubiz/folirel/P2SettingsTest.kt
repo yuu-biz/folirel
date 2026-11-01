@@ -154,7 +154,7 @@ class P2SettingsTest {
         listOf("theme_DARK", "palette_LEAF", "text_size_slider", "interval_row", "retention_row", "allow_http", "settings_layout_MAGAZINE").forEach { compose.onNodeWithTag(it).assertDoesNotExist() }
         // A summary under each: the values as they are now.
         compose.onNodeWithText(listOf(str(R.string.theme_system), str(R.string.palette_classic), str(R.string.percent_value, 100)).joinToString(" · ")).assertExists()
-        compose.onNodeWithText(str(R.string.list_mode_list)).assertExists()
+        compose.onNodeWithText(listOf(str(R.string.nav_mode_auto), str(R.string.list_mode_list)).joinToString(" · ")).assertExists()
         compose.onNodeWithText(str(R.string.browser_custom_tabs)).assertExists()
         compose.onNodeWithText(listOf(str(R.string.settings_summary_no_limit), str(R.string.settings_summary_images_mb, 128)).joinToString(" · ")).assertExists()
         // 2 hours and the unmetered rule (the defaults of TestData.reset: automatic updates are off there, so the summary says that).
