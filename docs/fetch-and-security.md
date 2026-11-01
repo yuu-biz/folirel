@@ -208,8 +208,10 @@ hide another feed's failure.
   app does not bypass this.
 - Startup refresh runs at most once per 30 minutes, measured from the last refresh attempt of any kind (manual, import,
   startup, periodic). An automatic request blocked by these rules is not counted as an attempt.
-- Periodic refresh is a unique WorkManager periodic job with the configured interval (minimum 15 minutes) and a
-  network constraint of unmetered or connected. Timing is inexact and the OS may delay it.
+- Periodic refresh is a unique WorkManager periodic job with the configured interval (minimum 15 minutes), a
+  network constraint of unmetered or connected, and "battery not low". Timing is inexact and the OS may delay it. The
+  job is re-registered with the UPDATE policy at each app start, so a changed constraint reaches existing installs
+  without moving the schedule.
 - If a periodic run leaves feeds unstarted or cancelled, the worker schedules up to two follow-up runs for the
   *pending* scope, each 3 minutes after the previous one, under the same network constraint. Otherwise the next run starts with the feeds
   attempted longest ago, so feeds are not starved.

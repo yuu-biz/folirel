@@ -2,7 +2,10 @@ package io.github.yuubiz.folirel.sync
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
@@ -112,11 +115,13 @@ class UpdateConstraintsTest {
         scheduler.apply(ready) // default: every 2 h, unmetered only
         val twoHours = info()!!
         assertEquals(NetworkType.UNMETERED, twoHours.constraints.requiredNetworkType)
+        assertTrue(twoHours.constraints.requiresBatteryNotLow())
         assertEquals(TimeUnit.HOURS.toMillis(2), twoHours.periodicityInfo!!.repeatIntervalMillis)
 
         scheduler.apply(ready.copy(refreshIntervalMinutes = 360, unmeteredOnly = false))
         val six = info()!!
         assertEquals(NetworkType.CONNECTED, six.constraints.requiredNetworkType)
+        assertTrue(six.constraints.requiresBatteryNotLow())
         assertEquals(TimeUnit.HOURS.toMillis(6), six.periodicityInfo!!.repeatIntervalMillis)
 
         scheduler.apply(ready.copy(refreshIntervalMinutes = 15))
@@ -126,5 +131,25 @@ class UpdateConstraintsTest {
 
         scheduler.apply(ready.copy(refreshIntervalMinutes = 0))
         assertEquals(null, info())
+    }
+
+    @Test
+    fun anInstallUpdatedFromAnOlderVersionGetsTheNewConstraintOnItsNextStart() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        WorkManagerTestInitHelper.initializeTestWorkManager(context)
+        val wm = WorkManager.getInstance(context)
+        fun info(): WorkInfo = wm.getWorkInfosForUniqueWork(RefreshScheduler.WORK_NAME).get().single { !it.state.isFinished }
+        // What 0.10.x registered: the network rule only.
+        val old = PeriodicWorkRequestBuilder<RefreshWorker>(2, TimeUnit.HOURS)
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build())
+            .build()
+        wm.enqueueUniquePeriodicWork(RefreshScheduler.WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, old).result.get()
+        assertFalse(info().constraints.requiresBatteryNotLow())
+
+        RefreshScheduler(context).apply(ready) // a new process after the update
+        val updated = info()
+        assertEquals("the same work, updated in place", old.id, updated.id)
+        assertTrue(updated.constraints.requiresBatteryNotLow())
+        assertEquals(NetworkType.UNMETERED, updated.constraints.requiredNetworkType)
     }
 }

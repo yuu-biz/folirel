@@ -89,6 +89,7 @@ class RefreshScheduler(private val context: Context) {
 
         fun constraints(unmeteredOnly: Boolean): Constraints = Constraints.Builder()
             .setRequiredNetworkType(if (unmeteredOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
+            .setRequiresBatteryNotLow(true)
             .build()
     }
 }
