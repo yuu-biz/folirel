@@ -1,5 +1,6 @@
 package io.github.yuubiz.folirel.app
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -26,11 +27,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import io.github.yuubiz.folirel.R
 import io.github.yuubiz.folirel.data.backup.BackupFormat
 import io.github.yuubiz.folirel.data.preferences.AppSettings
 import io.github.yuubiz.folirel.ui.home.FeedIconStore
@@ -57,10 +60,13 @@ import io.github.yuubiz.folirel.ui.subscriptions.SubscriptionsScreen
 import io.github.yuubiz.folirel.ui.subscriptions.SubscriptionsViewModel
 import io.github.yuubiz.folirel.ui.theme.FolirelTheme
 import io.github.yuubiz.folirel.ui.theme.isDarkTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.time.ZonedDateTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -174,8 +180,17 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings, subscr
     val createOpml = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/x-opml")) { uri ->
         if (uri != null) subscriptionsVm.export(uri)
     }
-    val pickOpml = { openOpml.launch(arrayOf("*/*")) }
-    val exportOpml = { createOpml.launch("folirel-subscriptions.opml") }
+    val noDocumentApp = stringResource(R.string.no_document_app)
+    // Some devices (work profiles, stripped-down builds) have no app that handles the system file picker.
+    fun launchDocuments(launch: () -> Unit) {
+        try {
+            launch()
+        } catch (_: ActivityNotFoundException) {
+            scope.launch { rootSnackbar.showSnackbar(noDocumentApp) }
+        }
+    }
+    val pickOpml = { launchDocuments { openOpml.launch(arrayOf("*/*")) } }
+    val exportOpml = { launchDocuments { createOpml.launch("folirel-subscriptions.opml") } }
     val createBackupDocument = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(BackupFormat.MIME_TYPE)) { uri ->
         if (uri != null) backupVm.createBackup(uri)
     }
@@ -186,17 +201,23 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings, subscr
             if (stack.lastOrNull() != ROUTE_RESTORE) push(ROUTE_RESTORE)
         }
     }
-    val createBackup = { createBackupDocument.launch(BackupFormat.fileName(ZonedDateTime.now())) }
+    val createBackup = { launchDocuments { createBackupDocument.launch(BackupFormat.fileName(ZonedDateTime.now())) } }
     // Any type: some providers label a ZIP as octet-stream; the content decides, not the label.
-    val pickBackup = { openBackup.launch(arrayOf("*/*")) }
+    val pickBackup = { launchDocuments { openBackup.launch(arrayOf("*/*")) } }
+    val settingsSaveFailed = stringResource(R.string.settings_save_failed)
 
     Box(Modifier.fillMaxSize()) {
         if (!settings.onboardingDone) {
             OnboardingScreen { autoUpdate, next ->
-                scope.launch {
-                    container.settings.setRefreshIntervalMinutes(if (autoUpdate) 120 else 0)
-                    container.settings.setStartupRefresh(autoUpdate)
-                    container.settings.setOnboardingDone(true)
+                // Not the composition's scope: a rotation would cancel the writes halfway. If they fail, setup stays on screen.
+                container.appScope.launch {
+                    try {
+                        container.settings.setRefreshIntervalMinutes(if (autoUpdate) 120 else 0)
+                        container.settings.setStartupRefresh(autoUpdate)
+                        container.settings.setOnboardingDone(true)
+                    } catch (_: IOException) {
+                        withContext(Dispatchers.Main) { rootSnackbar.showSnackbar(settingsSaveFailed) }
+                    }
                 }
                 when (next) {
                     OnboardingNext.IMPORT -> pickOpml()

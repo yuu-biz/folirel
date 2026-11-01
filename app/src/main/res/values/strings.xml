@@ -618,6 +618,7 @@
     <string name="layout_hidden_kept_note">Choices for a setting that this layout does not have are kept for when the layout changes.</string>
     <string name="browser_note">Custom Tabs open the article in a tab of your browser on top of this app. If that is not possible, the external browser is used.</string>
     <string name="settings_save_failed">Could not save the setting.</string>
+    <string name="no_document_app">No app on this device can open or save files.</string>
     <!-- Share to Subscribe -->
     <string name="share_title">Subscribe to a feed</string>
     <string name="share_choose_note">The shared text has several web addresses. Pick the one to check; nothing is looked at before you pick.</string>

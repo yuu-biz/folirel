@@ -593,6 +593,7 @@
     <string name="layout_hidden_kept_note">このレイアウトにない設定の選択は消えず、レイアウトを変えたときに使われます。</string>
     <string name="browser_note">Custom Tabsは、お使いのブラウザのタブをこのアプリの上に開いて記事を表示します。使えない場合は外部ブラウザで開きます。</string>
     <string name="settings_save_failed">設定を保存できませんでした。</string>
+    <string name="no_document_app">この端末には、ファイルを開いたり保存したりできるアプリがありません。</string>
     <!-- Share to Subscribe -->
     <string name="share_title">フィードを購読</string>
     <string name="share_choose_note">共有されたテキストに複数のWebアドレスがあります。調べるものを選んでください。選ぶまでは何も読み込みません。</string>
