@@ -66,6 +66,69 @@ class EntryIdentityDriftTest {
         assertEquals(listOf("First|read=true|saved=false", "Second|read=false|saved=true", "Third|read=false|saved=false"), stored(feedId))
     }
 
+    /**
+     * Documents current behaviour (not a fix): the stored key is never rewritten (D57), so after a GUID rewrite the article is found by
+     * its content only, and an edit of its text under the new GUID stores it again as unread.
+     */
+    @Test
+    fun currentBehaviour_afterRewrittenGuidsALaterEditIsStoredAgainAsUnread() = runBlocking {
+        val feedId = feed()
+        fetch(feedId, articles)
+        env.articles.setRead(idOf(feedId, "First"), true)
+        val rewritten = articles.map { it.copy(guid = "b-" + it.guid!!.removePrefix("a-")) }
+        fetch(feedId, rewritten)
+
+        fetch(feedId, rewritten.map { if (it.title == "First") it.copy(summary = "One, corrected") else it })
+
+        assertEquals(
+            listOf("First|read=false|saved=false", "First|read=true|saved=false", "Second|read=false|saved=false", "Third|read=false|saved=false"),
+            stored(feedId),
+        )
+    }
+
+    /** A feed that links every item to its homepage under one title: a new item has its own date and text, so it is new and unread. */
+    @Test
+    fun oneLinkAndTitleForEveryItemStillGivesNewArticles() = runBlocking {
+        val feedId = feed()
+        val home = "https://example.com/"
+        fetch(feedId, listOf(Item("Status", home, "s-1", 1, "Quiet day")))
+        env.articles.setRead(idOf(feedId, "Status"), true)
+
+        fetch(feedId, listOf(Item("Status", home, "s-2", 2, "Quiet day")))
+        fetch(feedId, listOf(Item("Status", home, "s-3", 2, "Busy day")))
+
+        assertEquals(listOf("Status|read=false|saved=false", "Status|read=false|saved=false", "Status|read=true|saved=false"), stored(feedId))
+    }
+
+    /** Two entries of one fetch with the same link: which of them would be the stored article is not known, so neither is. */
+    @Test
+    fun aLinkSharedInsideOneFetchIsNeverMatchedByContent() = runBlocking {
+        val feedId = feed()
+        fetch(feedId, articles.take(1))
+        env.articles.setRead(idOf(feedId, "First"), true)
+
+        fetch(feedId, listOf(articles[0].copy(guid = "b-1"), articles[0].copy(guid = "c-1")))
+
+        assertEquals(listOf("First|read=false|saved=false", "First|read=false|saved=false", "First|read=true|saved=false"), stored(feedId))
+    }
+
+    /** The stored article's own key is still in the fetch: an entry that repeats its old content under a new key is another article. */
+    @Test
+    fun anArticleStillPresentUnderItsKeyIsNotTakenByAnotherEntry() = runBlocking {
+        val feedId = feed()
+        fetch(feedId, articles.take(1))
+        env.articles.setRead(idOf(feedId, "First"), true)
+
+        fetch(feedId, listOf(articles[0].copy(guid = "b-1"), articles[0].copy(link = "https://example.com/posts/1-moved")))
+
+        val rows = env.db.articleDao().articlesOfFeed(feedId)
+        assertEquals(2, rows.size)
+        val kept = rows.single { it.entryKey == "id:a-1" }
+        assertEquals("https://example.com/posts/1-moved", kept.linkUrl)
+        assertEquals(true, env.db.articleDao().state(kept.id)!!.isRead)
+        assertEquals(false, env.db.articleDao().state(rows.single { it.entryKey == "id:b-1" }.id)!!.isRead)
+    }
+
     /** Documents current behaviour (not a fix): with neither GUID nor link, the summary is part of the identity. */
     @Test
     fun currentBehaviour_editedSummaryWithoutGuidOrLinkIsStoredAgainAsUnread() = runBlocking {

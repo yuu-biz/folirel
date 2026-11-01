@@ -21,6 +21,13 @@ interface ArticleDao {
     @Query("SELECT id, entryKey FROM articles WHERE accountId = :accountId AND feedId = :feedId AND entryKey IN (:keys)")
     suspend fun findByKeys(accountId: String, feedId: String, keys: List<String>): List<ArticleKeyRow>
 
+    /** The articles of one feed that carry exactly this link, title, date and text (B3: a feed that rewrote its GUIDs). */
+    @Query(
+        """SELECT id, entryKey FROM articles WHERE accountId = :accountId AND feedId = :feedId AND linkUrl = :linkUrl
+           AND title = :title AND publishedAt = :publishedAt AND summaryText = :summaryText""",
+    )
+    suspend fun findSameContent(accountId: String, feedId: String, linkUrl: String, title: String, publishedAt: Long, summaryText: String): List<ArticleKeyRow>
+
     /** ABORT on conflict. Never REPLACE: SQLite REPLACE deletes the row and cascades to article_states. */
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertArticle(article: ArticleEntity)
