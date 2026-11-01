@@ -57,7 +57,7 @@ class SmallResourceFetcher(private val client: OkHttpClient) {
 
     /**
      * One read of an address that may be a page or a feed. The limit depends on what the document turns out to be, decided from its
-     * root element once the first [SNIFF_BYTES] are in: an RSS/Atom/RDF document may be [feedMaxBytes] long (above that it fails, like
+     * root element (or a leading `{`) once the first [SNIFF_BYTES] are in: an RSS/Atom/RDF or JSON document may be [feedMaxBytes] long (above that it fails, like
      * the feed fetcher), anything else is cut at [pageMaxBytes] like the head of a page. The caller can use the bytes of a feed as
      * they are, so a feed address is not fetched a second time to be checked.
      */
