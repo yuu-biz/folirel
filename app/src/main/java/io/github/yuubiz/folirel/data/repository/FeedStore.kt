@@ -13,6 +13,7 @@ import io.github.yuubiz.folirel.data.db.FeedIconEntity
 import io.github.yuubiz.folirel.data.db.IconStatus
 import io.github.yuubiz.folirel.model.EntryKeyAliases
 import io.github.yuubiz.folirel.model.FetchError
+import io.github.yuubiz.folirel.model.NormalizedEntry
 import io.github.yuubiz.folirel.model.NormalizedFeed
 import java.time.Clock
 
@@ -126,12 +127,16 @@ class FeedStore(
         var updated = 0
         var skippedPruned = 0
         val insertedIds = ArrayList<String>()
+        val keysInFetch = feed.entries.mapTo(HashSet()) { it.entryKey }
+        val entriesPerLink = feed.entries.groupingBy { it.linkUrl }.eachCount()
         for (entry in feed.entries) {
             // Same article whose URL-like id/link only changed between http:// and https:// (e.g. after the feed
             // moved to HTTPS) is the same article, not a new unread one.
-            val existingId = articles.findId(current.accountId, feedId, entry.entryKey)
+            val knownId = articles.findId(current.accountId, feedId, entry.entryKey)
                 ?: schemeVariant(entry.entryKey)?.let { articles.findId(current.accountId, feedId, it) }
                 ?: if (aliasing) sameAddressArticle(current.accountId, feedId, entry.entryKey) else null
+            val existingId = knownId
+                ?: if (entriesPerLink[entry.linkUrl] == 1) sameContentArticle(current.accountId, feedId, entry, keysInFetch) else null
             if (existingId != null) {
                 articles.updateMetadata(
                     id = existingId,
@@ -267,6 +272,21 @@ class FeedStore(
         return variants.firstNotNullOfOrNull { found[it] }
     }
 
+    /**
+     * B3: the one stored article of this feed that [entry] repeats under a new GUID: the same link, title, date and text, while its
+     * own key is gone from the fetch. Two articles that agree in all of these cannot be told apart by the reader, so nothing distinct
+     * is merged; a feed that gives every item one link (a homepage) still has a date and a text per item. Only GUID keys on both
+     * sides: a GUID added to or dropped from an item of a feed that never moved stays a new article (D57). An entry without a link
+     * or date, or one whose link another entry of this fetch shares, is never matched this way.
+     */
+    private suspend fun sameContentArticle(accountId: String, feedId: String, entry: NormalizedEntry, keysInFetch: Set<String>): String? {
+        if (!entry.entryKey.startsWith(GUID_KEY)) return null
+        val link = entry.linkUrl ?: return null
+        val published = entry.publishedAt ?: return null
+        val match = articles.findSameContent(accountId, feedId, link, entry.title, published, entry.summaryText).singleOrNull() ?: return null
+        return match.id.takeIf { match.entryKey.startsWith(GUID_KEY) && match.entryKey !in keysInFetch }
+    }
+
     // Request bookkeeping: diagnostics only. lastAttemptAt / lastSuccessAt are never moved by these.
 
     private suspend fun ensureDiagnostics(feedIds: List<String>) {
@@ -316,6 +336,7 @@ class FeedStore(
             else -> null
         }
         private const val CHUNK = 500
+        private const val GUID_KEY = "id:"
     }
 }
 
