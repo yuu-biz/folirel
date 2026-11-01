@@ -41,7 +41,7 @@
     <string name="empty_search">「%1$s」に一致する記事はありません。</string>
     <string name="empty_unread">未読の記事はありません。</string>
     <string name="error_access_denied">アクセス拒否</string>
-    <string name="error_format">フィードの形式エラー（XML）</string>
+    <string name="error_format">フィードの形式エラー（XML/JSON）</string>
     <string name="error_gone">フィード廃止</string>
     <string name="error_http_blocked">HTTP未許可</string>
     <string name="error_http_status">想定外の応答</string>
@@ -703,4 +703,5 @@
     <string name="restore_retry">もう一度試す</string>
     <string name="restore_failed">バックアップを復元できませんでした。データと設定は変更していません。</string>
     <string name="restore_failed_settings">バックアップを復元できませんでした。データは変更していません。以前の設定は、次にFolirelを起動したときに戻ります。</string>
+    <string name="limit_json_depth">JSON深度</string>
 </resources>

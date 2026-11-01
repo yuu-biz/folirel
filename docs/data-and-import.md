@@ -81,7 +81,7 @@ created one wins. Preview and commit use the same lookup, so the counts shown eq
 
 `entryKey` is unique per feed and chosen in this order:
 
-1. `id:` followed by the trimmed RSS `guid`, Atom `id` or RSS 1.0 `rdf:about`, if non-empty. The value is opaque and
+1. `id:` followed by the trimmed RSS `guid`, Atom `id`, RSS 1.0 `rdf:about` or JSON Feed `id`, if non-empty. The value is opaque and
    is not URL-normalized.
 2. Otherwise `url:` followed by the normalized article URL.
 3. Otherwise `fallback:` followed by the lower-case hex SHA-256 of a compact JSON array

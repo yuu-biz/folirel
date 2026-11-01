@@ -60,7 +60,7 @@ Notes:
 
 ## Add a feed URL
 
-Choose **Add feed URL** (home screen menu, empty-state button, or the plus button on **Subscriptions**) and enter the address of an RSS or Atom feed. This must be the feed itself, not the web page of the site. If you enter a page address, the feed later fails with "Web page, not a feed". Feed formats supported are RSS 2.0, Atom 1.0 and RSS 1.0 (RDF).
+Choose **Add feed URL** (home screen menu, empty-state button, or the plus button on **Subscriptions**) and enter the address of an RSS or Atom feed. This must be the feed itself, not the web page of the site. If you enter a page address, the feed later fails with "Web page, not a feed". Feed formats supported are RSS 2.0, Atom 1.0, RSS 1.0 (RDF) and JSON Feed 1.0 and 1.1.
 
 If the URL starts with `http://`, the feed is added but not fetched until you allow HTTP in Settings (see [HTTP and HTTPS](#http-and-https)).
 
@@ -194,7 +194,7 @@ The Storage and data page also shows the number of articles stored and the datab
 - No built-in article reader, no full-text extraction, no offline copy of pages, no notifications, no widgets, no text-to-speech and no sync between devices. Articles are read on the original site.
 - Only what a feed currently returns is available. Older articles are not retrieved by crawling archives or pages.
 - A single feed document is limited to about 5 MiB and 2,000 entries; larger documents fail with "Too large or too many entries". OPML files are limited to 5 MiB.
-- Supported feed formats: RSS 2.0, Atom 1.0, RSS 1.0 (RDF). Other formats (for example JSON Feed) are not supported.
+- Supported feed formats: RSS 2.0, Atom 1.0, RSS 1.0 (RDF), JSON Feed 1.0 and 1.1. Other formats (for example Atom 0.3 or a site's own JSON API) are not supported.
 - Automatic refresh times are approximate and depend on Android's power management.
 - Older Android versions (for example Android 9) may fail to open HTTPS connections to some sites if their root certificates are out of date. Folirel does not weaken certificate checks to work around this.
 - The language follows the system language: Japanese if the device is set to Japanese, English otherwise. On Android 13 and later you can also pick the app language in the system settings (Settings > Apps > Folirel > Language); there is no language switch inside the app.
@@ -210,7 +210,7 @@ The Storage and data page also shows the number of articles stored and the datab
 | **Access denied** | The server refuses the request. Private feeds that need a sign-in cannot be read. |
 | **Too many requests** / **Server error** / **Timed out** / **Network error** | Usually temporary. Folirel retries later. To try sooner, use **Retry unfinished**. If the server asked Folirel to wait, it waits. The HTTP status code is on the feed details, in the **Response** row. |
 | **Certificate error** | The site's HTTPS certificate cannot be verified (expired, wrong name, unknown issuer, or an outdated root list on an old device). Folirel will not bypass this. |
-| **Broken feed (XML error)** / **Unsupported feed format** | The document is not valid RSS/Atom. Nothing to fix on your side; tell the site owner or use another feed address. |
+| **Broken feed (XML or JSON error)** / **Unsupported feed format** | The document is not a valid feed in a supported format. Nothing to fix on your side; tell the site owner or use another feed address. |
 | **Too large or too many entries** | The feed exceeds the limits above. |
 | **Blocked for safety** | The address (or a redirect) points to something Folirel refuses to contact, such as a local or private network address (Folirel contacts public internet addresses only). |
 | **Could not save (check free space)** | The device is out of storage. Free some space. |

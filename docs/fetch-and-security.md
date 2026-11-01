@@ -9,42 +9,48 @@ policy).
 
 ## 1. Supported formats
 
-RSS 2.0, Atom 1.0 and RSS 1.0 (RDF) are supported. Elements are matched by namespace URI and local name, never by
-prefix. Not supported: Atom 0.3 (`UNSUPPORTED_FORMAT`), JSON Feed, vendor-specific JSON APIs. An HTML page in place of
+RSS 2.0, Atom 1.0, RSS 1.0 (RDF) and JSON Feed 1.0 and 1.1 are supported. XML elements are matched by namespace URI
+and local name, never by prefix. A body whose first non-blank character is `{` is read as JSON Feed; it must have
+`"version": "https://jsonfeed.org/version/1"` or `.../version/1.1`. Not supported: Atom 0.3 and JSON with any other
+`version` or none (`UNSUPPORTED_FORMAT`), vendor-specific JSON APIs. An HTML page in place of
 a feed is reported as `NOT_A_FEED`; feed URLs are not discovered from arbitrary HTML when adding a feed. (The only
 HTML reading is the user-triggered search for a moved feed and the check of an address shared from another app, both section 8.)
 
-| Field | RSS 2.0 | Atom 1.0 | RSS 1.0 |
-|---|---|---|---|
-| ID | `guid` | `id` | `rdf:about` |
-| Title | `title` (character entities decoded, tags not interpreted) | `title`, interpreted by `type` (text, html, xhtml) | `title` (as RSS 2.0) |
-| Link | `link`; a `guid` is also a link candidate unless `isPermaLink="false"` | `link rel="alternate"` (a missing `rel` counts as alternate); entries without `type` or with `text/html` are preferred | `link` |
-| Published | `pubDate`, then `dc:date` | `published`, then `updated` | `dc:date` |
-| Author | `author`, then `dc:creator` | entry `author/name`, then `source/author/name`, then feed `author/name` | `dc:creator` |
-| Summary | `description`, then `content:encoded` | `summary`, then `content` | `description`, then `content:encoded` |
+| Field | RSS 2.0 | Atom 1.0 | RSS 1.0 | JSON Feed |
+|---|---|---|---|---|
+| ID | `guid` | `id` | `rdf:about` | `id` (a number is read as its text) |
+| Title | `title` (character entities decoded, tags not interpreted) | `title`, interpreted by `type` (text, html, xhtml) | `title` (as RSS 2.0) | `title` (plain text) |
+| Link | `link`; a `guid` is also a link candidate unless `isPermaLink="false"` | `link rel="alternate"` (a missing `rel` counts as alternate); entries without `type` or with `text/html` are preferred | `link` | `url`, then `external_url` |
+| Published | `pubDate`, then `dc:date` | `published`, then `updated` | `dc:date` | `date_published`, then `date_modified` |
+| Author | `author`, then `dc:creator` | entry `author/name`, then `source/author/name`, then feed `author/name` | `dc:creator` | first named item `authors[]`, then item `author` (1.0), then the same at feed level |
+| Summary | `description`, then `content:encoded` | `summary`, then `content` | `description`, then `content:encoded` | `summary` (plain text), then `content_html`, then `content_text` (plain text) |
 
-Feed-level data used by the app: title, site URL (RSS `link`, Atom alternate link, RSS 1.0 channel `link`) and an
-icon hint (RSS `image/url`, Atom `icon` then `logo`, RSS 1.0 `image/url`).
+Feed-level data used by the app: title, site URL (RSS `link`, Atom alternate link, RSS 1.0 channel `link`, JSON Feed
+`home_page_url`) and an icon hint (RSS `image/url`, Atom `icon` then `logo`, RSS 1.0 `image/url`, JSON Feed `favicon`
+then `icon`). The address a feed declares for itself (Atom `rel="self"`, JSON Feed `feed_url`) is never used: only
+redirects and the user change a feed's address.
 
 Links and image URLs are resolved against `xml:base` (inherited down the tree) and otherwise against the final URL of
-the response. An `xml:base` that is not a valid http(s) URL is ignored. A `guid` with `isPermaLink="false"` is an ID
+the response (always the final URL for JSON Feed). An `xml:base` that is not a valid http(s) URL is ignored. A `guid` with `isPermaLink="false"` is an ID
 only and is never used as the article URL.
 
 Dates: RFC 822/1123 variants and ISO 8601/RFC 3339. Zone names understood are GMT, UT, UTC, Z, the US abbreviations
 EST/EDT/CST/CDT/MST/MDT/PST/PDT and JST, plus numeric offsets. A value without a usable time zone, and a date without a
 time, yields `publishedAt = null`; the device time zone is never assumed. A bad date does not drop the entry.
 
-Encoding: the response is decoded to text before XML parsing, so the parser cannot re-detect the encoding. Precedence
+Encoding: the response is decoded to text before parsing, so the parser cannot re-detect the encoding. Precedence
 is BOM, then XML declaration, then HTTP `Content-Type` charset, then UTF-8. (This deliberately differs from
 RFC 7303.) UTF-16 without a BOM is recognized by byte pattern. Unknown charset names fall through to the next source.
 Shift_JIS labels (`shift_jis`, `shift-jis`, `sjis`, `x-sjis`, `ms_kanji`, `csshiftjis`) are decoded as `windows-31j`
-(CP932), because Japanese feeds labelled Shift_JIS commonly contain CP932 extension characters.
+(CP932), because Japanese feeds labelled Shift_JIS commonly contain CP932 extension characters. JSON has no
+declaration, so a JSON Feed is decoded by BOM, then HTTP charset, then UTF-8.
 
-Failure scope: one malformed item (bad date, URL or image) does not discard the other items. XML syntax errors,
+Failure scope: one malformed item (bad date, URL or image, or a JSON Feed item that is not an object) does not discard
+the other items. XML and JSON syntax errors,
 security violations and limit violations fail the whole response, and the previously stored data is kept.
 
-Fixed limits: 5 MiB per response (after decompression), 2,000 entries, XML depth 64. See section 6 for the other XML
-limits.
+Fixed limits: 5 MiB per response (after decompression), 2,000 entries, XML or JSON nesting depth 64. See section 6
+for the other XML limits.
 
 ## 2. HTML is never rendered
 
@@ -126,8 +132,8 @@ fresh content.
 | 5xx | `SERVER`; `Retry-After` honored when present. |
 | Other status | `HTTP_STATUS`. |
 | HTML page | `NOT_A_FEED`; previous data kept. |
-| Malformed XML | `FORMAT`; previous data kept. |
-| Other XML root, Atom 0.3 | `UNSUPPORTED_FORMAT`. |
+| Malformed XML or JSON | `FORMAT`; previous data kept. |
+| Other XML root, Atom 0.3, JSON that is not JSON Feed 1.0 or 1.1 | `UNSUPPORTED_FORMAT`. |
 | Limit exceeded | `LIMIT_EXCEEDED`. |
 | Blocked address, user info, DOCTYPE and similar | `SECURITY`. |
 | Certificate or host name failure | `TLS`. Verification is never relaxed. |
@@ -262,6 +268,14 @@ exists only in test code.
 - Security rests on rejecting these tokens, not on parser feature flags, which are not honored uniformly across
   Android versions. A text search for `<!DOCTYPE` is not the control.
 
+**Untrusted JSON.** JSON Feed is read with the `kotlinx.serialization` JSON element API in strict mode. JSON has no
+entities, includes or references, so nothing is ever resolved. Before the tree is built, the nesting of `{` and `[`
+outside strings is counted, and a body deeper than 64 fails as `LIMIT_EXCEEDED` (detail `JSON_DEPTH`), so a body of
+brackets cannot cost a stack frame or an object per level. The 5 MiB and 2,000-item limits are the same as for XML.
+A value is read only when it has the expected type (a string for a text or URL field, an object for an author);
+anything else counts as missing. HTML in `content_html` goes through the same jsoup text extraction as other feed
+HTML (section 2), and every URL is validated like any other.
+
 ### HTTP compatibility
 
 Existing subscriptions may point to old `http://` feeds, so registering an `http://` URL is allowed. By default no
@@ -354,8 +368,9 @@ satisfied. A failed lookup is never a feed failure.
 
 Runs only when the user taps it for one chosen feed; there is no crawling. The page read is the feed's site page, or
 an address the user typed (a site page or a feed URL). If the fetched document is an RSS, Atom or RDF feed (decided by
-its root element, not by a leading `<?xml`), it is treated as the entered feed. Otherwise the `link rel="alternate"`
-entries of type RSS, Atom or RDF are the candidates, at most 8, excluding the current address. Each candidate is
+its root element, not by a leading `<?xml`) or a JSON object, it is treated as the entered feed. Otherwise the
+`link rel="alternate"` entries of type RSS, Atom, RDF or JSON Feed (`application/feed+json`; plain `application/json`
+is not a feed type, because WordPress declares its REST API that way) are the candidates, at most 8, excluding the current address. Each candidate is
 fetched with the normal feed fetcher and parsed; the facts shown are fetchability and failure reason, feed title, site,
 entry count, date range, number of entries shared with the subscribed feed (URL-like keys compared regardless of
 `http`/`https` and `www.`) and whether the title is equal. Candidates are ordered by those facts but never chosen
@@ -374,13 +389,13 @@ read by the same core as the moved-feed search (`FeedProbe`), with the same clie
 unchanged and no sharing-specific exception exists: public addresses only, cleartext HTTP only after the user's opt-in
 (without it an `http://` address is refused with nothing sent, and a redirect is never upgraded or downgraded), normal
 certificate verification, every redirect hop checked, the page limit of 512 KiB (cut, not refused) and the feed limits.
-A candidate is a document that parses as RSS/Atom/RDF; its address is the final address after redirects. The shared
+A candidate is a document that parses as RSS/Atom/RDF/JSON Feed; its address is the final address after redirects. The shared
 address is not sent anywhere except the host it names (and the feed hosts that page declares), never to a search or
 feed-finding service. Results are facts only; the feed is registered by the add-feed path after the user's explicit
 confirmation (one refresh follows), and an address that already has a feed row (subscribed, or unsubscribed with its data)
 is merged into that row, never added twice. An unsubscribed feed is taken again only on an explicit "Subscribe again".
 
-**One read per address (0.9.3).** The first request to the chosen address is the only one: its limit depends on what the document turns out to be (decided from the root element once the first 64 KiB are in): an RSS/Atom/RDF document may be up to the feed limit (5 MiB, above that it fails as too large), anything else is cut at the page limit (512 KiB). When it is a feed, the bytes of that response are parsed and become the candidate, so a direct feed is one request and a redirect to a feed is one redirect chain; the result is reused within the run, not through ETag or any cache. A page costs one request plus one per declared feed (at most 8).
+**One read per address (0.9.3).** The first request to the chosen address is the only one: its limit depends on what the document turns out to be (decided from the root element, or a leading `{`, once the first 64 KiB are in): an RSS/Atom/RDF or JSON document may be up to the feed limit (5 MiB, above that it fails as too large), anything else is cut at the page limit (512 KiB). When it is a feed, the bytes of that response are parsed and become the candidate, so a direct feed is one request and a redirect to a feed is one redirect chain; the result is reused within the run, not through ETag or any cache. A page costs one request plus one per declared feed (at most 8).
 
 **Same-origin root fallback (0.9.3).** Only when the shared address is an HTML page that is not the root of its site (path other than `/`, or a query) and none of the feeds it declares could be used (it declared none, or every one failed to parse), the root page `scheme://host[:port]/` of the final page's origin (after redirects) is read once, with the same client and the same rules, and the feeds it declares are checked like those of any page (at most 8, skipping addresses already tried). If the root ends on another origin, is not an HTML page, cannot be read or declares nothing usable, the search ends. A direct feed never reads the root, a page with a usable feed never reads the root, and a shared root is not read twice. No deeper page, canonical/breadcrumb/category link, sitemap, guessed address (`/feed`, `/rss`, `/atom.xml`) or external service is used. Candidates are labelled by where they were found (the address itself, the shared page, the site root); two ways to the same final address are one candidate.
 
@@ -392,7 +407,7 @@ guard never allows cleartext, whatever the HTTP setting is, so a redirect back t
 only if all of the following hold:
 
 - a GET to the candidate succeeds with normal certificate verification and every redirect hop stays on HTTPS;
-- the body parses as RSS/Atom (an HTML page, a 200 alone or a HEAD request never counts);
+- the body parses as a feed (RSS, Atom or JSON Feed; an HTML page, a 200 alone or a HEAD request never counts);
 - it is the same feed: with the same host (ignoring `www.`), path and query it is accepted unless the stored history
   clearly disagrees (known entries exist, none overlaps, and the titles differ); if HTTPS redirected elsewhere there
   must be positive evidence (shared entries or the same title), and when HTTP is allowed the HTTP document may be
