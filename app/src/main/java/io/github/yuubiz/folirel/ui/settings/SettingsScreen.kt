@@ -188,7 +188,7 @@ private fun SettingsTop(s: AppSettings, onOpenPage: (SettingsPage) -> Unit) {
     }
     val storage = retentionSummary(s.retentionLimit) + dash + stringResource(R.string.settings_summary_images_mb, s.imageCacheMb)
     // The build (git hash) is for bug reports and is shown in About only.
-    val about = stringResource(R.string.settings_version_short, BuildConfig.VERSION_NAME)
+    val about = stringResource(R.string.settings_version_short, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
     listOf(
         SettingsPage.APPEARANCE to appearance,
         SettingsPage.LAYOUT to layout,
