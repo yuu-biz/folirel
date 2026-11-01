@@ -16,10 +16,6 @@ open the original page in your browser.
 
 **Folirel** is a coined name inspired by *folio* and *reader*. The word *folio* ultimately traces back to Latin *folium*, "leaf" or "sheet," reflecting the idea of turning the feeds you choose into pages you can browse. The logo is two leaves, the larger one carrying lines of text like a page.
 
-> **Status:** release candidate stage before 1.0 (0.10.x). The features planned for 1.0 are in place and covered by
-> automated tests; device checks are done by hand. Debug-signed APKs are published on the Releases page; there is no
-> Google Play listing yet.
-
 ## Features
 
 - **OPML import and export.** Importing shows what will be added before anything is written, and only adds or merges.
@@ -36,7 +32,7 @@ open the original page in your browser.
 - **Explicit read state.** Articles are marked read, unread or saved only when you say so. Opening an article never
   marks it read.
 - **Original site first.** Articles open in Custom Tabs (or your external browser); there is no built-in reader.
-- **Local search** over titles, summaries and sources.
+- **Local search** over titles, summaries and feed names.
 - **Refresh** on demand (scoped to what you are looking at) and periodically in the background, with a confirmation on
   metered networks.
 - **Feed housekeeping:** find the feed behind a site address, move HTTP feeds to HTTPS after verifying it is the same
@@ -45,14 +41,45 @@ open the original page in your browser.
 
 ## Install
 
-1. Download the latest APK from the **Releases** page of this repository.
-2. Allow installing apps from your browser or file manager when Android asks, then open the APK. Android 9 (API 28) or
-   later is required.
-3. Open Folirel and either import an OPML file or add a feed URL.
+Folirel needs Android 9 (API 28) or later. It is distributed as an APK on the
+[Releases](https://github.com/yuu-biz/folirel/releases) page of this repository.
 
-Release APKs are currently signed with a debug key, so they update only over builds signed with the same key.
-Uninstalling the app deletes its data; use *Create Folirel backup* (Settings > Storage & data) to keep everything, or
-*Export subscription list (OPML)* to keep the subscription list.
+1. On the phone, download the APK of the latest release and open it.
+2. If Android says that installing unknown apps is not allowed, tap **Settings**, turn on **Allow from this source**
+   for your browser or file manager, and go back.
+3. Tap **Install**, open Folirel, and import an OPML file or add a feed URL.
+
+### Check the signing certificate
+
+Release APKs from 1.0 on are signed with one release key. To check a download on a computer with the Android SDK
+build tools, run:
+
+```sh
+apksigner verify --print-certs folirel.apk
+```
+
+The line `Signer #1 certificate SHA-256 digest` must read:
+
+```text
+<RELEASE_CERT_SHA256>
+```
+
+If it does not match, do not install the file.
+
+### Moving from a 0.x debug build
+
+Builds before 1.0 were signed with a debug key. Android cannot install 1.0 over them, and uninstalling deletes the
+app's data, so move your data with a Folirel backup:
+
+1. In the old app, open Settings > Storage and data > **Create Folirel backup** and save the file outside the app (for
+   example in Downloads).
+2. Check the backup: **Restore from Folirel backup**, pick the file, compare the preview with the app, then **Cancel**.
+3. Uninstall the old app and install 1.0.
+4. In 1.0, open Settings > Storage and data > **Restore from Folirel backup** and confirm.
+
+The full procedure is in [Full backup and restore, section 7](docs/backup-format.md#7-moving-to-a-differently-signed-app-release-signing).
+Builds before 0.10.0 have no full backup; use **Export OPML** there to keep the subscription list.
+
 Details: [User guide](docs/user-guide.md).
 
 ## Build from source
@@ -84,6 +111,7 @@ Details: [Fetch and security](docs/fetch-and-security.md).
 | Document | Contents |
 |---|---|
 | [User guide](docs/user-guide.md) / [日本語](docs/user-guide.ja.md) | Installing, importing, daily use, settings |
+| [Terminology](docs/terminology.md) | The English and Japanese words used in the app |
 | [Product and UX](docs/product-and-ux.md) | Scope, requirements, screens and interaction rules |
 | [Architecture](docs/architecture.md) | Modules, data flow, extension boundary |
 | [Data and import](docs/data-and-import.md) | Database model, OPML, article identity, retention |

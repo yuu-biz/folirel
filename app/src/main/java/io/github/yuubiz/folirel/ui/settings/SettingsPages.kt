@@ -153,7 +153,7 @@ private fun CardColumnsNote(preference: Int) {
     val columns = CardGridLayout.columns(widthDp, density.fontScale, preference)
     SettingNote(stringResource(R.string.settings_card_columns_note))
     SettingNote(
-        stringResource(R.string.settings_card_columns_now, columns.count) +
+        pluralStringResource(R.plurals.settings_card_columns_now, columns.count, columns.count) +
             if (columns.corrected) " " + stringResource(R.string.settings_card_columns_reduced, preference) else "",
     )
 }

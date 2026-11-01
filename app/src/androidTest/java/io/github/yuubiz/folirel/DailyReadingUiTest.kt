@@ -47,7 +47,7 @@ class DailyReadingUiTest : HomeFlowTestBase() {
         until(5_000) { existsAnywhere("menu_show_feed") }
     }
 
-    /** T01, T03: "Show articles from this source" is a scope change; the article's read and saved state stay as they were. */
+    /** T01, T03: "Show articles from this feed" is a scope change; the article's read and saved state stay as they were. */
     @Test
     fun theMenuShowsTheArticlesOfThatSourceWithoutChangingTheArticle() {
         firstFetchThenShow()
@@ -65,7 +65,7 @@ class DailyReadingUiTest : HomeFlowTestBase() {
         until(5_000) { vm.selection.value.scope == ArticleScope.All }
     }
 
-    /** T02: "Source details" opens the existing feed detail of that feed. */
+    /** T02: "Feed details" opens the existing feed detail of that feed. */
     @Test
     fun theMenuOpensTheDetailsOfThatSource() {
         firstFetchThenShow()

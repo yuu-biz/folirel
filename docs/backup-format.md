@@ -11,7 +11,7 @@ different thing:
 | Readable by | Any feed reader | Folirel 0.10.0 and later |
 | Applying it | Adds and merges; never removes or overwrites | **Replaces** all Folirel data on the device |
 
-Both are reached from **Settings > Storage & data**: "Export subscription list (OPML)", "Create Folirel backup",
+Both are reached from **Settings > Storage and data**: "Export subscription list (OPML)", "Create Folirel backup",
 "Restore from Folirel backup". Files are chosen through the system file picker (Storage Access Framework); Folirel
 asks for no storage permission and writes to no fixed path.
 
@@ -175,7 +175,7 @@ once. Feed icons are looked up again by the normal icon lookup when it next runs
 Android does not install an APK over an app signed with another key; the old app must be uninstalled, which deletes its
 data. The full backup is the way across:
 
-1. In the installed (debug-signed) Folirel 0.10.0 or later: Settings > Storage & data > **Create Folirel backup**, and
+1. In the installed (debug-signed) Folirel 0.10.0 or later: Settings > Storage and data > **Create Folirel backup**, and
    save the file outside the app (for example Downloads or a cloud folder).
 2. **Check the file before uninstalling.** In the same app: **Restore from Folirel backup**, pick the file just saved,
    wait for the preview, compare its counts with the app (feeds, articles, saved), then **Cancel**. The preview runs
@@ -184,7 +184,7 @@ data. The full backup is the way across:
 3. Optionally take an OPML export as a second copy of the subscription list.
 4. Uninstall the old app.
 5. Install the differently signed (release) APK and open it. Complete or skip the first-run screen.
-6. Settings > Storage & data > **Restore from Folirel backup**, pick the file, compare the preview with step 2, confirm.
+6. Settings > Storage and data > **Restore from Folirel backup**, pick the file, compare the preview with step 2, confirm.
 7. Check: subscriptions and categories (order, pins, layouts), unread and saved counts, a saved article of an
    unsubscribed feed, the theme and Custom colours, hidden keywords and period, then a manual update.
 

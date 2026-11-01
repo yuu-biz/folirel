@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- V1 disables OS backup/transfer: subscriptions and URLs may contain personal data. OPML export is the only explicit backup. -->
+<!-- OS backup and device transfer stay off because feed URLs may contain personal tokens. The user makes a full backup explicitly (Settings > Storage and data), to a file of their choice. -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="root" />
