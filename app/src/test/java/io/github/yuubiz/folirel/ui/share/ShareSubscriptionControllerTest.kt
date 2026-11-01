@@ -5,6 +5,7 @@ import io.github.yuubiz.folirel.model.ExistingFeed
 import io.github.yuubiz.folirel.model.ShareCandidate
 import io.github.yuubiz.folirel.model.ShareDiscovery
 import io.github.yuubiz.folirel.model.ShareProblem
+import io.github.yuubiz.folirel.model.ShareProvenance
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
@@ -32,8 +33,11 @@ class ShareSubscriptionControllerTest {
     private var pendingRegistration: Pair<(AddFeedResult) -> Unit, () -> Unit>? = null
     private val uncooperative = HashSet<String>()
 
-    private fun candidate(url: String, existing: ExistingFeed? = null) =
-        ShareCandidate(url, url, "Title of $url", "https://site.example/", 3, null, null, existing)
+    private fun candidate(url: String, existing: ExistingFeed? = null, provenance: ShareProvenance = ShareProvenance.SHARED_PAGE) =
+        ShareCandidate(url, url, "Title of $url", "https://site.example/", 3, null, null, existing, provenance)
+
+    private fun direct(url: String, existing: ExistingFeed? = null) =
+        ShareDiscovery.Found(null, listOf(candidate(url, existing, ShareProvenance.DIRECT_FEED)))
 
     private fun found(vararg urls: String) = ShareDiscovery.Found("https://page.example/", urls.map { candidate(it) })
 
@@ -268,5 +272,74 @@ class ShareSubscriptionControllerTest {
         c.receive("https://example.com/")
         testScope.advanceUntilIdle()
         assertEquals(ShareProblem.FAILED, (c.state.value as ShareState.Failed).problem)
+    }
+
+    // "Add feed URL" (F1): the typed address goes through the same flow.
+
+    @Test
+    fun aTypedFeedAddressIsRegisteredAtOnceLikeTheAddDialogAlwaysDid() {
+        gate("https://example.com/feed.xml").complete(direct("https://example.com/feed.xml"))
+        val id = controller.lookUp("  https://example.com/feed.xml ")
+        testScope.advanceUntilIdle()
+        assertEquals(listOf("https://example.com/feed.xml"), registered)
+        val done = state() as ShareState.Done
+        assertEquals(id, done.id)
+        assertEquals(AddFeedResult.Added("new-feed"), done.result)
+    }
+
+    @Test
+    fun aTypedFeedThatIsAlreadySubscribedGoesToTheAddPathWhichSaysSo() {
+        registerResult = AddFeedResult.AlreadySubscribed("f1")
+        gate("https://example.com/feed.xml").complete(direct("https://example.com/feed.xml", ExistingFeed("f1", "Mine", subscribed = true)))
+        controller.lookUp("https://example.com/feed.xml")
+        testScope.advanceUntilIdle()
+        assertEquals(AddFeedResult.AlreadySubscribed("f1"), (state() as ShareState.Done).result)
+    }
+
+    @Test
+    fun feedsFoundOnATypedPageAreOnlyShownEvenWhenThereIsOne() {
+        gate("https://example.com/").complete(found("https://example.com/feed.xml"))
+        controller.lookUp("https://example.com/")
+        testScope.advanceUntilIdle()
+        assertEquals(1, (state() as ShareState.Candidates).candidates.size)
+        assertEquals("a feed declared by a page waits for a tap", emptyList<String>(), registered)
+        controller.subscribe((state() as ShareState.Candidates).candidates.single())
+        assertEquals(listOf("https://example.com/feed.xml"), registered)
+    }
+
+    @Test
+    fun aSharedFeedAddressIsStillOnlyShown() {
+        gate("https://example.com/feed.xml").complete(direct("https://example.com/feed.xml"))
+        controller.setReady(true)
+        controller.receive("https://example.com/feed.xml")
+        testScope.advanceUntilIdle()
+        assertTrue(state() is ShareState.Candidates)
+        assertEquals(emptyList<String>(), registered)
+    }
+
+    @Test
+    fun aTypedSiteNameWithoutASchemeIsLookedUpOverHttps() {
+        gate("https://example.com").complete(ShareDiscovery.Failed(ShareProblem.NO_FEED))
+        controller.lookUp("example.com")
+        testScope.advanceUntilIdle()
+        assertEquals(listOf("https://example.com"), discovered)
+        assertEquals(ShareProblem.NO_FEED, (state() as ShareState.Failed).problem)
+        assertEquals(emptyList<String>(), registered)
+    }
+
+    @Test
+    fun aTypedAddressNeedsNoFirstRunReadinessAndReplacesARunningShare() {
+        val shared = gate("https://shared.example/")
+        uncooperative += "https://shared.example/"
+        gate("https://typed.example/").complete(found("https://typed.example/feed.xml"))
+        controller.setReady(true)
+        controller.receive("https://shared.example/")
+        testScope.runCurrent()
+        controller.lookUp("https://typed.example/")
+        testScope.runCurrent()
+        shared.complete(direct("https://shared.example/feed.xml"))
+        testScope.advanceUntilIdle()
+        assertEquals("https://typed.example/feed.xml", (state() as ShareState.Candidates).candidates.single().url)
+        assertEquals(emptyList<String>(), registered)
     }
 }

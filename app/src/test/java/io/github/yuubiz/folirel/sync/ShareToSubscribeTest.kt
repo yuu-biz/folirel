@@ -674,4 +674,88 @@ class ShareToSubscribeTest {
         assertEquals(0, feedRows().size)
         assertEquals(0, count("/rss.xml"))
     }
+
+    // --- "Add feed URL" with a site address (F1): the typed address goes through the same search ---
+
+    private suspend fun SubscriptionsViewModel.addAndWait(typed: String): ShareState {
+        val id = share.lookUp(typed)
+        return await("search ended", share.state) { s ->
+            when (s) {
+                is ShareState.Candidates -> s.id == id
+                is ShareState.Failed -> s.id == id
+                is ShareState.Done -> s.id == id
+                else -> false
+            }
+        }
+    }
+
+    @Test
+    fun aTypedFeedAddressIsAddedAtOnceWithOneRefresh() = runBlocking<Unit> {
+        routes["/rss.xml"] = rss("The Blog", "a", "b")
+        val vm = viewModel()
+        val added = (vm.addAndWait(url("/rss.xml")) as ShareState.Done).result as AddFeedResult.Added
+        assertEquals(url("/rss.xml"), feedRows().single().subscriptionUrl)
+        val event = withTimeout(5_000) { vm.eventFlow.first() }
+        assertTrue(event is SubscriptionEvent.FeedAdded && event.result is AddFeedResult.Added)
+        vm.awaitRefreshFinished()
+        assertEquals(2, env.db.articleDao().articlesOfFeed(added.feedId).size)
+        assertEquals("one read to check it, one by the refresh of the new feed", 2, count("/rss.xml"))
+    }
+
+    @Test
+    fun aTypedFeedAddressThatIsAlreadySubscribedMakesNoCopy() = runBlocking<Unit> {
+        routes["/rss.xml"] = rss("The Blog", "a")
+        val existingId = (env.subscriptions.addFeed(env.subscriptions.ensureLocalAccount(), url("/rss.xml")) as AddFeedResult.Added).feedId
+        val vm = viewModel()
+        assertEquals(AddFeedResult.AlreadySubscribed(existingId), (vm.addAndWait(url("/rss.xml")) as ShareState.Done).result)
+        assertEquals(listOf(existingId), feedRows().map { it.id })
+    }
+
+    @Test
+    fun aTypedPageWithOneFeedLinkShowsThatFeedAndAddsNothingUntilItIsTapped() = runBlocking<Unit> {
+        routes["/"] = page(feedLink("/rss.xml", title = "Posts"))
+        routes["/rss.xml"] = rss("The Blog", "p1")
+        val vm = viewModel()
+        val shown = vm.addAndWait(url("/")) as ShareState.Candidates
+        assertEquals(listOf(url("/rss.xml")), shown.candidates.map { it.url })
+        assertEquals(0, feedRows().size)
+        vm.share.subscribe(shown.candidates.single())
+        await("done", vm.share.state) { it is ShareState.Done }
+        assertEquals(url("/rss.xml"), feedRows().single().subscriptionUrl)
+        vm.awaitRefreshFinished()
+    }
+
+    @Test
+    fun aTypedPageWithSeveralFeedLinksListsTheVerifiedOnesAndAddsOnlyThePickedOne() = runBlocking<Unit> {
+        routes["/"] = page(feedLink("/all.xml", title = "All"), feedLink("/comments.xml", "application/atom+xml", "Comments"), feedLink("/missing.xml"))
+        routes["/all.xml"] = rss("All posts", "a")
+        routes["/comments.xml"] = atom("Comments")
+        val vm = viewModel()
+        val shown = vm.addAndWait(url("/")) as ShareState.Candidates
+        assertEquals(listOf(url("/all.xml"), url("/comments.xml")), shown.candidates.map { it.url })
+        assertEquals(0, feedRows().size)
+        vm.share.subscribe(shown.candidates[1])
+        await("done", vm.share.state) { it is ShareState.Done }
+        assertEquals(listOf(url("/comments.xml")), feedRows().map { it.subscriptionUrl })
+        vm.awaitRefreshFinished()
+    }
+
+    @Test
+    fun aTypedPageWithoutFeedLinksIsNoFeedAndAddsNothing() = runBlocking<Unit> {
+        routes["/"] = html("<html><head><title>nothing</title></head><body>hello</body></html>")
+        val vm = viewModel()
+        assertEquals(ShareProblem.NO_FEED, (vm.addAndWait(url("/")) as ShareState.Failed).problem)
+        assertEquals(0, feedRows().size)
+        assertTrue("no refresh was started", vm.refreshState.value.requests.isEmpty())
+    }
+
+    @Test
+    fun aTypedHttpAddressWhileHttpIsNotAllowedSendsNothingAndAddsNothing() = runBlocking<Unit> {
+        routes["/rss.xml"] = rss("Plain", "a")
+        env.allowHttp.set(false)
+        val vm = viewModel()
+        assertEquals(ShareProblem.HTTP_NOT_ALLOWED, (vm.addAndWait(url("/rss.xml")) as ShareState.Failed).problem)
+        assertEquals(0, feedRows().size)
+        assertEquals(0, count("/rss.xml"))
+    }
 }

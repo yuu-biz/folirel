@@ -365,17 +365,12 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings, subscr
         }
         SnackbarHost(rootSnackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
-    // A dialog over the current screen, not a route: the stack and the state under it stay as they are.
-    ShareSubscribeOverlay(subscriptionsVm.share, onOpenFeed = { push(ROUTE_FEED_PREFIX + it) })
     if (addFeedOpen) {
-        AddFeedDialog(
-            onAdd = { url ->
-                addFeedOpen = false
-                subscriptionsVm.addFeed(url)
-            },
-            onDismiss = { addFeedOpen = false },
-        )
+        AddFeedDialog(subscriptionsVm.share, onDismiss = { addFeedOpen = false })
     }
+    // A dialog over the current screen (and over "Add feed URL", whose search it shows), not a route: the stack and the state under it
+    // stay as they are.
+    ShareSubscribeOverlay(subscriptionsVm.share, onOpenFeed = { addFeedOpen = false; push(ROUTE_FEED_PREFIX + it) })
 }
 
 /**

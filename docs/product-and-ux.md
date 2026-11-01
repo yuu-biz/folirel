@@ -18,7 +18,7 @@ The first-run path is "import OPML" or "add a feed URL". There is no registratio
 
 - Imports subscriptions and categories from OPML, with a preview before anything is written, and exports them again.
 - Manages subscriptions: add by URL, rename, assign to several categories, pause, unsubscribe and subscribe again.
-- Fetches RSS 2.0, Atom 1.0 and RSS 1.0 (RDF) feeds directly, on demand and periodically.
+- Fetches RSS 2.0, Atom 1.0, RSS 1.0 (RDF) and JSON Feed 1.0 and 1.1 feeds directly, on demand and periodically.
 - Shows the stored articles in five list layouts (S11), with category tabs, a drawer, filters, sorting and local search.
 - Opens an article's original page in a Custom Tab (or an external browser, by setting).
 - Keeps read/unread and saved state as explicit, manual, persistent choices.
@@ -32,7 +32,7 @@ These are deliberate. Contributions that add them are out of scope.
 - **No automatic read state.** Tapping an article, returning from the browser, scrolling, the passage of time, refreshing or preloading never marks anything as read. The only way to change read state is an explicit action. The open time is never used as a hidden read marker, and there is no "auto mark as read" setting, not even a disabled one.
 - No notifications, text-to-speech, home-screen widgets, ads, AI features or analytics.
 - No full-text (FTS) search and no cloud backup. The full backup is a file the user creates and keeps (S41); OPML export moves subscriptions and categories only.
-- No site auto-discovery from a web page URL typed into "Add feed URL" (the add dialog takes a feed address as is). Discovery on a page happens only for an address shared from another app (see "Share to Subscribe") and for the moved-feed search, both limited to the feed links that page itself declares. No feed generation for JavaScript-only sites, no scraping of article pages (for example for preview images), no bypassing of authentication or paywalls, no ad removal.
+- Feed discovery on a page is limited to the feed links that page (or, once, the root page of its site) itself declares. It runs for an address typed into "Add feed URL" (S30), for an address shared from another app (S31) and for the moved-feed search, and a feed found on a page is subscribed only when the user taps it. No guessed feed addresses, no feed generation for JavaScript-only sites, no scraping of article pages (for example for preview images), no bypassing of authentication or paywalls, no ad removal.
 - No paging through a feed's archive. The app stores what each feed currently returns.
 - No gesture customisation, no swipe-to-act rows or multi-select mode on the article list, no volume-key navigation.
 
@@ -50,7 +50,7 @@ These are deliberate. Contributions that add them are out of scope.
 | R01 | Local start | The app starts with no network, token or server and shows existing data. |
 | R02 | OPML import | A system file picker, a preview, add/merge semantics, categories, and a breakdown of skipped and failed items. |
 | R03 | OPML export | Currently subscribed feed URLs and categories are written through the system file-save dialog. |
-| R04 | Subscription management | RSS/Atom URLs can be added; title and categories edited; feeds paused, unsubscribed and subscribed again. |
+| R04 | Subscription management | Feeds can be added by their own URL or by the URL of a site or page that declares them; title and categories edited; feeds paused, unsubscribed and subscribed again. |
 | R05 | Categories | One feed can be in several categories or none (uncategorized); categories can be created, renamed (including nested ones) and deleted. |
 | R06 | Direct fetch | RSS 2.0, Atom 1.0 and RSS 1.0 are fetched, parsed and stored for the fields the app uses. |
 | R07 | Refresh | Manual refresh of everything, one category or one feed; optional periodic and on-open refresh; progress and partial failure are shown. |
@@ -258,6 +258,7 @@ A tap on a row opens the Custom Tab directly from the list; the app has no body 
 **Subscription management** is a searchable feed list plus category editing:
 
 - Feed detail shows the registered URL, the current fetch URL, site URL, last attempt, last success, last error kind, and per-feed diagnostics (what was requested, the HTTP response, and how many entries the last document held, merged and added). It has a switch to pause the feed, multi-select of categories, "Refresh this feed" and "Force refresh" (which sends no stored validators and asks caches to revalidate; articles and state are kept).
+- **Add feed URL** takes a feed URL or the URL of a site or page, and checks it with the same search as Share to Subscribe (S31), in a dialog over the add dialog. When the address is itself a feed, it is subscribed at once, as a feed URL always was (one tap on Add; an address already subscribed says so and makes no copy). When it is a page, the feeds that page declares (or, when it has none, the root page of its site) are listed and nothing is subscribed until the user taps **Subscribe** on one. Cancel or a problem (no feed, `http://` while HTTP is not allowed, unreachable, and the rest of S31) closes only the search and goes back to the address as typed. An address typed without a scheme (`example.com`) is looked up as `https://`. With HTTP off an `http://` address is not sent and not registered.
 - The URL of a feed is not editable. To use a different URL, add it as a new feed; for a feed that has moved, see "find where this feed moved" below.
 - **Unsubscribe** stops updates and removes the feed from normal lists; saved articles remain. Subscribing again with the same URL restores the original feed ID and state. A late fetch result never revives an unsubscribed feed.
 - **Categories:** create, create a subcategory, rename, delete. Deleting a category deletes only the category and its descendants' memberships, after confirmation; feeds and articles stay, and feeds left without a category become uncategorized.

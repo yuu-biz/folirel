@@ -21,8 +21,8 @@
     <string name="action_show_summary">Show summary</string>
     <string name="action_unsave">Remove from saved</string>
     <string name="add">Add</string>
-    <string name="add_feed_note">Enter the URL of an RSS or Atom feed, not of a web page. An http:// feed is added, but it is fetched only after you allow HTTP in Settings.</string>
-    <string name="add_feed_url_label">Feed URL</string>
+    <string name="add_feed_note">Enter a feed URL, or the URL of a site or page that links to its feeds. A feed is added at once; for a page, you pick which of its feeds to subscribe to.</string>
+    <string name="add_feed_url_label">Site or feed URL</string>
     <string name="browser_custom_tabs">Custom Tabs</string>
     <string name="browser_external">External browser</string>
     <string name="cancel">Cancel</string>
@@ -298,7 +298,7 @@
     <string name="https_reason_downgrade">HTTPS redirects back to HTTP</string>
     <string name="https_reason_html">HTTPS returned a web page, not a feed</string>
     <string name="https_reason_network">Network error. Try later</string>
-    <string name="https_reason_not_feed">HTTPS response is not RSS or Atom</string>
+    <string name="https_reason_not_feed">HTTPS response is not a feed</string>
     <string name="https_reason_ok">Same feed over HTTPS</string>
     <string name="https_reason_skipped">Feed changed during the check</string>
     <string name="https_reason_status">HTTPS returned an error</string>
@@ -461,7 +461,7 @@
     <string name="msg_move_conflict">Another feed already uses that address (%s).</string>
     <string name="msg_move_stale">The feed changed in the meantime, so nothing was changed.</string>
     <string name="discovery_title">Find where this feed moved</string>
-    <string name="discovery_intro">Looks on the feed\'s site for RSS or Atom links and checks each one. You choose which to use.</string>
+    <string name="discovery_intro">Looks on the feed\'s site for feed links and checks each one. You choose which to use.</string>
     <string name="discovery_find">Look on the site</string>
     <string name="discovery_web_search">Search the web by feed name</string>
     <string name="discovery_web_search_note">Searches for the feed name and \"RSS\" in your search app. Paste an address you find below to check it.</string>
@@ -474,7 +474,7 @@
     <string name="discovery_page_no_site">No site address is known for this feed. Enter one below.</string>
     <string name="discovery_page_http">That address uses http://, which is not allowed in Settings.</string>
     <string name="discovery_page_unreadable">The page could not be read.</string>
-    <string name="discovery_none_found">No RSS or Atom links were found there.</string>
+    <string name="discovery_none_found">No feed links were found there.</string>
     <string name="discovery_not_fetchable">Not usable as a feed</string>
     <plurals name="discovery_entries">
         <item quantity="one">%d entry</item>
@@ -629,14 +629,14 @@
     <string name="share_unsubscribed_note">You unsubscribed from this feed earlier. Its articles, read state and categories come back.</string>
     <string name="share_open_feed">Feed details</string>
     <string name="share_latest">latest %s</string>
-    <string name="share_from_root">Found on the top page of the site (the shared page itself has no feed)</string>
+    <string name="share_from_root">Found on the top page of the site (the page itself has no feed)</string>
     <string name="share_subscribing">Subscribing…</string>
     <string name="share_problem_no_url">The shared text has no http:// or https:// address.</string>
     <string name="share_problem_too_large">The shared text is too large to read.</string>
     <string name="share_problem_invalid_url">That address cannot be used.</string>
-    <string name="share_problem_no_feed">No RSS or Atom feed was found at this address.</string>
-    <string name="share_problem_feeds_unreadable">The page points to a feed, but it could not be read as RSS or Atom.</string>
-    <string name="share_problem_http">This address uses http://, which is not allowed in Settings. Share the https:// address, or allow HTTP in Settings and share again.</string>
+    <string name="share_problem_no_feed">No feed was found at this address.</string>
+    <string name="share_problem_feeds_unreadable">The page points to a feed, but it could not be read as one.</string>
+    <string name="share_problem_http">This address uses http://, which is not allowed in Settings, so nothing was sent. Use the https:// address, or allow HTTP in Settings and try again.</string>
     <string name="share_problem_tls">A secure connection could not be made because of a certificate problem.</string>
     <string name="share_problem_network">The address could not be reached. Check the connection and try again.</string>
     <string name="share_problem_blocked">This address is not allowed (local network, or an unsafe redirect).</string>
