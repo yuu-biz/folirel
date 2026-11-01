@@ -341,6 +341,7 @@ private fun AppNavigation(container: AppContainer, settings: AppSettings, subscr
                         backup = backupVm,
                         onCreateBackup = createBackup,
                         onRestore = pickBackup,
+                        onOpenLink = ::openLink,
                     )
                     route == ROUTE_RESTORE -> RestoreScreen(
                         backupVm,
