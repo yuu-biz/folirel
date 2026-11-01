@@ -60,18 +60,22 @@ Notes:
 
 ## Add a feed URL
 
-Choose **Add feed URL** (home screen menu, empty-state button, or the plus button on **Subscriptions**) and enter the address of an RSS or Atom feed. This must be the feed itself, not the web page of the site. If you enter a page address, the feed later fails with "Web page, not a feed". Feed formats supported are RSS 2.0, Atom 1.0, RSS 1.0 (RDF) and JSON Feed 1.0 and 1.1.
+Choose **Add feed URL** (home screen menu, empty-state button, or the plus button on **Subscriptions**) and enter the address of a feed, or of the site or page you want to follow, then tap **Add**. Feed formats supported are RSS 2.0, Atom 1.0, RSS 1.0 (RDF) and JSON Feed 1.0 and 1.1.
 
-If the URL starts with `http://`, the feed is added but not fetched until you allow HTTP in Settings (see [HTTP and HTTPS](#http-and-https)).
+- If the address is a feed, it is added at once.
+- If it is a web page, Folirel looks for the feeds the page declares (and, if it declares none, once on the top page of the same site), checks that each is a real feed and lists them. Tap **Subscribe** on the one you want; nothing is added until you do. This is the same search as [Share to Subscribe](#subscribe-from-another-app-share-to-subscribe).
+- If nothing is found, or the address cannot be read, Folirel says why. Cancel or OK takes you back to the address you typed, so you can correct it.
+- You can leave out `https://` (for example `example.com`).
+- An `http://` address is checked only after you allow HTTP in Settings (see [HTTP and HTTPS](#http-and-https)); until then Folirel says so, sends nothing and adds nothing.
 
 ## Subscribe from another app (Share to Subscribe)
 
-In a browser or any app, share a page or a link to **Folirel** (the share sheet lists it for text). Folirel takes the addresses out of the shared text. With one address, it looks for a feed there: if the address is a feed itself, or the page declares RSS or Atom feeds, it checks that each is a real feed. If the text has several addresses, you choose which one to look at.
+In a browser or any app, share a page or a link to **Folirel** (the share sheet lists it for text). Folirel takes the addresses out of the shared text. With one address, it looks for a feed there: if the address is a feed itself, or the page declares feeds, it checks that each is a real feed. If the text has several addresses, you choose which one to look at.
 
 - Nothing is added when you share. A dialog shows what was found (title, address, number of entries, latest date). Tap **Subscribe** to add it, or **Cancel** or Back to leave everything as it was. When a page offers several feeds you pick one.
 - If you already subscribe to the feed, the dialog says so and offers **Feed details**. If you unsubscribed from it earlier, it offers **Subscribe again**, and its articles, read and saved state and categories come back as they were.
 - The feed is added without a category; change that in the feed details. `http://` addresses follow the HTTP setting like everything else: while HTTP is off, Folirel says so and sends nothing.
-- If the shared page (an article, say) declares no feed, Folirel looks once at the top page of the same site for the feeds it declares and says "Found on the top page of the site" for what it finds there. It never looks deeper, guesses addresses or searches the web. If there is still no feed, it says so; find the feed address yourself and use **Add feed URL**.
+- If the shared page (an article, say) declares no feed, Folirel looks once at the top page of the same site for the feeds it declares and says "Found on the top page of the site" for what it finds there. It never looks deeper, guesses addresses or searches the web. If there is still no feed, it says so; find the feed address yourself and add it with **Add feed URL**.
 - If you share before finishing the first-run screen, the share waits and is handled once it is done.
 
 ## Daily use
@@ -205,7 +209,7 @@ The Storage and data page also shows the number of articles stored and the datab
 |---|---|
 | No articles after import | Wait for the first fetch (**Fetching feeds…**), or pull down to refresh. Check the notice over the list and the **Subscriptions** summary for failures. |
 | **HTTP not allowed** | The feed uses `http://`. Run **Check HTTPS support of HTTP feeds**, or allow HTTP in Settings. |
-| **Web page, not a feed** | The address is a web page. Find the site's RSS/Atom feed address, or use **Find where this feed moved** on the feed details. |
+| **Web page, not a feed** | The address is a web page. Use **Find where this feed moved** on the feed details, or add the site's address again with **Add feed URL**, which lists the feeds the site declares. |
 | **Not found** / **Feed removed** | The address may have moved or the feed was removed. Try **Find where this feed moved**, or unsubscribe. |
 | **Access denied** | The server refuses the request. Private feeds that need a sign-in cannot be read. |
 | **Too many requests** / **Server error** / **Timed out** / **Network error** | Usually temporary. Folirel retries later. To try sooner, use **Retry unfinished**. If the server asked Folirel to wait, it waits. The HTTP status code is on the feed details, in the **Response** row. |
