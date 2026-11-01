@@ -98,6 +98,12 @@ interface ArticleDao {
     @Query("UPDATE article_states SET isRead = 1, updatedAt = :now WHERE isRead = 0 AND articleId IN (:articleIds)")
     suspend fun markReadByIds(articleIds: List<String>, now: Long): Int
 
+    @Query("SELECT articleId FROM article_states WHERE isRead = 0 AND articleId IN (:articleIds)")
+    suspend fun unreadAmong(articleIds: List<String>): List<String>
+
+    @Query("UPDATE article_states SET isRead = 0, updatedAt = :now WHERE isRead = 1 AND articleId IN (:articleIds)")
+    suspend fun markUnreadByIds(articleIds: List<String>, now: Long): Int
+
     @Query("SELECT COUNT(*) FROM articles WHERE accountId = :accountId")
     suspend fun countArticles(accountId: String): Int
 

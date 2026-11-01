@@ -51,11 +51,23 @@ import kotlinx.coroutines.launch
 /** Article list for one resolved query. [key] identifies the list for position restore. */
 data class ArticlesState(val key: String, val items: List<ArticleRow>, val loaded: Boolean)
 
+/**
+ * What the snackbar reports. A change the row's own icons already show has no message; one that takes articles out of the list on
+ * screen can be undone, and [HomeViewModel.undo] puts back exactly what it changed.
+ */
 sealed interface HomeEvent {
-    data class Message(val kind: Kind) : HomeEvent {
-        enum class Kind { SAVED, UNSAVED, MARKED_READ, MARKED_UNREAD, BULK_MARKED, UPDATE_FAILED }
-    }
-    data class BulkMarked(val count: Int) : HomeEvent
+    data object UpdateFailed : HomeEvent
+
+    sealed interface Undoable : HomeEvent
+
+    /** "Mark all as read"; [ids] are the articles it changed (ones already read are not among them). */
+    data class AllMarkedRead(val ids: List<String>) : Undoable
+
+    /** Marked read while only unread articles are shown. */
+    data class LeftUnread(val articleId: String) : Undoable
+
+    /** Unsaved while only saved articles are shown. */
+    data class LeftSaved(val articleId: String) : Undoable
 }
 
 class HomeViewModel(
@@ -350,7 +362,7 @@ class HomeViewModel(
 
     /** Returns what happened so the sheet can say why a keyword was not added. */
     suspend fun addHiddenKeyword(raw: String): HiddenKeywords.AddResult =
-        runCatching { settingsRepository.addHiddenKeyword(raw) }.getOrElse { events.send(HomeEvent.Message(HomeEvent.Message.Kind.UPDATE_FAILED)); HiddenKeywords.AddResult.Blank }
+        runCatching { settingsRepository.addHiddenKeyword(raw) }.getOrElse { events.send(HomeEvent.UpdateFailed); HiddenKeywords.AddResult.Blank }
 
     fun removeHiddenKeyword(keyword: String) {
         settingWrite { settingsRepository.removeHiddenKeyword(keyword) }
@@ -364,7 +376,7 @@ class HomeViewModel(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                events.send(HomeEvent.Message(HomeEvent.Message.Kind.UPDATE_FAILED))
+                events.send(HomeEvent.UpdateFailed)
             }
         }
     }
@@ -385,7 +397,7 @@ class HomeViewModel(
         viewModelScope.launch {
             val account = accountId.value ?: return@launch
             val ok = runCatching { subscriptions.setCategoryPinned(account, categoryId, !pinned) }.getOrDefault(false)
-            if (!ok) events.send(HomeEvent.Message(HomeEvent.Message.Kind.UPDATE_FAILED))
+            if (!ok) events.send(HomeEvent.UpdateFailed)
         }
     }
 
@@ -402,7 +414,7 @@ class HomeViewModel(
         viewModelScope.launch {
             val account = accountId.value ?: return@launch
             val ok = runCatching { write(account) }.getOrDefault(false)
-            if (!ok) events.send(HomeEvent.Message(HomeEvent.Message.Kind.UPDATE_FAILED))
+            if (!ok) events.send(HomeEvent.UpdateFailed)
         }
     }
 
@@ -427,19 +439,15 @@ class HomeViewModel(
     // Manual state changes: confirmed only after the DB write succeeded.
 
     fun toggleSaved(row: ArticleRow) = viewModelScope.launch {
+        val leaves = row.isSaved && _selection.value.filter == ReadFilter.SAVED
         val ok = runCatching { articles.setSaved(row.id, !row.isSaved) }.getOrDefault(false)
-        events.send(
-            if (!ok) HomeEvent.Message(HomeEvent.Message.Kind.UPDATE_FAILED)
-            else HomeEvent.Message(if (row.isSaved) HomeEvent.Message.Kind.UNSAVED else HomeEvent.Message.Kind.SAVED),
-        )
+        if (!ok) events.send(HomeEvent.UpdateFailed) else if (leaves) events.send(HomeEvent.LeftSaved(row.id))
     }
 
     fun setRead(row: ArticleRow, read: Boolean) = viewModelScope.launch {
+        val leaves = read && _selection.value.filter == ReadFilter.UNREAD
         val ok = runCatching { articles.setRead(row.id, read) }.getOrDefault(false)
-        events.send(
-            if (!ok) HomeEvent.Message(HomeEvent.Message.Kind.UPDATE_FAILED)
-            else HomeEvent.Message(if (read) HomeEvent.Message.Kind.MARKED_READ else HomeEvent.Message.Kind.MARKED_UNREAD),
-        )
+        if (!ok) events.send(HomeEvent.UpdateFailed) else if (leaves) events.send(HomeEvent.LeftUnread(row.id))
     }
 
     /** Captures the full matching unread set (not just loaded rows) when the confirmation opens. */
@@ -453,7 +461,19 @@ class HomeViewModel(
 
     fun confirmMarkAllRead(request: MarkAllReadRequest) = viewModelScope.launch {
         val changed = runCatching { articles.markRead(request.ids) }.getOrNull()
-        events.send(if (changed == null) HomeEvent.Message(HomeEvent.Message.Kind.UPDATE_FAILED) else HomeEvent.BulkMarked(changed))
+        events.send(if (changed == null) HomeEvent.UpdateFailed else HomeEvent.AllMarkedRead(changed))
+    }
+
+    /** The snackbar's Undo, an explicit action of its own: exactly what [event] changed goes back. */
+    fun undo(event: HomeEvent.Undoable) = viewModelScope.launch {
+        val ok = runCatching {
+            when (event) {
+                is HomeEvent.AllMarkedRead -> { articles.markUnread(event.ids); true }
+                is HomeEvent.LeftUnread -> articles.setRead(event.articleId, false)
+                is HomeEvent.LeftSaved -> articles.setSaved(event.articleId, true)
+            }
+        }.getOrDefault(false)
+        if (!ok) events.send(HomeEvent.UpdateFailed)
     }
 
     /** Manual refresh of the shown scope. Filter, sort and search are display conditions only (SYNC-02). */

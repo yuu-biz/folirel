@@ -80,6 +80,7 @@ import io.github.yuubiz.folirel.model.FeedDiagnostics
 import io.github.yuubiz.folirel.model.FeedNode
 import io.github.yuubiz.folirel.model.FetchError
 import io.github.yuubiz.folirel.model.Structure
+import kotlinx.coroutines.flow.collectLatest
 
 /** Collects one-shot events into a snackbar. */
 @Composable
@@ -102,7 +103,8 @@ fun SubscriptionEvents(vm: SubscriptionsViewModel, snackbar: SnackbarHostState) 
     val resources = LocalResources.current
     val undoLabel = stringResource(R.string.action_undo)
     LaunchedEffect(vm, context) {
-        vm.eventFlow.collect { event ->
+        // Latest only: a new message replaces the one on screen (and its Undo) instead of waiting behind it.
+        vm.eventFlow.collectLatest { event ->
             if (event is SubscriptionEvent.BulkUnsubscribed) {
                 val n = event.ids.size
                 val message = buildString {
@@ -112,11 +114,11 @@ fun SubscriptionEvents(vm: SubscriptionsViewModel, snackbar: SnackbarHostState) 
                 // The undo restores exactly the feeds this action changed.
                 val result = snackbar.showSnackbar(message, actionLabel = if (n > 0) undoLabel else null, duration = SnackbarDuration.Long)
                 if (result == SnackbarResult.ActionPerformed) vm.undoBulkUnsubscribe(event.ids)
-                return@collect
+                return@collectLatest
             }
             if (event is SubscriptionEvent.MoveConflict) {
                 snackbar.showSnackbar(resources.getString(R.string.msg_move_conflict, event.name))
-                return@collect
+                return@collectLatest
             }
             val key = when (event) {
                 is SubscriptionEvent.FeedAdded -> when (event.result) {

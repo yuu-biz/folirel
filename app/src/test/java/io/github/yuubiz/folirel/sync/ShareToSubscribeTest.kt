@@ -533,6 +533,29 @@ class ShareToSubscribeTest {
     }
 
     @Test
+    fun unsubscribingOneFeedOffersAnUndoThatSubscribesExactlyThatFeedAgain() = runBlocking<Unit> {
+        routes["/rss.xml"] = rss("The Blog", "a")
+        routes["/other.xml"] = rss("Other", "o")
+        val account = env.subscriptions.ensureLocalAccount()
+        val id = (env.subscriptions.addFeed(account, url("/rss.xml")) as AddFeedResult.Added).feedId
+        val otherId = (env.subscriptions.addFeed(account, url("/other.xml")) as AddFeedResult.Added).feedId
+        env.subscriptions.unsubscribe(otherId)
+        val vm = viewModel()
+
+        vm.unsubscribe(id).join()
+        val event = withTimeout(5_000) { vm.eventFlow.first() }
+        assertEquals(SubscriptionEvent.BulkUnsubscribed(listOf(id), skippedRecovered = 0), event)
+        assertFalse(feedRows().single { it.id == id }.isSubscribed)
+
+        vm.undoBulkUnsubscribe((event as SubscriptionEvent.BulkUnsubscribed).ids).join()
+        assertTrue(feedRows().single { it.id == id }.isSubscribed)
+        assertFalse("a feed the action did not change stays as it was", feedRows().single { it.id == otherId }.isSubscribed)
+        // Unsubscribing a feed that already is changes nothing, so there is nothing to undo.
+        vm.unsubscribe(otherId).join()
+        assertEquals(SubscriptionEvent.BulkUnsubscribed(emptyList(), skippedRecovered = 0), withTimeout(5_000) { vm.eventFlow.first() })
+    }
+
+    @Test
     fun aFeedThatIsAlreadySubscribedIsShownAsSuchAndNoDuplicateIsMade() = runBlocking<Unit> {
         routes["/rss.xml"] = rss("The Blog", "a")
         val account = env.subscriptions.ensureLocalAccount()

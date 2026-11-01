@@ -154,10 +154,16 @@ class ArticleRepository(
     /** Snapshot of unread ids at confirmation time; later arrivals are not included. */
     suspend fun unreadIdsSnapshot(spec: ArticleQuerySpec): List<String> = dao.ids(ArticleQuery.unreadIds(spec))
 
-    /** Marks exactly [ids] as read in one transaction. Returns the number of rows changed. */
-    suspend fun markRead(ids: List<String>): Int = db.withTransaction {
+    /** Marks exactly [ids] as read in one transaction. Returns the ids it changed (those that were still unread), for an exact undo. */
+    suspend fun markRead(ids: List<String>): List<String> = db.withTransaction {
         val now = clock.millis()
-        ids.chunked(500).sumOf { dao.markReadByIds(it, now) }
+        ids.chunked(500).flatMap { chunk -> dao.unreadAmong(chunk).also { if (it.isNotEmpty()) dao.markReadByIds(it, now) } }
+    }
+
+    /** The undo of [markRead]: exactly [ids] unread again, in one transaction. Returns the number of rows changed. */
+    suspend fun markUnread(ids: List<String>): Int = db.withTransaction {
+        val now = clock.millis()
+        ids.chunked(500).sumOf { dao.markUnreadByIds(it, now) }
     }
 
     /** Returns false when nothing was changed (e.g. the article does not exist). */

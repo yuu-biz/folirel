@@ -71,7 +71,6 @@ import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -153,6 +152,7 @@ import io.github.yuubiz.folirel.model.CardLayoutStyle
 import io.github.yuubiz.folirel.model.CategoryDisplay
 import io.github.yuubiz.folirel.model.ResolvedLayout
 import io.github.yuubiz.folirel.ui.common.LayoutPicker
+import io.github.yuubiz.folirel.ui.common.rememberLatestSnackbar
 import io.github.yuubiz.folirel.ui.common.SectionTitle
 import io.github.yuubiz.folirel.model.FetchError
 import io.github.yuubiz.folirel.model.ListMode
@@ -212,7 +212,7 @@ fun HomeScreen(
     }
     // Bumped to send the list on screen back to its top (tapping the selected tab); lists compare it with the value they started with.
     var scrollToTopTick by remember { mutableIntStateOf(0) }
-    val snackbar = remember { SnackbarHostState() }
+    val snackbar = rememberLatestSnackbar()
 
     var markAllRequest by remember { mutableStateOf<MarkAllReadRequest?>(null) }
     var meteredConfirm by remember { mutableStateOf(false) }
@@ -232,23 +232,26 @@ fun HomeScreen(
     BackHandler(enabled = selection.scope is ArticleScope.Feed && returnScope != null) { vm.leaveFeed() }
     LaunchedEffect(vm) {
         vm.eventFlow.collect { event ->
-            val text = when (event) {
-                is HomeEvent.BulkMarked -> messages.bulkMarked(event.count)
-                is HomeEvent.Message -> messages.of(event.kind)
+            when (event) {
+                HomeEvent.UpdateFailed -> snackbar.show(messages.updateFailed)
+                is HomeEvent.AllMarkedRead -> if (event.ids.isEmpty()) snackbar.show(messages.bulkMarked(0)) else {
+                    snackbar.show(messages.bulkMarked(event.ids.size), messages.undo) { vm.undo(event) }
+                }
+                is HomeEvent.LeftUnread -> snackbar.show(messages.markedRead, messages.undo) { vm.undo(event) }
+                is HomeEvent.LeftSaved -> snackbar.show(messages.unsaved, messages.undo) { vm.undo(event) }
             }
-            snackbar.showSnackbar(text)
         }
     }
 
     fun openUrl(row: ArticleRow, mode: BrowserMode) {
         when (val check = browser.check(row.linkUrl)) {
-            BrowserLauncher.LinkCheck.Missing -> scope.launch { snackbar.showSnackbar(messages.noUrl) }
-            BrowserLauncher.LinkCheck.Unsafe -> scope.launch { snackbar.showSnackbar(messages.unsafeUrl) }
+            BrowserLauncher.LinkCheck.Missing -> snackbar.show(messages.noUrl)
+            BrowserLauncher.LinkCheck.Unsafe -> snackbar.show(messages.unsafeUrl)
             is BrowserLauncher.LinkCheck.Ok -> if (!check.isHttps && settings.confirmHttpOpen) {
                 httpConfirmUrl = check.url
                 httpConfirmMode = mode
             } else if (browser.open(context, check.url, mode) == BrowserLauncher.OpenResult.NO_BROWSER) {
-                scope.launch { snackbar.showSnackbar(messages.noBrowser) }
+                snackbar.show(messages.noBrowser)
             }
         }
     }
@@ -323,7 +326,7 @@ fun HomeScreen(
         val narrow = maxWidth < NARROW_BAR_DP.dp
         val bigText = LocalDensity.current.fontScale > 1.3f
         Scaffold(
-            snackbarHost = { SnackbarHost(snackbar) },
+            snackbarHost = { SnackbarHost(snackbar.host) },
             topBar = {
                 TopAppBar(
                     colors = appBarColors(),
@@ -600,7 +603,7 @@ fun HomeScreen(
                 httpConfirmUrl = null
                 if (dontAskAgain) vm.stopAskingBeforeHttpOpen()
                 if (browser.open(context, url, httpConfirmMode) == BrowserLauncher.OpenResult.NO_BROWSER) {
-                    scope.launch { snackbar.showSnackbar(messages.noBrowser) }
+                    snackbar.show(messages.noBrowser)
                 }
             },
             onDismiss = { httpConfirmUrl = null },
@@ -1268,13 +1271,15 @@ fun scopeTitle(scope: ArticleScope, structure: Structure): String = when (scope)
 
 /** Snackbar texts resolved in composition. */
 private class HomeMessages(
-    private val texts: Map<HomeEvent.Message.Kind, String>,
+    val markedRead: String,
+    val unsaved: String,
+    val updateFailed: String,
+    val undo: String,
     private val bulk: (Int) -> String,
     val noUrl: String,
     val unsafeUrl: String,
     val noBrowser: String,
 ) {
-    fun of(kind: HomeEvent.Message.Kind) = texts.getValue(kind)
     fun bulkMarked(count: Int) = bulk(count)
 
     companion object {
@@ -1282,14 +1287,10 @@ private class HomeMessages(
         fun load(): HomeMessages {
             val resources = LocalResources.current
             return HomeMessages(
-                texts = mapOf(
-                    HomeEvent.Message.Kind.SAVED to stringResource(R.string.msg_saved),
-                    HomeEvent.Message.Kind.UNSAVED to stringResource(R.string.msg_unsaved),
-                    HomeEvent.Message.Kind.MARKED_READ to stringResource(R.string.msg_marked_read),
-                    HomeEvent.Message.Kind.MARKED_UNREAD to stringResource(R.string.msg_marked_unread),
-                    HomeEvent.Message.Kind.BULK_MARKED to stringResource(R.string.msg_marked_read),
-                    HomeEvent.Message.Kind.UPDATE_FAILED to stringResource(R.string.msg_update_failed),
-                ),
+                markedRead = stringResource(R.string.msg_marked_read),
+                unsaved = stringResource(R.string.msg_unsaved),
+                updateFailed = stringResource(R.string.msg_update_failed),
+                undo = stringResource(R.string.action_undo),
                 bulk = { n -> resources.getQuantityString(R.plurals.msg_bulk_marked, n, n) },
                 noUrl = stringResource(R.string.msg_no_url),
                 unsafeUrl = stringResource(R.string.msg_unsafe_url),
