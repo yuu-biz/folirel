@@ -13,7 +13,9 @@ import io.github.yuubiz.folirel.model.ShareProblem
 import io.github.yuubiz.folirel.model.ShareProvenance
 import io.github.yuubiz.folirel.network.AddressPolicy
 import io.github.yuubiz.folirel.testutil.TestEnv
+import io.github.yuubiz.folirel.testutil.cancelAndJoinAll
 import io.github.yuubiz.folirel.testutil.literalUrl
+import io.github.yuubiz.folirel.testutil.scopeJob
 import io.github.yuubiz.folirel.ui.share.ShareState
 import io.github.yuubiz.folirel.ui.subscriptions.SubscriptionEvent
 import io.github.yuubiz.folirel.ui.subscriptions.SubscriptionsViewModel
@@ -21,9 +23,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -63,6 +65,7 @@ class ShareToSubscribeTest {
     private val calls = ConcurrentHashMap<String, AtomicInteger>()
     private val routes = ConcurrentHashMap<String, () -> MockResponse>()
     private val extraServers = CopyOnWriteArrayList<MockWebServer>()
+    private val viewModels = CopyOnWriteArrayList<SubscriptionsViewModel>()
 
     private val probe get() = FeedProbe(SmallResourceFetcher(env.httpClient), env.fetcher)
     private val service get() = ShareDiscoveryService(probe, env.subscriptions)
@@ -81,11 +84,11 @@ class ShareToSubscribeTest {
 
     @After
     fun tearDown() {
-        Dispatchers.resetMain()
-        bg.cancel()
+        cancelAndJoinAll(viewModels.map { it.scopeJob } + bg.coroutineContext.job)
         extraServers.forEach { it.close() }
         env.close()
         server.close()
+        Dispatchers.resetMain()
     }
 
     private fun url(path: String) = server.url(path).toString()
@@ -481,7 +484,7 @@ class ShareToSubscribeTest {
             env.subscriptions, coordinator, upgrade,
             FeedDiscoveryService(FeedDiscovery(probe), env.subscriptions), service,
             DocumentIo(TestEnv.context()), { env.allowHttp.get() }, env.clock,
-        )
+        ).also { viewModels += it }
     }
 
     /** Suspends until [flow] has a value that satisfies [predicate]: driven by the state changing, with a deadline only to fail a test that would hang. */

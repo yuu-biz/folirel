@@ -21,7 +21,9 @@ import io.github.yuubiz.folirel.network.NetworkState
 import io.github.yuubiz.folirel.sync.RefreshCoordinator
 import io.github.yuubiz.folirel.sync.RefreshScheduler
 import io.github.yuubiz.folirel.testutil.TestEnv
+import io.github.yuubiz.folirel.testutil.cancelAndJoinAll
 import io.github.yuubiz.folirel.testutil.literalUrl
+import io.github.yuubiz.folirel.testutil.scopeJob
 import io.github.yuubiz.folirel.ui.home.HomeViewModel
 import io.github.yuubiz.folirel.ui.home.Selection
 import kotlinx.coroutines.CompletableDeferred
@@ -34,6 +36,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -182,13 +185,14 @@ class RestoreAftermathTest {
         val bg = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val source = BackupDevice()
         val target = BackupDevice(idPrefix = "t")
+        val viewModels = ArrayList<HomeViewModel>()
         try {
             val ids = RichState.build(source)
             val coordinator = RefreshCoordinator(target.env.backend, { target.account() }, { true }, {}, bg, target.clock)
             val vm = HomeViewModel(
                 target.env.articles, target.env.subscriptions, target.settings, coordinator, flowOf(NetworkState(true, false)),
                 SavedStateHandle(), target.clock, target.service.replaced,
-            )
+            ).also { viewModels += it }
             withTimeout(5_000) { vm.selection.first { it == Selection() } }
             vm.selectFilter(ReadFilter.SAVED)
             vm.setSearchActive(true)
@@ -199,7 +203,7 @@ class RestoreAftermathTest {
             assertFalse(vm.searchActive.value)
             assertEquals("", vm.searchText.value)
         } finally {
-            bg.cancel()
+            cancelAndJoinAll(viewModels.map { it.scopeJob } + bg.coroutineContext.job)
             source.close()
             target.close()
             Dispatchers.resetMain()

@@ -7,11 +7,13 @@ import io.github.yuubiz.folirel.data.preferences.SettingsRepository
 import io.github.yuubiz.folirel.network.NetworkState
 import io.github.yuubiz.folirel.sync.RefreshCoordinator
 import io.github.yuubiz.folirel.testutil.TestEnv
+import io.github.yuubiz.folirel.testutil.cancelAndJoinAll
+import io.github.yuubiz.folirel.testutil.scopeJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.job
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -34,6 +36,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 class RefreshFailureTest {
     private val env = TestEnv()
     private val bg = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val viewModels = ArrayList<HomeViewModel>()
     private val uncaught = CopyOnWriteArrayList<Throwable>()
     private val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
 
@@ -46,7 +49,7 @@ class RefreshFailureTest {
     @After
     fun tearDown() {
         Thread.setDefaultUncaughtExceptionHandler(previousHandler)
-        bg.cancel()
+        cancelAndJoinAll(viewModels.map { it.scopeJob } + bg.coroutineContext.job)
         env.close()
         Dispatchers.resetMain()
     }
@@ -56,6 +59,7 @@ class RefreshFailureTest {
         val coordinator = RefreshCoordinator(env.backend, { env.subscriptions.ensureLocalAccount() }, { true }, { throw IOException("No space left on device") }, bg, env.clock)
         val settings = SettingsRepository(PreferenceDataStoreFactory.create(scope = bg) { File(TestEnv.context().cacheDir, "rf-${System.nanoTime()}.preferences_pb") })
         val vm = HomeViewModel(env.articles, env.subscriptions, settings, coordinator, flowOf(NetworkState(true, false)), SavedStateHandle(), env.clock)
+            .also { viewModels += it }
         // The dispatcher is unconfined: each call runs to the failing write before it returns.
         vm.refreshCurrentScope()
         vm.retryPending()

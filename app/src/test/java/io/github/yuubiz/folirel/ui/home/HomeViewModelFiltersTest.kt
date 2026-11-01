@@ -15,12 +15,14 @@ import io.github.yuubiz.folirel.model.ReadFilter
 import io.github.yuubiz.folirel.network.NetworkState
 import io.github.yuubiz.folirel.sync.RefreshCoordinator
 import io.github.yuubiz.folirel.testutil.TestEnv
+import io.github.yuubiz.folirel.testutil.cancelAndJoinAll
+import io.github.yuubiz.folirel.testutil.scopeJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.job
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -49,6 +51,7 @@ class HomeViewModelFiltersTest {
     private val main = UnconfinedTestDispatcher()
     private val bg = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val collectors = HashMap<ArticleScope, Job>()
+    private val viewModels = ArrayList<HomeViewModel>()
     private lateinit var account: String
     private lateinit var feedId: String
     private lateinit var settingsFile: File
@@ -69,6 +72,7 @@ class HomeViewModelFiltersTest {
     private fun newViewModel(handle: SavedStateHandle = SavedStateHandle()): HomeViewModel {
         val coordinator = RefreshCoordinator(env.backend, { account }, { true }, {}, bg, env.clock)
         return HomeViewModel(env.articles, env.subscriptions, settings, coordinator, flowOf(NetworkState(true, false)), handle, env.clock)
+            .also { viewModels += it }
     }
 
     @Before
@@ -99,8 +103,7 @@ class HomeViewModelFiltersTest {
 
     @After
     fun tearDown() {
-        collectors.values.forEach { it.cancel() }
-        bg.cancel()
+        cancelAndJoinAll(collectors.values + viewModels.map { it.scopeJob } + bg.coroutineContext.job)
         env.close()
         Dispatchers.resetMain()
     }
