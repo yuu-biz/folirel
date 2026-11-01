@@ -4,6 +4,7 @@ import io.github.yuubiz.folirel.data.repository.AddFeedResult
 import io.github.yuubiz.folirel.model.ShareCandidate
 import io.github.yuubiz.folirel.model.ShareDiscovery
 import io.github.yuubiz.folirel.model.ShareProblem
+import io.github.yuubiz.folirel.model.ShareProvenance
 import io.github.yuubiz.folirel.network.SharedUrlExtractor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -33,8 +34,9 @@ sealed interface ShareState {
 }
 
 /**
- * The flow "shared text -> address -> feed candidates -> explicit subscribe" (Share to Subscribe). Receiving a share only
- * starts looking; nothing is registered until [subscribe] is called for a candidate the user tapped.
+ * The flow "shared text -> address -> feed candidates -> explicit subscribe" (Share to Subscribe), also used by "Add feed URL"
+ * through [lookUp]. Receiving a share only starts looking; nothing is registered until [subscribe] is called for a candidate the
+ * user tapped.
  *
  * Like `DiscoveryController`, only the latest request may write the state: a new share, [cancel] or a new choice
  * invalidates every earlier run, whether it notices its cancellation or not, so a late result can neither replace a newer request nor
@@ -81,7 +83,7 @@ class ShareSubscriptionController(
             SharedUrlExtractor.Result.None -> _state.value = ShareState.Failed(id, ShareProblem.NO_URL)
             SharedUrlExtractor.Result.TooLarge -> _state.value = ShareState.Failed(id, ShareProblem.TEXT_TOO_LARGE)
             is SharedUrlExtractor.Result.Found ->
-                if (urls.urls.size == 1) look(id, urls.urls.first()) else _state.value = ShareState.ChoosingUrl(id, urls.urls)
+                if (urls.urls.size == 1) look(id, urls.urls.first(), typedByUser = false) else _state.value = ShareState.ChoosingUrl(id, urls.urls)
         }
     }
 
@@ -90,10 +92,22 @@ class ShareSubscriptionController(
         val current = _state.value as? ShareState.ChoosingUrl ?: return
         if (url !in current.urls) return
         invalidate()
-        look(generation, url)
+        look(generation, url, typedByUser = false)
     }
 
-    private fun look(id: Long, url: String) {
+    /**
+     * An address the user typed in "Add feed URL" and confirmed with Add; returns the id its states carry. A feed at that address is
+     * registered at once, as the dialog always did. Feeds found on a page are only shown, like a share's, until one is tapped.
+     * An address without a scheme is taken as https://, so a site name such as `example.com` works.
+     */
+    fun lookUp(typed: String): Long {
+        invalidate()
+        val trimmed = typed.trim()
+        look(generation, if (trimmed.isEmpty() || "://" in trimmed) trimmed else "https://$trimmed", typedByUser = true)
+        return generation
+    }
+
+    private fun look(id: Long, url: String, typedByUser: Boolean) {
         _state.value = ShareState.Discovering(id, url)
         job = scope.launch {
             val result = try {
@@ -104,9 +118,12 @@ class ShareSubscriptionController(
                 ShareDiscovery.Failed(ShareProblem.FAILED)
             }
             if (id != generation) return@launch
-            _state.value = when (result) {
-                is ShareDiscovery.Found -> ShareState.Candidates(id, url, result.candidates)
-                is ShareDiscovery.Failed -> ShareState.Failed(id, result.problem)
+            val direct = (result as? ShareDiscovery.Found)?.candidates?.singleOrNull()?.takeIf { it.provenance == ShareProvenance.DIRECT_FEED }
+            when {
+                // Already subscribed or not: the add path says which, with the same message as before discovery existed.
+                typedByUser && direct != null -> startRegistration(id, direct)
+                result is ShareDiscovery.Found -> _state.value = ShareState.Candidates(id, url, result.candidates)
+                result is ShareDiscovery.Failed -> _state.value = ShareState.Failed(id, result.problem)
             }
         }
     }
@@ -115,7 +132,10 @@ class ShareSubscriptionController(
     fun subscribe(candidate: ShareCandidate) {
         val current = _state.value as? ShareState.Candidates ?: return
         if (candidate !in current.candidates || candidate.existing?.subscribed == true) return
-        val id = current.id
+        startRegistration(current.id, candidate)
+    }
+
+    private fun startRegistration(id: Long, candidate: ShareCandidate) {
         _state.value = ShareState.Subscribing(id, candidate.url)
         register(
             candidate.subscribeUrl,

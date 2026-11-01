@@ -20,8 +20,8 @@
     <string name="action_show_summary">概要を表示</string>
     <string name="action_unsave">保存を解除</string>
     <string name="add">追加</string>
-    <string name="add_feed_note">RSSまたはAtomのフィードのURLを入力してください（WebページのURLではありません）。http://のフィードは追加されますが、設定でHTTPを許可するまで取得しません。</string>
-    <string name="add_feed_url_label">フィードURL</string>
+    <string name="add_feed_note">フィードのURL、またはフィードへのリンクがあるサイトやページのURLを入力します。フィードはすぐに追加し、ページの場合は見つかったフィードから購読するものを選びます。</string>
+    <string name="add_feed_url_label">サイトまたはフィードのURL</string>
     <string name="browser_custom_tabs">アプリ内タブ</string>
     <string name="browser_external">外部ブラウザ</string>
     <string name="cancel">キャンセル</string>
@@ -603,14 +603,14 @@
     <string name="share_unsubscribed_note">以前に購読を解除したフィードです。再購読すると、記事・既読・カテゴリが戻ります。</string>
     <string name="share_open_feed">フィードの詳細</string>
     <string name="share_latest">最新 %s</string>
-    <string name="share_from_root">サイトのトップページで見つかりました（共有されたページ自体にはフィードがありません）</string>
+    <string name="share_from_root">サイトのトップページで見つかりました（そのページ自体にはフィードがありません）</string>
     <string name="share_subscribing">登録中…</string>
     <string name="share_problem_no_url">共有されたテキストに、http://やhttps://のアドレスがありません。</string>
     <string name="share_problem_too_large">共有されたテキストが大きすぎて読み取れません。</string>
     <string name="share_problem_invalid_url">このアドレスは使えません。</string>
     <string name="share_problem_no_feed">このアドレスにフィードが見つかりませんでした。</string>
     <string name="share_problem_feeds_unreadable">ページはフィードを示していますが、フィードとして読み込めませんでした。</string>
-    <string name="share_problem_http">このアドレスはhttp://で、設定で許可されていません。https://のアドレスを共有するか、設定でHTTPを許可してからもう一度共有してください。</string>
+    <string name="share_problem_http">このアドレスはhttp://で、設定で許可されていないため、何も送信していません。https://のアドレスを使うか、設定でHTTPを許可してからもう一度試してください。</string>
     <string name="share_problem_tls">証明書の問題のため、安全に接続できませんでした。</string>
     <string name="share_problem_network">アドレスに接続できませんでした。通信状態を確認してもう一度お試しください。</string>
     <string name="share_problem_blocked">このアドレスは使えません（ローカルネットワーク、または安全でないリダイレクト）。</string>

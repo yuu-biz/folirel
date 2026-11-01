@@ -18,6 +18,7 @@ class NoFixedWaitsInShareTestsTest {
         "src/test/java/io/github/yuubiz/folirel/ui/share/ShareSubscriptionControllerTest.kt",
         "src/test/java/io/github/yuubiz/folirel/network/SharedUrlExtractorTest.kt",
         "src/androidTest/java/io/github/yuubiz/folirel/ShareOverlayUiTest.kt",
+        "src/androidTest/java/io/github/yuubiz/folirel/AddFeedDialogUiTest.kt",
     )
 
     private val forbidden = listOf(

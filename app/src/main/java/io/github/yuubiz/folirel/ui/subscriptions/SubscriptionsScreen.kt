@@ -10,6 +10,8 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarDuration
 import io.github.yuubiz.folirel.ui.home.SourceIcon
+import io.github.yuubiz.folirel.ui.share.ShareState
+import io.github.yuubiz.folirel.ui.share.ShareSubscriptionController
 import io.github.yuubiz.folirel.model.FeedProblem
 import io.github.yuubiz.folirel.model.FeedListFilter
 import androidx.compose.material3.FilterChip
@@ -733,12 +735,28 @@ fun CategoriesScreen(vm: SubscriptionsViewModel, onBack: () -> Unit, initialOrde
     }
 }
 
+/**
+ * "Add feed URL". Add hands the address to the Share to Subscribe flow ([ShareSubscriptionController.lookUp]), whose dialog shows the
+ * search, the feeds a page offers and any problem on top of this one. This dialog stays open under it, so Cancel or OK there comes
+ * back to the address as typed; it closes once a feed is being subscribed.
+ */
 @Composable
-fun AddFeedDialog(onAdd: (String) -> Unit, onDismiss: () -> Unit) {
+fun AddFeedDialog(controller: ShareSubscriptionController, onDismiss: () -> Unit) {
     var url by rememberSaveable { mutableStateOf("") }
+    var request by rememberSaveable { mutableStateOf<Long?>(null) }
+    val state by controller.state.collectAsStateWithLifecycle()
     val focus = remember { FocusRequester() }
+    val add = { if (url.isNotBlank()) request = controller.lookUp(url) }
     // The field takes the focus (and the keyboard opens) when the dialog opens; Done on the keyboard adds, like the button.
     LaunchedEffect(Unit) { focus.requestFocus() }
+    LaunchedEffect(state, request) {
+        val subscribing = when (val s = state) {
+            is ShareState.Subscribing -> s.id
+            is ShareState.Done -> s.id
+            else -> null
+        }
+        if (subscribing != null && subscribing == request) onDismiss()
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.action_add_feed)) },
@@ -750,13 +768,14 @@ fun AddFeedDialog(onAdd: (String) -> Unit, onDismiss: () -> Unit) {
                     label = { Text(stringResource(R.string.add_feed_url_label)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { if (url.isNotBlank()) onAdd(url) }),
+                    keyboardActions = KeyboardActions(onDone = { add() }),
                     modifier = Modifier.focusRequester(focus).testTag("add_feed_url"),
                 )
                 Text(stringResource(R.string.add_feed_note), style = MaterialTheme.typography.bodySmall)
             }
         },
-        confirmButton = { TextButton(onClick = { onAdd(url) }, enabled = url.isNotBlank(), modifier = Modifier.testTag("add_feed_ok")) { Text(stringResource(R.string.add)) } },
+        confirmButton = { TextButton(onClick = add, enabled = url.isNotBlank(), modifier = Modifier.testTag("add_feed_ok")) { Text(stringResource(R.string.add)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        modifier = Modifier.testTag("add_feed_dialog"),
     )
 }

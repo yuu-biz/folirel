@@ -21,8 +21,8 @@
     <string name="action_show_summary">Show summary</string>
     <string name="action_unsave">Remove from saved</string>
     <string name="add">Add</string>
-    <string name="add_feed_note">Enter the URL of an RSS or Atom feed, not of a web page. An http:// feed is added, but it is fetched only after you allow HTTP in Settings.</string>
-    <string name="add_feed_url_label">Feed URL</string>
+    <string name="add_feed_note">Enter a feed URL, or the URL of a site or page that links to its feeds. A feed is added at once; for a page, you pick which of its feeds to subscribe to.</string>
+    <string name="add_feed_url_label">Site or feed URL</string>
     <string name="browser_custom_tabs">Custom Tabs</string>
     <string name="browser_external">External browser</string>
     <string name="cancel">Cancel</string>
@@ -629,14 +629,14 @@
     <string name="share_unsubscribed_note">You unsubscribed from this feed earlier. Its articles, read state and categories come back.</string>
     <string name="share_open_feed">Feed details</string>
     <string name="share_latest">latest %s</string>
-    <string name="share_from_root">Found on the top page of the site (the shared page itself has no feed)</string>
+    <string name="share_from_root">Found on the top page of the site (the page itself has no feed)</string>
     <string name="share_subscribing">Subscribing…</string>
     <string name="share_problem_no_url">The shared text has no http:// or https:// address.</string>
     <string name="share_problem_too_large">The shared text is too large to read.</string>
     <string name="share_problem_invalid_url">That address cannot be used.</string>
     <string name="share_problem_no_feed">No feed was found at this address.</string>
     <string name="share_problem_feeds_unreadable">The page points to a feed, but it could not be read as one.</string>
-    <string name="share_problem_http">This address uses http://, which is not allowed in Settings. Share the https:// address, or allow HTTP in Settings and share again.</string>
+    <string name="share_problem_http">This address uses http://, which is not allowed in Settings, so nothing was sent. Use the https:// address, or allow HTTP in Settings and try again.</string>
     <string name="share_problem_tls">A secure connection could not be made because of a certificate problem.</string>
     <string name="share_problem_network">The address could not be reached. Check the connection and try again.</string>
     <string name="share_problem_blocked">This address is not allowed (local network, or an unsafe redirect).</string>

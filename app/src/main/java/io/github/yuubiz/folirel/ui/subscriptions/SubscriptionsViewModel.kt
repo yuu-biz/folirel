@@ -330,8 +330,8 @@ class SubscriptionsViewModel(
     }
 
     /**
-     * Share to Subscribe. Registering goes through [addFeed], so the confirmation message, the HTTP-pending rule and the one
-     * refresh of the new feed are the same as for "Add feed URL".
+     * Share to Subscribe, and the search behind "Add feed URL". Registering goes through [addFeed], so the confirmation message,
+     * the HTTP-pending rule and the one refresh of the new feed are the same for both.
      */
     val share = ShareSubscriptionController(
         viewModelScope,
