@@ -288,7 +288,7 @@
     <string name="https_reason_downgrade">HTTPSからHTTPへ戻される</string>
     <string name="https_reason_html">HTTPSではフィードでなくWebページ</string>
     <string name="https_reason_network">通信エラー。後で再確認</string>
-    <string name="https_reason_not_feed">HTTPSの応答がRSS/Atomでない</string>
+    <string name="https_reason_not_feed">HTTPSの応答がフィードでない</string>
     <string name="https_reason_ok">HTTPSで同じフィードを確認</string>
     <string name="https_reason_skipped">確認中にフィードが変更された</string>
     <string name="https_reason_status">HTTPSでエラー応答</string>
@@ -439,7 +439,7 @@
     <string name="msg_move_conflict">そのアドレスは別のフィード（%s）が使っています。</string>
     <string name="msg_move_stale">その間にフィードの状態が変わったため、何も変更していません。</string>
     <string name="discovery_title">移行先を探す</string>
-    <string name="discovery_intro">このフィードのサイトでRSS/Atomのリンクを探し、1つずつ確かめます。使うものは自分で選びます。</string>
+    <string name="discovery_intro">このフィードのサイトでフィードへのリンクを探し、1つずつ確かめます。使うものは自分で選びます。</string>
     <string name="discovery_find">サイト内を探す</string>
     <string name="discovery_web_search">フィード名でWeb検索</string>
     <string name="discovery_web_search_note">検索アプリでフィード名と「RSS」を検索します。見つけたアドレスは下に貼り付けて確認できます。</string>
@@ -452,7 +452,7 @@
     <string name="discovery_page_no_site">このフィードのサイトのアドレスが分かりません。下に入力してください。</string>
     <string name="discovery_page_http">そのアドレスはhttp://で、設定で許可されていません。</string>
     <string name="discovery_page_unreadable">ページを読み込めませんでした。</string>
-    <string name="discovery_none_found">RSS/Atomのリンクは見つかりませんでした。</string>
+    <string name="discovery_none_found">フィードへのリンクは見つかりませんでした。</string>
     <string name="discovery_not_fetchable">フィードとして使えません</string>
     <plurals name="discovery_entries">
         <item quantity="other">%d件の記事</item>
@@ -608,8 +608,8 @@
     <string name="share_problem_no_url">共有されたテキストに、http://やhttps://のアドレスがありません。</string>
     <string name="share_problem_too_large">共有されたテキストが大きすぎて読み取れません。</string>
     <string name="share_problem_invalid_url">このアドレスは使えません。</string>
-    <string name="share_problem_no_feed">このアドレスにRSS/Atomフィードが見つかりませんでした。</string>
-    <string name="share_problem_feeds_unreadable">ページはフィードを示していますが、RSS/Atomとして読み込めませんでした。</string>
+    <string name="share_problem_no_feed">このアドレスにフィードが見つかりませんでした。</string>
+    <string name="share_problem_feeds_unreadable">ページはフィードを示していますが、フィードとして読み込めませんでした。</string>
     <string name="share_problem_http">このアドレスはhttp://で、設定で許可されていません。https://のアドレスを共有するか、設定でHTTPを許可してからもう一度共有してください。</string>
     <string name="share_problem_tls">証明書の問題のため、安全に接続できませんでした。</string>
     <string name="share_problem_network">アドレスに接続できませんでした。通信状態を確認してもう一度お試しください。</string>
