@@ -197,19 +197,19 @@ The Storage & data page also shows the number of articles stored and the databas
 | What you see | What it means and what to do |
 |---|---|
 | No articles after import | Wait for the first fetch (**Fetching feeds…**), or pull down to refresh. Check the band above the list and the **Subscriptions** summary for failures. |
-| **HTTP pending** / **HTTP not allowed in settings** | The feed uses `http://`. Run **Check HTTPS support of HTTP feeds**, or allow HTTP in Settings. |
-| **Not a feed (HTML page)** | The address is a web page. Find the site's RSS/Atom feed address, or use **Find where this feed moved** on the feed details. |
-| **Not found (404)** / **Feed removed (410)** | The address may have moved or the feed was removed. Try **Find where this feed moved**, or unsubscribe. |
-| **Access denied (401/403)** | The server refuses the request. Private feeds that need a sign-in cannot be read. |
-| **Rate limited (429)** / **Server error (5xx)** / **Timed out** / **Network error** | Usually temporary. Folirel retries later; use **Retry unfinished** to try sooner. A server-requested wait is respected. |
+| **HTTP not allowed** | The feed uses `http://`. Run **Check HTTPS support of HTTP feeds**, or allow HTTP in Settings. |
+| **Web page, not a feed** | The address is a web page. Find the site's RSS/Atom feed address, or use **Find where this feed moved** on the feed details. |
+| **Not found** / **Feed removed** | The address may have moved or the feed was removed. Try **Find where this feed moved**, or unsubscribe. |
+| **Access denied** | The server refuses the request. Private feeds that need a sign-in cannot be read. |
+| **Too many requests** / **Server error** / **Timed out** / **Network error** | Usually temporary. Folirel retries later. To try sooner, use **Retry unfinished**. If the server asked Folirel to wait, it waits. The HTTP status code is on the feed details, in the **Response** row. |
 | **Certificate error** | The site's HTTPS certificate cannot be verified (expired, wrong name, unknown issuer, or an outdated root list on an old device). Folirel will not bypass this. |
 | **Broken feed (XML error)** / **Unsupported feed format** | The document is not valid RSS/Atom. Nothing to fix on your side; tell the site owner or use another feed address. |
-| **Too large (size/entry limit)** | The feed exceeds the limits above. |
+| **Too large or too many entries** | The feed exceeds the limits above. |
 | **Blocked for safety** | The address (or a redirect) points to something Folirel refuses to contact, such as a local or private network address (Folirel contacts public internet addresses only). |
 | **Could not save (check free space)** | The device is out of storage. Free some space. |
-| A refresh changes nothing | Use **Revalidate and refetch** on the feed. The site or its CDN may still be serving old content. |
-| The band says **Last update was interrupted**, or a feed's result is **Not reached (time limit)** | The update stopped early. Feeds not reached go first next time, or use **Retry unfinished**. |
-| Automatic updates seem late | Android may delay background work (battery saver, Doze). Set the app's battery usage to unrestricted if you need more regular updates, and keep **Update when the app opens** on. |
+| A refresh changes nothing | Use **Force refresh** on the feed. The site or its CDN may still be serving old content. |
+| The band says **The last refresh was interrupted**, or a feed's result is **Not reached (time limit)** | The update stopped early. Feeds not reached go first next time, or use **Retry unfinished**. |
+| Automatic updates seem late | Android may delay background work (battery saver, Doze). Set the app's battery usage to unrestricted if you need more regular updates, and keep **Refresh when the app opens** on. |
 | Cannot install an update | The APK is signed with a different key than the installed one. See [Install](#install). |
 | **No app can open this link** | Install or enable a browser, or switch **Open articles in** to the other option. |
 | The first-run screen appears again and the settings are back to their defaults | The settings file could not be read (for example after a storage error) and was reset. Subscriptions, articles and read and saved state are kept; choose your settings again (HTTP is off until you allow it). |

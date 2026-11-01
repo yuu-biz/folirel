@@ -49,7 +49,7 @@ fun OnboardingScreen(onFinish: (autoUpdate: Boolean, next: OnboardingNext) -> Un
                 R.string.onboarding_point_direct,
                 R.string.onboarding_point_saved,
                 R.string.onboarding_point_opml,
-            ).forEach { Text("・" + stringResource(it), style = MaterialTheme.typography.bodyLarge) }
+            ).forEach { Text(stringResource(R.string.onboarding_point, stringResource(it)), style = MaterialTheme.typography.bodyLarge) }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Switch) { autoUpdate = !autoUpdate },

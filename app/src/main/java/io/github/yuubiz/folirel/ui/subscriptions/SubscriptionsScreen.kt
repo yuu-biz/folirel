@@ -413,13 +413,21 @@ private fun FetchSummary(
     val waiting = results.count { it == FeedResult.BACKOFF || it == FeedResult.OFFLINE }
     val notDone = results.count { it != null && it.unfinished }
     val neverFetched = active.count { !it.initialized }
+    val parts = buildList {
+        if (ok > 0) add(stringResource(R.string.status_part_ok, ok))
+        if (failed > 0) add(stringResource(R.string.status_part_failed, failed))
+        if (httpHeld > 0) add(stringResource(R.string.status_part_http, httpHeld))
+        if (waiting > 0) add(stringResource(R.string.status_part_waiting, waiting))
+        if (notDone > 0) add(stringResource(R.string.status_part_unfinished, notDone))
+    }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).testTag("fetch_summary"),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                stringResource(R.string.summary_counts, active.size, ok, failed, httpHeld, waiting, notDone),
+                if (parts.isEmpty()) pluralStringResource(R.plurals.category_feed_count, active.size, active.size)
+                else stringResource(R.string.status_result_compact, active.size, parts.joinToString(stringResource(R.string.status_part_separator))),
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (neverFetched > 0) Text(stringResource(R.string.summary_never_fetched, neverFetched), style = MaterialTheme.typography.bodySmall)

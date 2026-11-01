@@ -157,7 +157,7 @@ class HomeNoticeFlowTest : HomeFlowTestBase() {
     }
 
     /**
-     * Metered network, automatic updates on unmetered only: the manual update asks first. "Do not ask again" with "Update now"
+     * Metered network, automatic updates on unmetered only: the manual update asks first. "Do not ask again" with "Refresh now"
      * updates and stops the question; the next manual update runs at once. Cancelling never saves the box.
      */
     @Test
