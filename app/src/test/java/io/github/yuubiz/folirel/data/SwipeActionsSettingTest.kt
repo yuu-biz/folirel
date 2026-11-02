@@ -24,19 +24,19 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
-/** F3: the swipe actions setting (on by default, which direction does what) and what a released swipe carries out. */
+/** F3: the swipe actions setting (off by default, which direction does what) and what a released swipe carries out. */
 @RunWith(AndroidJUnit4::class)
 class SwipeActionsSettingTest {
     private fun file() = File(TestEnv.context().cacheDir, "swipe-${System.nanoTime()}.preferences_pb")
 
     @Test
-    fun aStoreWithoutTheKeyHasSwipeActionsOnAndReadingWritesNothing() = runBlocking<Unit> {
+    fun aStoreWithoutTheKeyHasSwipeActionsOffAndReadingWritesNothing() = runBlocking<Unit> {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val store = PreferenceDataStoreFactory.create(scope = scope) { file() }
         store.edit { it[stringPreferencesKey("list_layout")] = "LIST" }
         val s = SettingsRepository(store).current()
-        assertEquals(SwipeActions.RIGHT_READ_LEFT_SAVED, s.swipeActions)
-        assertEquals(SwipeActions.RIGHT_READ_LEFT_SAVED, AppSettings().swipeActions)
+        assertEquals(SwipeActions.OFF, s.swipeActions)
+        assertEquals(SwipeActions.OFF, AppSettings().swipeActions)
         assertFalse(store.data.first().asMap().keys.any { it.name == "swipe_actions" })
         scope.cancel()
     }
@@ -46,17 +46,17 @@ class SwipeActionsSettingTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val f = file()
         val first = SettingsRepository(PreferenceDataStoreFactory.create(scope = scope) { f })
-        first.setSwipeActions(SwipeActions.OFF)
+        first.setSwipeActions(SwipeActions.RIGHT_READ_LEFT_SAVED)
         scope.coroutineContext[Job]!!.cancelAndJoin()
 
         val restartScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val store = PreferenceDataStoreFactory.create(scope = restartScope) { f }
         val second = SettingsRepository(store)
-        assertEquals(SwipeActions.OFF, second.current().swipeActions)
+        assertEquals(SwipeActions.RIGHT_READ_LEFT_SAVED, second.current().swipeActions)
         second.setSwipeActions(SwipeActions.RIGHT_SAVED_LEFT_READ)
         assertEquals(SwipeActions.RIGHT_SAVED_LEFT_READ, second.current().swipeActions)
         store.edit { it[stringPreferencesKey("swipe_actions")] = "FROM_A_LATER_VERSION" }
-        assertEquals(SwipeActions.RIGHT_READ_LEFT_SAVED, second.current().swipeActions)
+        assertEquals(SwipeActions.OFF, second.current().swipeActions)
         restartScope.cancel()
     }
 

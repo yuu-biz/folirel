@@ -92,7 +92,7 @@ class BackupRoundTripTest {
             assertTrue(s.hiddenKeywordsEnabled)
             assertEquals(ArticleScope.Category(ids.categories.getValue("domestic")), s.lastScope)
             assertTrue(s.restoreLastScope)
-            assertEquals(SwipeActions.OFF, s.swipeActions)
+            assertEquals(SwipeActions.RIGHT_SAVED_LEFT_READ, s.swipeActions)
             assertTrue("a restored install is set up", s.onboardingDone)
             val prefs = b.env.db.subscriptionDao().categoryPreferences(b.account()).associateBy { it.categoryId }
             assertEquals(5, prefs.getValue(ids.categories.getValue("tech")).cardColumnsOverride)

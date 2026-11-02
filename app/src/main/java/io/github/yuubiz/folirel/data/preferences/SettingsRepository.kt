@@ -59,7 +59,8 @@ enum class SwipeAction { READ, SAVED }
 
 /**
  * Swipe actions on the rows of the List and Compact list layouts: off, or the action each direction toggles. "Right" is toward the end
- * of the line (left to right in English and Japanese). Default [RIGHT_READ_LEFT_SAVED], also for a store written before 0.14.
+ * of the line (left to right in English and Japanese). Default [OFF], also for a store written before 0.14: a drag on a row then
+ * changes category as it always did, and a reader turns swipe actions on in settings.
  */
 enum class SwipeActions(private val towardEnd: SwipeAction?, private val towardStart: SwipeAction?) {
     RIGHT_READ_LEFT_SAVED(SwipeAction.READ, SwipeAction.SAVED),
@@ -97,7 +98,7 @@ data class AppSettings(
     val categoryNavigation: CategoryNavigation = CategoryNavigation.AUTO,
     val browserMode: BrowserMode = BrowserMode.CUSTOM_TABS,
     /** Swiping a list row toggles read or saved; absent in a store written before 0.14, which reads as the default (on). */
-    val swipeActions: SwipeActions = SwipeActions.RIGHT_READ_LEFT_SAVED,
+    val swipeActions: SwipeActions = SwipeActions.OFF,
     /** Periodic update interval in minutes; 0 = off. Default 2 hours. */
     val refreshIntervalMinutes: Int = 120,
     /** Refresh once when the app comes to the foreground (at most every 30 minutes, same network rule). */

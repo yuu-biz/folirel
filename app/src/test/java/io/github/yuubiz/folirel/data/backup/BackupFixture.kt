@@ -235,7 +235,7 @@ object RichState {
         s.setShowImages(false)
         s.setCategoryNavigation(CategoryNavigation.PANE)
         s.setBrowserMode(BrowserMode.EXTERNAL)
-        s.setSwipeActions(SwipeActions.OFF)
+        s.setSwipeActions(SwipeActions.RIGHT_SAVED_LEFT_READ)
         s.setRefreshIntervalMinutes(360)
         s.setStartupRefresh(false)
         s.setUnmeteredOnly(false)

@@ -132,13 +132,13 @@ class BackupArchiveSecurityTest {
         assertEquals(written.copy(restoreLastScope = false), target.inspect(older).settings)
     }
 
-    /** An archive written before 0.14 has no swipeActions: it is read with swipe actions on (the default) and the rest as written. */
+    /** An archive written before 0.14 has no swipeActions: it is read with swipe actions off (the default) and the rest as written. */
     @Test
     fun swipeActionsAddedLaterAreOptional() = withBackup { bytes, target ->
         val older = Zips.edit(bytes, BackupFormat.SETTINGS) { JsonObject(json(it).jsonObject - "swipeActions").toString() }
         val written = target.inspect(bytes).settings
-        assertEquals(SwipeActions.OFF, written.swipeActions)
-        assertEquals(written.copy(swipeActions = SwipeActions.RIGHT_READ_LEFT_SAVED), target.inspect(older).settings)
+        assertEquals(SwipeActions.RIGHT_SAVED_LEFT_READ, written.swipeActions)
+        assertEquals(written.copy(swipeActions = SwipeActions.OFF), target.inspect(older).settings)
     }
 
     /** T17: a newer format version is refused as such, before anything else of it is read. */
