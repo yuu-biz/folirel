@@ -1,4 +1,10 @@
+import groovy.json.JsonOutput
 import java.util.Properties
+import java.util.zip.ZipInputStream
+import javax.xml.parsers.DocumentBuilderFactory
+import org.gradle.api.artifacts.component.ComponentArtifactIdentifier
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.result.ResolvedArtifactResult
 
 plugins {
     alias(libs.plugins.android.application)
@@ -102,7 +108,9 @@ android {
 
     packaging {
         resources {
-            excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/LICENSE*", "/META-INF/NOTICE*")
+            // Settings > About > Licenses shows every licence and notice text of the runtime classpath (LicenseCatalogTask below), so
+            // the copies inside the libraries stay out of the APK.
+            excludes += setOf("/META-INF/LICENSE*", "/META-INF/NOTICE*", "/META-INF/**/LICENSE*", "/META-INF/**/NOTICE*")
         }
     }
 }
@@ -166,4 +174,180 @@ dependencies {
     androidTestImplementation(libs.kotlinx.coroutines.test)
     // The home flow test serves feeds from the device itself (the test source set only; production never allows loopback).
     androidTestImplementation(libs.okhttp.mockwebserver3)
+}
+
+// Settings > About > Licenses shows what this task writes. It reads the variant's runtime classpath, so the list cannot drift from
+// what the APK contains.
+androidComponents {
+    onVariants { variant ->
+        val resolved = variant.runtimeConfiguration.incoming.artifactView {
+            componentFilter { it is ModuleComponentIdentifier }
+        }.artifacts.resolvedArtifacts
+        // Each module's own POM (not its dependencies) is where its licence is declared.
+        val pomConfiguration = configurations.create("${variant.name}LicensePoms") {
+            isCanBeConsumed = false
+            isTransitive = false
+        }
+        pomConfiguration.dependencies.addAllLater(
+            resolved.map { artifacts ->
+                artifacts.map { (it.id.componentIdentifier as ModuleComponentIdentifier).displayName }.distinct()
+                    .map { project.dependencies.create("$it@pom") }
+            },
+        )
+        val catalog = tasks.register<LicenseCatalogTask>("${variant.name}LicenseCatalog") {
+            artifactIds.set(resolved.map { set -> set.map { it.id } })
+            artifactFiles.set(resolved.map { set -> set.map { it.file } })
+            poms.set(pomConfiguration.incoming.artifacts.resolvedArtifacts)
+            inheritedLicenses.put("com.google.guava:listenablefuture", "Apache-2.0") // declared in its parent, guava-parent
+            // DataStore's repackaged Protocol Buffers carry the BSD terms without the upstream copyright line, which the terms require.
+            copyrights.put("androidx.datastore:datastore-preferences-external-protobuf", "Protocol Buffers\nCopyright 2008 Google Inc.  All rights reserved.")
+            appLicense.set(rootProject.layout.projectDirectory.file("LICENSE"))
+            sharedTexts.set(layout.projectDirectory.dir("licenses"))
+            // Vector drawables copied from Material Icons (see the header of each file in res/drawable); not a classpath module.
+            bundled.set(listOf("Material Icons (vector drawables)|github.com/google/material-design-icons|Apache-2.0"))
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(catalog, LicenseCatalogTask::outputDir)
+    }
+}
+
+/**
+ * Writes `licenses.json`: Folirel's own licence, then every module of the runtime classpath with the licences its POM declares, the
+ * full texts, and the LICENSE and NOTICE files its artifact carries. The APK drops those files (`packaging.resources.excludes`), so
+ * this screen is where Apache-2.0 section 4(d) notices are shown. A licence the task cannot map fails the build: a new dependency
+ * cannot ship without its text.
+ */
+abstract class LicenseCatalogTask : DefaultTask() {
+    @get:Input abstract val artifactIds: ListProperty<ComponentArtifactIdentifier>
+    @get:InputFiles @get:PathSensitive(PathSensitivity.NAME_ONLY) abstract val artifactFiles: ListProperty<File>
+
+    // Resolved only when the task runs: resolving it while Gradle plans the build would resolve the runtime classpath that early too.
+    // Not an input: a published POM never changes for the module versions that artifactIds already tracks.
+    @get:Internal abstract val poms: SetProperty<ResolvedArtifactResult>
+
+    /** Modules whose POM leaves the licence to a parent POM: "group:module" to licence id. */
+    @get:Input abstract val inheritedLicenses: MapProperty<String, String>
+
+    /** Copyright lines a library's bundled LICENSE file leaves out, put in front of it: "group:module" to the line. */
+    @get:Input abstract val copyrights: MapProperty<String, String>
+
+    @get:InputFile @get:PathSensitive(PathSensitivity.NONE) abstract val appLicense: RegularFileProperty
+    @get:InputDirectory @get:PathSensitive(PathSensitivity.RELATIVE) abstract val sharedTexts: DirectoryProperty
+
+    /** Third-party material that is not a classpath module: "name|id|licence id". */
+    @get:Input abstract val bundled: ListProperty<String>
+
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun write() {
+        val pomByModule = poms.get().associate { (it.id.componentIdentifier as ModuleComponentIdentifier).moduleIdentifier.toString() to it.file }
+        val inherited = inheritedLicenses.get()
+        val shared = sharedTexts.get().asFile.listFiles { f -> f.extension == "txt" }!!.associate { it.nameWithoutExtension to it.readText() }
+        val texts = linkedMapOf<String, Map<String, String>>()
+        fun sharedText(id: String): String {
+            val body = shared[id] ?: throw GradleException("No text for licence $id in app/licenses/.")
+            texts.getOrPut(id) { mapOf("title" to LICENSE_TITLES.getValue(id), "body" to body) }
+            return id
+        }
+        val libraries = mutableListOf<Map<String, Any>>()
+        texts["Folirel"] = mapOf("title" to LICENSE_TITLES.getValue("MIT"), "body" to appLicense.get().asFile.readText())
+        libraries += library("Folirel", "io.github.yuubiz.folirel", "", listOf("Folirel"), emptyList())
+
+        val problems = mutableListOf<String>()
+        artifactIds.get().zip(artifactFiles.get())
+            .groupBy { (id, _) -> id.componentIdentifier as ModuleComponentIdentifier }
+            .toSortedMap(compareBy { it.displayName })
+            .forEach { (component, artifacts) ->
+                val module = component.moduleIdentifier.toString()
+                val pom = pomByModule[module]?.let(::readPom) ?: throw GradleException("No POM for $module.")
+                val ids = pom.licenses.mapNotNull { (name, url) -> spdx(name, url) ?: null.also { problems += "$module: unknown licence \"$name\" ($url)" } }
+                    .ifEmpty { listOfNotNull(inherited[module]) }
+                if (pom.licenses.isEmpty() && ids.isEmpty()) problems += "$module: the POM declares no licence"
+                val files = artifacts.flatMap { (_, file) -> licenseFiles(file) }.distinctBy { it.second.normalized() }
+                val ownFile = files.firstOrNull { (path, _) -> !path.contains("NOTICE", ignoreCase = true) }
+                val licenseKeys = ids.mapNotNull { id ->
+                    if (id in OWN_TEXT) {
+                        ownFile?.let { (_, body) ->
+                            val text = listOfNotNull(copyrights.get()[module], body).joinToString("\n\n")
+                            "$module/LICENSE".also { texts[it] = mapOf("title" to LICENSE_TITLES.getValue(id), "body" to text) }
+                        } ?: null.also { problems += "$module: $id licence without a bundled LICENSE file" }
+                    } else {
+                        sharedText(id)
+                    }
+                }
+                val known = shared.values.map { it.normalized() }
+                // AndroidX ships the Apache text without its appendix ("How to apply..."); that is the same licence, not a notice.
+                val notices = files.filter { (path, body) ->
+                    val b = body.normalized()
+                    (ownFile?.first != path || ids.none { it in OWN_TEXT }) && known.none { it == b || (it.startsWith(b) && "END OF TERMS AND CONDITIONS" in b) }
+                }
+                    .map { (path, body) -> "$module/$path".also { texts[it] = mapOf("title" to path.substringAfterLast('/'), "body" to body) } }
+                libraries += library(pom.name, module, component.version, licenseKeys, notices)
+            }
+        bundled.get().forEach { line ->
+            val (name, module, id) = line.split('|')
+            libraries += library(name, module, "", listOf(sharedText(id)), emptyList())
+        }
+        if (problems.isNotEmpty()) {
+            throw GradleException("Licences screen: ${problems.joinToString("; ")}. Add the text under app/licenses/ and map it in LicenseCatalogTask.")
+        }
+        val out = outputDir.get().asFile.apply { deleteRecursively(); mkdirs() }
+        File(out, "licenses.json").writeText(JsonOutput.prettyPrint(JsonOutput.toJson(mapOf("texts" to texts, "libraries" to libraries))))
+    }
+
+    private fun library(name: String, module: String, version: String, licenses: List<String>, notices: List<String>) =
+        mapOf("name" to name, "module" to module, "version" to version, "licenses" to licenses, "notices" to notices)
+
+    private data class Pom(val name: String, val licenses: List<Pair<String, String>>)
+
+    private fun readPom(file: File): Pom {
+        val factory = DocumentBuilderFactory.newInstance().apply {
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            isExpandEntityReferences = false
+        }
+        val project = factory.newDocumentBuilder().parse(file).documentElement
+        fun org.w3c.dom.Element.children(tag: String) = (0 until childNodes.length).map { childNodes.item(it) }
+            .filterIsInstance<org.w3c.dom.Element>().filter { it.tagName == tag }
+        fun org.w3c.dom.Element.text(tag: String) = children(tag).firstOrNull()?.textContent.orEmpty().trim()
+        val licenses = project.children("licenses").flatMap { it.children("license") }.map { it.text("name") to it.text("url") }
+        return Pom(project.text("name").ifEmpty { project.text("artifactId") }, licenses)
+    }
+
+    /** LICENSE, NOTICE and COPYING files inside a jar, or inside an aar and the jars it contains. */
+    private fun licenseFiles(file: File): List<Pair<String, String>> {
+        val found = mutableListOf<Pair<String, String>>()
+        fun scan(zip: ZipInputStream) {
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                when {
+                    entry.isDirectory -> Unit
+                    entry.name.endsWith(".jar") -> scan(ZipInputStream(zip))
+                    LICENSE_FILE.matches(entry.name.substringAfterLast('/')) -> found += entry.name to zip.readBytes().decodeToString()
+                }
+            }
+        }
+        ZipInputStream(file.inputStream().buffered()).use(::scan)
+        return found
+    }
+
+    private fun spdx(name: String, url: String): String? {
+        val n = name.lowercase()
+        val u = url.lowercase()
+        return when {
+            "apache.org/licenses/license-2.0" in u || ("apache" in n && "2.0" in n) -> "Apache-2.0"
+            "opensource.org/licenses/mit" in u || n in setOf("mit", "mit license", "the mit license") -> "MIT"
+            "opensource.org/licenses/bsd-3-clause" in u || n == "bsd-3-clause" -> "BSD-3-Clause"
+            else -> null
+        }
+    }
+
+    private fun String.normalized() = trim().split(Regex("\\s+")).joinToString(" ")
+
+    private companion object {
+        val LICENSE_FILE = Regex("(?i)(LICENSE|LICENCE|NOTICE|COPYING)([._-][^/]*)?")
+        val LICENSE_TITLES = mapOf("Apache-2.0" to "Apache License 2.0", "MIT" to "MIT License", "BSD-3-Clause" to "BSD 3-Clause License")
+
+        // Licences whose text carries the library's own copyright line, so the text must come from the library's LICENSE file.
+        val OWN_TEXT = setOf("MIT", "BSD-3-Clause")
+    }
 }

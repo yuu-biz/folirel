@@ -179,7 +179,7 @@ Settings opens on a short list of six pages. Each row shows the values it holds 
 | Storage and data | Image cache size | 64, 128 (default), 256 or 512 MB. It takes effect the next time Folirel starts, when older images beyond the new size are removed. Until then the page shows both the size in use and the new one. **Clear image cache** removes cached thumbnails only |
 | Storage and data | Export subscription list (OPML) | Subscriptions and categories only |
 | Storage and data | Create Folirel backup / Restore from Folirel backup | Everything Folirel holds, in one file. Restoring replaces the current data after a preview and a confirmation. See [Data, backup and uninstalling](#data-backup-and-uninstalling) |
-| About | Version, build, licence summary | The version line shows the version, version code and build identifier |
+| About | Version, build, source code, privacy policy, licenses | The version line shows the version, version code and build identifier. **Licenses** lists every library in the app under its license; **Show full text** opens the license text |
 
 The Storage and data page also shows the number of articles stored and the database size, and warns when the database is larger than 100 MB.
 

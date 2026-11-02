@@ -4,7 +4,6 @@ import android.text.format.Formatter
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -408,7 +407,7 @@ internal fun StoragePage(
 }
 
 @Composable
-internal fun AboutPage(onOpenLink: (String) -> Unit) {
+internal fun AboutPage(onOpenLink: (String) -> Unit, onOpenLicenses: () -> Unit) {
     Column {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             // Fixed brand picture (never tinted or taken from the colour set); small, so the version below stays in view at large text.
@@ -421,11 +420,7 @@ internal fun AboutPage(onOpenLink: (String) -> Unit) {
         HorizontalDivider()
         NavRow(stringResource(R.string.about_privacy), PRIVACY_URL.removePrefix("https://"), { onOpenLink(PRIVACY_URL) }, Modifier.testTag("about_privacy"))
         HorizontalDivider()
-        // A licence screen with the full texts comes later; until then the list of what is included.
-        Column(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 8.dp).testTag("about_licenses")) {
-            Text(stringResource(R.string.about_licenses), style = MaterialTheme.typography.bodyLarge)
-            Text(stringResource(R.string.settings_licenses), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        NavRow(stringResource(R.string.about_licenses), stringResource(R.string.settings_licenses), onOpenLicenses, Modifier.testTag("about_licenses"))
     }
 }
 

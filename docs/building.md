@@ -161,6 +161,7 @@ Libraries included in the app:
 | AndroidX Room | 2.8.5 | Apache-2.0 | Local database |
 | AndroidX WorkManager | 2.12.0 | Apache-2.0 | Periodic background updates |
 | AndroidX DataStore (Preferences) | 1.2.1 | Apache-2.0 | Settings |
+| Protocol Buffers (repackaged inside DataStore) | with DataStore 1.2.1 | BSD-3-Clause | DataStore's file format |
 | AndroidX Browser | 1.10.0 | Apache-2.0 | Custom Tabs |
 | OkHttp (with Okio) | 5.5.0 | Apache-2.0 | HTTP client |
 | Coil 3 (compose, network-okhttp) | 3.6.3 | Apache-2.0 | Thumbnail loading |
@@ -182,7 +183,7 @@ Build and test only (not shipped in the APK):
 | AndroidX Test (core, ext-junit, runner, rules), Espresso, UI Automator, Compose UI test | see the version catalogue | Apache-2.0 |
 | kotlinx-coroutines-test, Room testing, WorkManager testing | as above | Apache-2.0 |
 
-Folirel itself is released under the MIT License; see the `LICENSE` file in the repository root. The app's Settings, About section lists the main open-source components and their licences.
+Folirel itself is released under the MIT License; see the `LICENSE` file in the repository root. Settings > About > Licenses lists every library in the APK with its licence text. The list is generated at build time from the runtime classpath (`LicenseCatalogTask` in `app/build.gradle.kts`): the task reads each module's POM, takes the Apache-2.0 text from `app/licenses/` and MIT or BSD texts from the library's own LICENSE file, and fails the build on a licence it cannot map. The LICENSE and NOTICE files inside the libraries are left out of the APK, since the screen shows them.
 
 ## Signing
 

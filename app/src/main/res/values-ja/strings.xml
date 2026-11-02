@@ -179,7 +179,7 @@
     <string name="settings_export_note">購読とカテゴリだけを、ほかのリーダーで使える形式で書き出します。</string>
     <string name="settings_interval">自動更新</string>
     <string name="settings_interval_note">Androidの都合で遅れることがあります。</string>
-    <string name="settings_licenses">オープンソース: AndroidX, Kotlin, kotlinx.coroutines, kotlinx.serialization, OkHttp, Okio, Coil（Apache-2.0）、jsoup（MIT）、Material Icons（Apache-2.0）。</string>
+    <string name="settings_licenses">Folirelが使っているオープンソースソフトウェアとライセンス文</string>
     <string name="settings_local_note">データはこの端末だけにあり、アンインストールすると消えます。残すには「保存とデータ」でFolirelのバックアップを作成してください。</string>
     <string name="settings_open">記事を開く方法</string>
     <string name="settings_open_note">記事を開いても既読にはなりません。</string>
@@ -715,4 +715,6 @@
     <string name="about_source_code">ソースコード</string>
     <string name="about_privacy">プライバシーポリシー</string>
     <string name="about_licenses">ライセンス</string>
+    <string name="licenses_show_text">全文を表示</string>
+    <string name="licenses_hide_text">全文を閉じる</string>
 </resources>

@@ -168,6 +168,24 @@ class P2SettingsTest {
         until { exists("drawer_open") }
     }
 
+    @Test
+    fun aboutOpensTheLicencesWithEachTextOneTapAwayAndBackReturnsToAbout() {
+        launch()
+        openPage("ABOUT")
+        click("about_licenses")
+        until { exists("settings_page_LICENSES") }
+        until { exists("licenses_text_0") }
+        compose.onNodeWithText("Folirel").assertExists()
+        compose.onNodeWithText("jsoup Java HTML Parser").performScrollTo().assertExists()
+        compose.onNodeWithTag("licenses_text_0_body").assertDoesNotExist()
+        click("licenses_text_0")
+        compose.onNodeWithTag("licenses_text_0_body").assertExists()
+        click("licenses_text_0")
+        compose.onNodeWithTag("licenses_text_0_body").assertDoesNotExist()
+        back()
+        until { exists("settings_page_ABOUT") }
+    }
+
     // ---- P2-A: colours
 
     @Test

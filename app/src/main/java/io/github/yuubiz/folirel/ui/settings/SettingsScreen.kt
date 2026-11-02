@@ -102,7 +102,10 @@ class SettingsViewModel(
     }
 }
 
-/** The pages under Settings. The top page lists them with the values they hold; a page is one step below it, never deeper. */
+/**
+ * The pages under Settings. The top page lists them with the values they hold; a page is one step below it. Licenses is the one
+ * exception: a list to read, not settings, it opens from About and is not on the top page.
+ */
 enum class SettingsPage(val route: String, val title: Int) {
     APPEARANCE("settings/appearance", R.string.settings_group_appearance),
     LAYOUT("settings/layout", R.string.settings_group_layout),
@@ -110,6 +113,7 @@ enum class SettingsPage(val route: String, val title: Int) {
     REFRESH("settings/refresh", R.string.settings_group_refresh),
     STORAGE("settings/storage", R.string.settings_group_storage),
     ABOUT("settings/about", R.string.settings_about),
+    LICENSES("settings/licenses", R.string.about_licenses),
     ;
 
     companion object {
@@ -160,7 +164,8 @@ fun SettingsScreen(
                 SettingsPage.OPEN -> OpenPage(s, vm)
                 SettingsPage.REFRESH -> RefreshPage(s, vm, onHttpsCheck)
                 SettingsPage.STORAGE -> StoragePage(s, vm, snackbar, onExport, backup, onCreateBackup, onRestore)
-                SettingsPage.ABOUT -> AboutPage(onOpenLink)
+                SettingsPage.ABOUT -> AboutPage(onOpenLink, onOpenLicenses = { onOpenPage(SettingsPage.LICENSES) })
+                SettingsPage.LICENSES -> LicensesPage()
             }
         }
     }

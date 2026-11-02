@@ -180,7 +180,7 @@
     <string name="settings_export_note">Subscriptions and categories only, for use in other readers.</string>
     <string name="settings_interval">Automatic refresh</string>
     <string name="settings_interval_note">Android may run it later than planned.</string>
-    <string name="settings_licenses">Open source: AndroidX, Kotlin, kotlinx.coroutines, kotlinx.serialization, OkHttp, Okio, Coil (Apache-2.0); jsoup (MIT); Material Icons (Apache-2.0).</string>
+    <string name="settings_licenses">The open-source software in Folirel and its license texts</string>
     <string name="settings_local_note">Your data stays on this device and is deleted when you uninstall Folirel. To keep it, create a Folirel backup under Storage and data.</string>
     <string name="settings_open">Opening articles</string>
     <string name="settings_open_note">Opening an article never marks it as read.</string>
@@ -741,4 +741,6 @@
     <string name="about_source_code">Source code</string>
     <string name="about_privacy">Privacy policy</string>
     <string name="about_licenses">Licenses</string>
+    <string name="licenses_show_text">Show full text</string>
+    <string name="licenses_hide_text">Hide full text</string>
 </resources>
