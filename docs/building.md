@@ -85,7 +85,7 @@ Outputs:
 
 Notes:
 
-- Lint is configured to fail the build on errors (`abortOnError = true`) and checks the debug variant.
+- Lint is configured to fail the build on errors (`abortOnError = true`). `:app:lintDebug` checks the debug variant; `:app:lintRelease` checks the release variant, and `assembleRelease` runs the fatal checks (`checkReleaseBuilds = true`).
 - The JVM tests use Robolectric. On JDK 17 and newer it needs access to some JDK internals; the required `--add-opens` / `--add-exports` flags are already set for the test JVM in `app/build.gradle.kts`.
 - The JVM and instrumented tests read their input files (feeds, OPML, icons) from the repository's top-level `fixtures/` directory; these are synthetic test data.
 - The Room schema is exported to `app/schemas/` and used by the migration tests. Database migrations must never be destructive.
