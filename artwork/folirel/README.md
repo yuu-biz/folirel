@@ -54,3 +54,8 @@ light/dark setting; only the choice between the light and the dark logo variant 
 Edit the SVG first, then regenerate or replace what is derived from it: run `svg_to_vector.py` for the logo drawables, and
 bring `android/*.svg` and the three Android resources in line by hand (the layers have no generator here). Do not edit the
 generated VectorDrawables in place.
+
+## Licence
+
+The logo, icon and wordmark were drawn for Folirel by the scripts in `source/` (no third-party font or image is used) and are
+released under the repository's [MIT License](../../LICENSE).

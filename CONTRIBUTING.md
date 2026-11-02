@@ -44,5 +44,4 @@ say so in the pull request.
 
 ## Reporting security issues
 
-Please do not open a public issue for a vulnerability. Contact the maintainer privately (for example through GitHub's
-private vulnerability reporting, if enabled for the repository) and allow time for a fix.
+Please do not open a public issue for a vulnerability. See [SECURITY.md](SECURITY.md).
