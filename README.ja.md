@@ -95,7 +95,7 @@ APK は `app/build/outputs/apk/debug/app-debug.apk` に出力されます。Wind
 - フィードの内容は信頼しません。DTD/DOCTYPE や外部エンティティを含む XML は拒否し、TLS 検証は常に有効です。
   `http://` のフィードは許可するまで取得せず、URL は毎回、プライベート/ローカルアドレスでないか検査してから要求します。
 
-詳細は [Fetch and security](docs/fetch-and-security.md)（英語）を参照してください。
+プライバシーについての説明: [docs/privacy.ja.md](docs/privacy.ja.md)。詳細は [Fetch and security](docs/fetch-and-security.md)（英語）を参照してください。
 
 ## ドキュメント
 

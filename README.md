@@ -104,7 +104,7 @@ More in [docs/building.md](docs/building.md).
   always on, plain `http://` feeds are not fetched until you allow them, and each URL is checked against private and
   local addresses before it is requested.
 
-Details: [Fetch and security](docs/fetch-and-security.md).
+Privacy statement: [docs/privacy.md](docs/privacy.md). Details: [Fetch and security](docs/fetch-and-security.md).
 
 ## Documentation
 
