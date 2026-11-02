@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -25,8 +27,31 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // The release key stays outside the repository; the git-ignored keystore.properties says where it is. Without the file the
+    // release variant still configures, so tests, lint and debug builds work anywhere, but packaging a release APK fails (below).
+    val releaseKeystore = rootProject.file("keystore.properties")
+    signingConfigs {
+        if (releaseKeystore.isFile) {
+            val props = Properties().apply { releaseKeystore.inputStream().use(::load) }
+            val missing = listOf("storeFile", "storePassword", "keyAlias", "keyPassword").filter { props.getProperty(it).isNullOrBlank() }
+            if (missing.isNotEmpty()) throw GradleException("keystore.properties lacks ${missing.joinToString()}; see docs/releasing.md.")
+            create("release") {
+                storeFile = rootProject.file(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+                // minSdk 28 verifies v2 and v3, so a v1 (JAR) signature would only add size; v4 would add an .idsig file nobody uses.
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = false
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
@@ -78,6 +103,14 @@ android {
         resources {
             excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/LICENSE*", "/META-INF/NOTICE*")
         }
+    }
+}
+
+// An unsigned or debug-signed release APK must never come out of this build: stop before packaging when the key is not set up.
+tasks.matching { it.name == "packageRelease" }.configureEach {
+    val keystore = rootProject.file("keystore.properties")
+    doFirst {
+        if (!keystore.isFile) throw GradleException("Release signing is not set up: create keystore.properties in the repository root (see docs/releasing.md).")
     }
 }
 

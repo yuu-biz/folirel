@@ -187,6 +187,6 @@ Folirel itself is released under the MIT License; see the `LICENSE` file in the 
 ## Signing
 
 - Debug builds are signed automatically by the Android toolchain with the standard debug keystore, which the SDK generates on first use at `~/.android/debug.keystore` (on Windows, `.android\debug.keystore` in your user profile). This key is for development only and is different on every machine, so a debug APK built on one computer cannot update a copy built on another.
-- The repository contains no distribution keystore and defines no release signing configuration. `assembleRelease` therefore produces an unsigned APK, which Android will not install, and the release variant is not minified. A debug APK is not a production release.
+- Release builds are signed with the key named in `keystore.properties` in the repository root (format: `keystore.properties.example`). The file and the keystore are not in the repository. Without the file, tests, lint and debug builds still work, but `assembleRelease` stops with an error instead of producing an unsigned or debug-signed APK. A debug APK is not a production release.
 - Never commit a keystore, a key password or a `keystore.properties` file. `.gitignore` already excludes `*.jks`, `*.keystore`, `keystore.properties`, `.env` files and `local.properties`; keep it that way. If you publish your own signed build, create your own long-lived key, store it outside the repository, and back it up: it is the only way users can update the app without losing their data.
 - CI uses no secrets and builds only the debug variant.
