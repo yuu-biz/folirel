@@ -40,7 +40,7 @@ Windows (PowerShell), from the repository root:
 ```
 
 Linux / macOS: the same tasks with `./gradlew`. The signed APK is `app/build/outputs/apk/release/app-release.apk`. The
-release build is shrunk with R8 (`build/outputs/mapping/release/mapping.txt` maps stack traces back to the source; keep
+release build is shrunk with R8 (`app/build/outputs/mapping/release/mapping.txt` maps stack traces back to the source; keep
 it with the release). Build from a clean, committed tree: the version line in Settings > About shows the Git commit, with
 `-dirty` when the tree had uncommitted changes.
 

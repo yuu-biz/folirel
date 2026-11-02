@@ -116,7 +116,7 @@ android {
 }
 
 // An unsigned or debug-signed release APK must never come out of this build: stop before packaging when the key is not set up.
-tasks.matching { it.name == "packageRelease" }.configureEach {
+tasks.named { it == "packageRelease" }.configureEach {
     val keystore = rootProject.file("keystore.properties")
     doFirst {
         if (!keystore.isFile) throw GradleException("Release signing is not set up: create keystore.properties in the repository root (see docs/releasing.md).")
