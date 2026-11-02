@@ -524,7 +524,7 @@ The Share rows run the real network stack against a local MockWebServer and coun
 | P3C-T12 | Redirect to a feed: one chain, no second check; a direct feed larger than the page limit is read in full. | `aRedirectToAFeedIsOneChainAndNoSecondCheck`, `aDirectFeedLargerThanAPageIsStillReadInFull` |
 | P3C-T13 | HTML with declared feeds: 1 request plus 1 per candidate. | `anHtmlPageWithDeclaredFeedsIsOneRequestPlusOnePerCandidate` |
 | P3C-T14 | No fixed sleep or delay in the Share tests. | `NoFixedWaitsInShareTestsTest` |
-| P3C-T15 | The Share tests repeated (8 runs of 73 tests, cleaned between runs) all pass. | Run by hand (not a test); see ACCEPTANCE_RESULTS |
+| P3C-T15 | The Share tests repeated (8 runs of 73 tests, cleaned between runs) all pass. | Run by hand (not a test); the maintainer's local run log |
 | P3C-T16, T17 | `CUSTOM` and the seed persist across a restart; a store from before 0.9.3 reads as before and nothing is written by reading; alpha is ignored. | `CustomPaletteSettingTest` |
 | P3C-T18, T19 | Light and dark schemes are generated from one seed, are complete (every family differs between seeds), deterministic, and share the seed's hue. | `CustomPaletteTest` |
 | P3C-T20..T22 | Black, white, bright yellow, saturated red, dark navy and a sweep of 144 hue/strength seeds (plus greys, pure primaries): every text, icon, accent and outline pair reaches its contrast in light and dark. | `CustomPaletteTest`, `PalettesTest` (Custom at the default seed in the existing checks) |
