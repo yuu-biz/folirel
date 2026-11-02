@@ -161,6 +161,9 @@ dependencies {
     testImplementation(libs.room.testing)
     testImplementation(libs.work.testing)
 
+    // createComposeRule() starts the empty ComponentActivity this manifest declares; debug only, so a release build never has it.
+    debugImplementation(libs.compose.ui.test.manifest)
+
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.core)
