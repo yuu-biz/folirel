@@ -32,6 +32,10 @@ internal interface ScrollHandle {
     fun indexAt(px: Float): Int
 
     suspend fun scrollTo(index: Int)
+
+    /** The next measure keeps the first index and offset as they are, instead of following the first row's key to its new index. */
+    fun keepIndex()
+
     suspend fun scroll(block: suspend ScrollScope.() -> Unit)
 }
 
@@ -54,6 +58,7 @@ internal class ListScroll(private val s: LazyListState) : ScrollHandle {
     }
 
     override suspend fun scrollTo(index: Int) = s.scrollToItem(index)
+    override fun keepIndex() = s.requestScrollToItem(s.firstVisibleItemIndex, s.firstVisibleItemScrollOffset)
     override suspend fun scroll(block: suspend ScrollScope.() -> Unit) = s.scroll(block = block)
 }
 
@@ -86,6 +91,7 @@ internal class GridScroll(private val s: LazyGridState) : ScrollHandle {
     }
 
     override suspend fun scrollTo(index: Int) = s.scrollToItem(index)
+    override fun keepIndex() = s.requestScrollToItem(s.firstVisibleItemIndex, s.firstVisibleItemScrollOffset)
     override suspend fun scroll(block: suspend ScrollScope.() -> Unit) = s.scroll(block = block)
 }
 
@@ -116,6 +122,7 @@ internal class StaggeredScroll(private val s: LazyStaggeredGridState) : ScrollHa
     }
 
     override suspend fun scrollTo(index: Int) = s.scrollToItem(index)
+    override fun keepIndex() = s.requestScrollToItem(s.firstVisibleItemIndex, s.firstVisibleItemScrollOffset)
     override suspend fun scroll(block: suspend ScrollScope.() -> Unit) = s.scroll(block = block)
 }
 
@@ -147,6 +154,7 @@ internal class BlockScroll(
     }
 
     override suspend fun scrollTo(index: Int) = s.scrollToItem(blockOf.getOrElse(index) { 0 })
+    override fun keepIndex() = s.requestScrollToItem(s.firstVisibleItemIndex, s.firstVisibleItemScrollOffset)
     override suspend fun scroll(block: suspend ScrollScope.() -> Unit) = s.scroll(block = block)
 }
 

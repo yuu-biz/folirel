@@ -104,6 +104,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -806,6 +807,25 @@ private const val FOLLOW_HEAD_AFTER_BACK_TO_TOP_MS = 4_000L
 
 private const val MOVE_TO_TOP = "top"
 
+/** The rows of one list from one look at it to the next: which ones left, and whether one of them is back. */
+internal class ReturningRows {
+    private var last: List<ArticleRow>? = null
+    private var shown: Set<String> = emptySet()
+    private val left = HashSet<String>()
+
+    /** Index in [items] of the first row that had left this list and is back, or -1. */
+    fun backAt(items: List<ArticleRow>): Int {
+        if (items === last) return -1
+        last = items
+        val ids = items.mapTo(HashSet(items.size)) { it.id }
+        shown.filterTo(left) { it !in ids }
+        shown = ids
+        val back = items.indexOfFirst { it.id in left }
+        left.removeAll(ids)
+        return back
+    }
+}
+
 @Composable
 internal fun ArticleList(
     host: ListHost,
@@ -886,6 +906,12 @@ private fun ArticleListBody(
             firstArticleOf,
         )
         else -> ListScroll(remember(state.key) { LazyListState(start.first, start.second) }.also { listState = it })
+    }
+    // A row that left while shown (read under Unread, unsaved under Saved) and comes back with Undo where the first row on screen is
+    // takes that place again; following the first row's key would leave it just above the screen. New arrivals never move the list.
+    val returning = remember(state.key) { ReturningRows() }
+    Snapshot.withoutReadObservation {
+        if (returning.backAt(items) == scroll.firstIndex) scroll.keepIndex()
     }
     val currentItems by rememberUpdatedState(items)
     val currentNew by rememberUpdatedState(newIds)

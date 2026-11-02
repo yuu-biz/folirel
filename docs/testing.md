@@ -616,7 +616,7 @@ manual ([backup-format.md](backup-format.md) section 7).
 | F3-T02 | A released swipe acts only past the threshold, in the chosen direction; Off never acts. | `SwipeActionsSettingTest.aReleasedSwipeActsOnlyPastTheThresholdAndInTheChosenDirection` |
 | F3-T03 | The setting is in the full backup; an archive without it reads as the default; a bad value is refused. | `BackupArchiveSecurityTest.swipeActionsAddedLaterAreOptional`, `t24_invalidValues`, `BackupRoundTripTest.t43_richStateRestoresIdenticallyIntoAFreshInstall` |
 | F3-T04 | On a List row, right toggles read and left toggles saved; a short swipe changes nothing and does not page. | `SwipeActionsUiTest.swipingARowTogglesReadAndSavedAndAShortSwipeChangesNothing` (not run) |
-| F3-T05 | A row the Unread filter hides after a swipe leaves the list with Undo, and Undo brings it back unread. | `SwipeActionsUiTest.aRowTheFilterHidesLeavesWithUndo` (not run) |
+| F3-T05 | A row the Unread filter hides after a swipe leaves the list with Undo, and Undo brings it back unread and on screen where it was (a list keeps its first row by key, which alone would leave the returned row just above the screen). | `SwipeActionsUiTest.aRowTheFilterHidesLeavesWithUndo` (not run), `ArticleListReturnTest` (JVM) |
 | F3-T06 | With swipe actions off a drag on a row pages to the next category and changes no article. | `SwipeActionsUiTest.withSwipeActionsOffADragOnARowPagesAgain` (not run) |
 
 The screen tests that drag the category pager start with swipe actions off (`TestData.reset`); only `SwipeActionsUiTest` turns them on.
