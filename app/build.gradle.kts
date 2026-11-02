@@ -160,6 +160,10 @@ dependencies {
     testImplementation(libs.okhttp.tls)
     testImplementation(libs.room.testing)
     testImplementation(libs.work.testing)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    // Compose UI test pulls an espresso-core that fails under Robolectric's newer SDKs (InputManager.getInstance removed).
+    testImplementation(libs.androidx.test.espresso.core)
 
     // createComposeRule() starts the empty ComponentActivity this manifest declares; debug only, so a release build never has it.
     debugImplementation(libs.compose.ui.test.manifest)
