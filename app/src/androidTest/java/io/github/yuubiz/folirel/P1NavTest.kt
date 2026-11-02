@@ -8,13 +8,14 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.yuubiz.folirel.app.MainActivity
 import io.github.yuubiz.folirel.model.ArticleScope
@@ -27,6 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -42,8 +44,9 @@ import kotlin.math.abs
 @RunWith(AndroidJUnit4::class)
 class P1NavTest {
     @get:Rule
-    val compose = createAndroidComposeRule<MainActivity>()
+    val compose = createEmptyComposeRule()
 
+    private var scenario: ActivityScenario<MainActivity>? = null
     private lateinit var ids: List<String>
     private lateinit var names: List<String>
 
@@ -63,6 +66,11 @@ class P1NavTest {
         val sorted = paths.sortedBy { it.joinToString("\u0000") }
         ids = sorted.map { byPath.getValue(it.joinToString(" / ")) }
         runBlocking { TestData.container.settings.setListMode(ListMode.LIST) }
+    }
+
+    @After
+    fun tearDown() {
+        scenario?.close()
     }
 
     private fun scopeOf(id: String) = ArticleScope.Category(id)
@@ -93,9 +101,17 @@ class P1NavTest {
 
     private fun savedScope() = runBlocking { TestData.container.settings.current().lastScope }
 
+    /**
+     * Started after the seed, not recreated: a recreated activity keeps its view models, and a home view model made before
+     * [TestData.reset] still reads the account the reset deleted (no categories) and the scope chosen before the seed.
+     */
+    private fun launch() {
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+    }
+
     private fun launchAt(index: Int) {
         runBlocking { TestData.container.settings.setLastScope(scopeOf(ids[index])) }
-        compose.activityRule.scenario.recreate()
+        launch()
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("tab_${scopeOf(ids[index]).encode()}")).fetchSemanticsNodes().isNotEmpty() }
         compose.waitForIdle()
         Thread.sleep(600)
@@ -307,7 +323,7 @@ class P1NavTest {
             TestData.container.settings.settings.map { it.lastScope }.collect { seen += it }
         }
         try {
-            compose.activityRule.scenario.recreate()
+            launch()
             compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("tab_${saved.encode()}")).fetchSemanticsNodes().isNotEmpty() }
             compose.waitForIdle()
             Thread.sleep(1_500)

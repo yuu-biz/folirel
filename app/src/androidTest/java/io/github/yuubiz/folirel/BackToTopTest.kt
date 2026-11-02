@@ -5,17 +5,19 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
+import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.yuubiz.folirel.app.MainActivity
 import io.github.yuubiz.folirel.model.ArticleScope
 import io.github.yuubiz.folirel.model.ListMode
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -30,7 +32,14 @@ import kotlin.concurrent.thread
 @RunWith(AndroidJUnit4::class)
 class BackToTopTest {
     @get:Rule
-    val compose = createAndroidComposeRule<MainActivity>()
+    val compose = createEmptyComposeRule()
+
+    private var scenario: ActivityScenario<MainActivity>? = null
+
+    @After
+    fun tearDown() {
+        scenario?.close()
+    }
 
     private val all = ArticleScope.All
 
@@ -42,8 +51,8 @@ class BackToTopTest {
         TestData.reset()
         runBlocking { TestData.container.settings.setListMode(mode) }
         TestData.seedArticles(total)
-        // The activity of the rule is already running: restart it so that it reads the seeded data and settings.
-        compose.activityRule.scenario.recreate()
+        // Started after the seed: a recreated activity would keep a home view model that still reads the account the reset deleted.
+        scenario = ActivityScenario.launch(MainActivity::class.java)
         compose.waitUntil(10_000) { exists("article_list") }
         inAllPage("article_list").performScrollToIndex(total - 300)
         compose.waitForIdle()
