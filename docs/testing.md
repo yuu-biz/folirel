@@ -112,6 +112,7 @@ Rules that apply to every layer:
 | `IconDecoderTest` | Source-icon decoding on a real Android runtime: PNG, ICO with PNG entry, ICO with BMP entry, wide logo, 512 px image, non-images (`U08`) |
 | `PerformanceTest` | Synthetic 300 feeds / 5,000 articles: warm start to a visible list and local search timings (`T47`) |
 | `ArticleListCostProbe` (JVM) | Home list query cost on 30,000 articles, one query against 1,000-row chunks. A measurement, not a check: excluded from `testDebugUnitTest` unless you pass `-Pfolirel.probe` |
+| `RealBackupProbe` (JVM) | Restores a maintainer's own Folirel backup with the current code, backs it up again and compares the counts. The file never enters the repository (keep it in the git-ignored `local-data/`). Run with `-Pfolirel.probe -Pfolirel.realBackup=<path>` |
 
 `TestData` seeds the app through its own repositories; there is no demo mode in the app.
 
