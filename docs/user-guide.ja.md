@@ -22,7 +22,7 @@ APKがプロジェクトの配布したものか確かめるには、Android SDK
 apksigner verify --print-certs folirel.apk
 ```
 
-`Signer #1 certificate SHA-256 digest` の行が `<RELEASE_CERT_SHA256>` と一致することを確かめてください。一致しないファイルはインストールしないでください。
+`Signer #1 certificate SHA-256 digest` の行が `c740ae3b5a57bf46be12edd7894b6a017095b95a3f7217e2cc4b9402cc9b00b1` と一致することを確かめてください。一致しないファイルはインストールしないでください。
 
 **0.x版からの移行。** 1.0より前の版は開発用の鍵で署名されているため、1.0を上書きインストールできません。古いアプリでFolirelのバックアップを作成し（設定 > 保存とデータ > 「Folirelのバックアップを作成」）、アンインストールしてから1.0をインストールし、バックアップを復元します（設定 > 保存とデータ > 「Folirelのバックアップから復元」）。アンインストール前にバックアップを確かめる方法を含む手順は、[Full backup and restore の7節](backup-format.md#7-moving-to-a-differently-signed-app-release-signing)（英語）にあります。0.10.0より前の版には完全バックアップがないため、OPMLを書き出してください（購読とカテゴリだけが移ります）。
 

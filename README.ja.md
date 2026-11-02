@@ -55,7 +55,7 @@ apksigner verify --print-certs folirel.apk
 `Signer #1 certificate SHA-256 digest` の行が次と一致することを確かめてください。
 
 ```text
-<RELEASE_CERT_SHA256>
+c740ae3b5a57bf46be12edd7894b6a017095b95a3f7217e2cc4b9402cc9b00b1
 ```
 
 一致しないファイルはインストールしないでください。
@@ -110,6 +110,8 @@ APK は `app/build/outputs/apk/debug/app-debug.apk` に出力されます。Wind
 | [Fetch and security](docs/fetch-and-security.md) | HTTP、解析、画像、更新、通信ポリシー |
 | [Testing](docs/testing.md) | 試験の構成、fixture、シナリオ一覧 |
 | [Building](docs/building.md) | ツールチェーン、ビルド、CI、依存ライブラリとライセンス |
+| [Releasing](docs/releasing.md) | リリース署名、確認、GitHub Release の手順、開発者確認 |
+| [プライバシー](docs/privacy.ja.md) / [English](docs/privacy.md) | アプリが送るもの、保存するもの、集めないもの |
 
 技術文書は英語です。コントリビューター向けの規約は [AGENTS.md](AGENTS.md) と [CONTRIBUTING.md](CONTRIBUTING.md) にあります。
 

@@ -61,7 +61,7 @@ apksigner verify --print-certs folirel.apk
 The line `Signer #1 certificate SHA-256 digest` must read:
 
 ```text
-<RELEASE_CERT_SHA256>
+c740ae3b5a57bf46be12edd7894b6a017095b95a3f7217e2cc4b9402cc9b00b1
 ```
 
 If it does not match, do not install the file.
@@ -119,6 +119,8 @@ Privacy statement: [docs/privacy.md](docs/privacy.md). Details: [Fetch and secur
 | [Fetch and security](docs/fetch-and-security.md) | HTTP, parsing, images, refresh, network policy |
 | [Testing](docs/testing.md) | Test layers, fixtures, scenario catalogue |
 | [Building](docs/building.md) | Toolchain, build, CI, dependencies and licenses |
+| [Releasing](docs/releasing.md) | Release signing, checks, GitHub Release steps, developer verification |
+| [Privacy](docs/privacy.md) / [日本語](docs/privacy.ja.md) | What the app sends, keeps and never collects |
 
 Technical documents are in English. Contributor and coding-agent conventions are in [AGENTS.md](AGENTS.md) and
 [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -22,7 +22,7 @@ To check that the APK is the one the project published, compare its signing cert
 apksigner verify --print-certs folirel.apk
 ```
 
-The line `Signer #1 certificate SHA-256 digest` must read `<RELEASE_CERT_SHA256>`. If it does not, do not install the file.
+The line `Signer #1 certificate SHA-256 digest` must read `c740ae3b5a57bf46be12edd7894b6a017095b95a3f7217e2cc4b9402cc9b00b1`. If it does not, do not install the file.
 
 **Moving from a 0.x build.** Builds before 1.0 were signed with a development key, and Android cannot install 1.0 over them. Create a Folirel backup in the old app (Settings > Storage and data > **Create Folirel backup**), uninstall it, install 1.0, and restore the backup (Settings > Storage and data > **Restore from Folirel backup**). The steps, including how to check the backup before you uninstall, are in [Full backup and restore, section 7](backup-format.md#7-moving-to-a-differently-signed-app-release-signing). Builds before 0.10.0 have no full backup; export OPML there instead (subscriptions and categories only).
 
