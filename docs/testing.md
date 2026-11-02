@@ -605,3 +605,16 @@ manual ([backup-format.md](backup-format.md) section 7).
 | F1-T06 | A typed `http://` address while HTTP is not allowed sends nothing and stores nothing. | `aTypedHttpAddressWhileHttpIsNotAllowedSendsNothingAndAddsNothing` |
 | F1-T07 | A site name without a scheme is looked up over `https://`; a typed address replaces a running share and needs no first-run wait; a shared feed address is still only shown. | `aTypedSiteNameWithoutASchemeIsLookedUpOverHttps`, `aTypedAddressNeedsNoFirstRunReadinessAndReplacesARunningShare`, `aSharedFeedAddressIsStillOnlyShown` |
 | F1-T08 | The add dialog stays under the search dialog and closes when a feed is being subscribed. | `AddFeedDialogUiTest` (not run) |
+
+### 4.17 Swipe to mark read or save (0.14, F3-T01 to F3-T06)
+
+| ID | Scenario | Test |
+|---|---|---|
+| F3-T01 | A store without the key has swipe actions on; the choice survives a restart; an unknown name reads as the default. | `SwipeActionsSettingTest` |
+| F3-T02 | A released swipe acts only past the threshold, in the chosen direction; Off never acts. | `SwipeActionsSettingTest.aReleasedSwipeActsOnlyPastTheThresholdAndInTheChosenDirection` |
+| F3-T03 | The setting is in the full backup; an archive without it reads as the default; a bad value is refused. | `BackupArchiveSecurityTest.swipeActionsAddedLaterAreOptional`, `t24_invalidValues`, `BackupRoundTripTest.t43_richStateRestoresIdenticallyIntoAFreshInstall` |
+| F3-T04 | On a List row, right toggles read and left toggles saved; a short swipe changes nothing and does not page. | `SwipeActionsUiTest.swipingARowTogglesReadAndSavedAndAShortSwipeChangesNothing` (not run) |
+| F3-T05 | A row the Unread filter hides after a swipe leaves the list with Undo, and Undo brings it back unread. | `SwipeActionsUiTest.aRowTheFilterHidesLeavesWithUndo` (not run) |
+| F3-T06 | With swipe actions off a drag on a row pages to the next category and changes no article. | `SwipeActionsUiTest.withSwipeActionsOffADragOnARowPagesAgain` (not run) |
+
+The screen tests that drag the category pager start with swipe actions off (`TestData.reset`); only `SwipeActionsUiTest` turns them on.
