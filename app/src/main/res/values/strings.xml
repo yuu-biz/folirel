@@ -612,6 +612,11 @@
     <string name="settings_group_manual">Manual refresh</string>
     <string name="settings_group_articles">Articles</string>
     <string name="settings_group_images">Images</string>
+    <string name="settings_swipe_actions">Swipe actions</string>
+    <string name="settings_swipe_actions_note">In List and Compact list, swipe a row to mark it read or unread, or to save it. While this is on, change category with the tabs.</string>
+    <string name="swipe_right_read_left_saved">Right: read or unread. Left: save</string>
+    <string name="swipe_right_saved_left_read">Right: save. Left: read or unread</string>
+    <string name="swipe_off">Off</string>
     <string name="settings_group_backup">Backup and export</string>
     <string name="layout_hidden_kept_note">Settings this layout does not use are kept for later.</string>
     <string name="browser_note">Custom Tabs opens the article in your browser on top of Folirel. If that is not possible, your browser app opens.</string>

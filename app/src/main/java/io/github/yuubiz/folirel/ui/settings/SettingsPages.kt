@@ -38,6 +38,7 @@ import io.github.yuubiz.folirel.app.AppContainer
 import io.github.yuubiz.folirel.data.preferences.AppSettings
 import io.github.yuubiz.folirel.data.preferences.BrowserMode
 import io.github.yuubiz.folirel.data.preferences.CategoryNavigation
+import io.github.yuubiz.folirel.data.preferences.SwipeActions
 import io.github.yuubiz.folirel.data.repository.RetentionPreview
 import io.github.yuubiz.folirel.model.CardLayoutStyle
 import io.github.yuubiz.folirel.ui.common.BrandLogo
@@ -142,8 +143,29 @@ internal fun LayoutPage(s: AppSettings, vm: SettingsViewModel) {
             s.showImages,
             Modifier.testTag("show_images"),
         ) { v -> vm.update { setShowImages(v) } }
+        GroupHeader(stringResource(R.string.settings_swipe_actions))
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+            Choice(
+                options = SwipeActions.entries,
+                selected = s.swipeActions,
+                label = { swipeActionsName(it) },
+                tag = { "settings_swipe_${it.name}" },
+                onSelect = { choice -> vm.update { setSwipeActions(choice) } },
+                forceRows = true,
+            )
+        }
+        SettingNote(stringResource(R.string.settings_swipe_actions_note))
     }
 }
+
+@Composable
+internal fun swipeActionsName(choice: SwipeActions): String = stringResource(
+    when (choice) {
+        SwipeActions.RIGHT_READ_LEFT_SAVED -> R.string.swipe_right_read_left_saved
+        SwipeActions.RIGHT_SAVED_LEFT_READ -> R.string.swipe_right_saved_left_read
+        SwipeActions.OFF -> R.string.swipe_off
+    },
+)
 
 /** What the column choice means on this screen right now, including when the choice is reduced to fit. */
 @Composable

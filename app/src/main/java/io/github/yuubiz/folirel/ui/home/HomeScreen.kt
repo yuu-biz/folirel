@@ -150,6 +150,7 @@ import io.github.yuubiz.folirel.backend.FeedResult
 import io.github.yuubiz.folirel.backend.RefreshScope
 import io.github.yuubiz.folirel.browser.BrowserLauncher
 import io.github.yuubiz.folirel.data.preferences.AppSettings
+import io.github.yuubiz.folirel.data.preferences.SwipeActions
 import io.github.yuubiz.folirel.data.preferences.BrowserMode
 import io.github.yuubiz.folirel.model.ArticleRow
 import io.github.yuubiz.folirel.model.ArticleScope
@@ -778,6 +779,7 @@ private fun ScopePage(
                 state = list,
                 mode = layout.listMode,
                 showImages = settings.showImages,
+                swipe = settings.swipeActions,
                 cardColumns = layout.cardColumns,
                 cardStyle = layout.cardStyle,
                 imageLoader = imageLoader,
@@ -820,12 +822,14 @@ internal fun ArticleList(
     scrollToTopTick: Int,
     /** The category the reader has chosen is this list's: false from the moment another one is chosen, while the pager may still show this page. */
     isSelected: Boolean = true,
+    /** Swiping a row of the two list layouts (cards have none); off where a test or a preview hosts the list on its own. */
+    swipe: SwipeActions = SwipeActions.OFF,
 ) {
     // The width decides the columns of the tile layouts (Masonry, Bento), whose positions depend on them.
     BoxWithConstraints(Modifier.fillMaxSize()) {
         ArticleListBody(
             maxWidth.value, host, state, mode, showImages, cardColumns, cardStyle, imageLoader, actions, newIds, newestFirst, isCurrent,
-            scrollToTopTick, isSelected,
+            scrollToTopTick, isSelected, swipe,
         )
     }
 }
@@ -846,6 +850,7 @@ private fun ArticleListBody(
     isCurrent: Boolean,
     scrollToTopTick: Int,
     isSelected: Boolean,
+    swipe: SwipeActions,
 ) {
     // While the list moves, it keeps the articles it is moving over: a refresh delivers feed after feed, and articles
     // inserted above the moving list would change its distance on every batch. They are applied when the movement ends.
@@ -1112,7 +1117,9 @@ private fun ArticleListBody(
         } else if (listState != null) {
             LazyColumn(state = listState!!, modifier = Modifier.fillMaxSize().testTag("article_list"), contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(items, key = { it.id }, contentType = { mode }) { row ->
-                    ArticleItem(row, mode, showImages, imageLoader, now, actions, Modifier.animateItem().testTag("article_${row.id}"))
+                    SwipeableArticle(row, swipe, actions, Modifier.animateItem()) {
+                        ArticleItem(row, mode, showImages, imageLoader, now, actions, Modifier.testTag("article_${row.id}"))
+                    }
                 }
             }
         }

@@ -59,6 +59,12 @@ object TestData {
             // Same as the colour set: an older release (before 0.8.0) has no category navigation.
         }
         c.settings.setCardStyle(io.github.yuubiz.folirel.model.CardLayoutStyle.MIXED)
+        try {
+            // The screen tests drag the category pager across list rows; SwipeActionsUiTest turns the row swipe on itself.
+            c.settings.setSwipeActions(io.github.yuubiz.folirel.data.preferences.SwipeActions.OFF)
+        } catch (_: LinkageError) {
+            // A release before 0.14 has no swipe actions.
+        }
     }
 
     private var seededFeedId: String? = null

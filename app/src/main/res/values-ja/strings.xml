@@ -586,6 +586,11 @@
     <string name="settings_group_manual">手動更新</string>
     <string name="settings_group_articles">記事</string>
     <string name="settings_group_images">画像</string>
+    <string name="settings_swipe_actions">スワイプ操作</string>
+    <string name="settings_swipe_actions_note">リストとリスト（コンパクト）で、行をスワイプすると既読・未読や保存を切り替えます。オンの間は、カテゴリをタブで切り替えます。</string>
+    <string name="swipe_right_read_left_saved">右で既読・未読、左で保存</string>
+    <string name="swipe_right_saved_left_read">右で保存、左で既読・未読</string>
+    <string name="swipe_off">オフ</string>
     <string name="settings_group_backup">バックアップと書き出し</string>
     <string name="layout_hidden_kept_note">このレイアウトで使わない設定は、あとのために残ります。</string>
     <string name="browser_note">アプリ内タブは、お使いのブラウザでFolirelの上に記事を開きます。使えないときはブラウザアプリで開きます。</string>
