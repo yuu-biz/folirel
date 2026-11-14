@@ -93,15 +93,23 @@ sha256sum Folirel-X.Y.Z.apk
    [building.md](building.md#continuous-integration)); create the release only after it is green.
 3. Create the GitHub Release from the tag. Mark a release candidate as a pre-release.
 4. Attach `Folirel-X.Y.Z.apk`. Attach nothing else that a reader could install by mistake.
-5. The release notes contain:
-   - what changed for the reader;
-   - the SHA-256 of `Folirel-X.Y.Z.apk` (step 4);
-   - the signing certificate SHA-256 (the table above) and the `apksigner` command from step 3, so readers can check
-     the file;
-   - for readers of a 0.x build: those builds were signed with a development key, and Android cannot install this
-     release over them. Create a Folirel backup in the old app, check it with the restore preview, uninstall, install
-     this release and restore the backup. The steps are in
-     [backup-format.md, section 7](backup-format.md#7-moving-to-a-differently-signed-app-release-signing).
+5. Write the release notes in English, then `---`, then `## 日本語` with the same facts:
+   - Start with the changes, one bullet per change, written for a person who uses the app: what they see or can now
+     do, with where a setting lives and its default. Name settings the way the app names them in each language
+     (Settings > Storage and data, 設定 > 保存とデータ). Do not open with the app's name or a "What's new" heading; the
+     release title names the version.
+   - Use `### Added`, `### Changed` and `### Fixed` only when there are more than four changes of more than one kind.
+     Otherwise write a flat list and start a bug fix with "Fixed".
+   - When readers must do something before they update (a new signing key, a new package name, data that would be
+     lost), put that first, as numbered steps.
+   - End the English part with two lines, without explanation:
+     `- APK SHA-256: <hash of Folirel-X.Y.Z.apk from step 4>` and
+     `- Signing certificate SHA-256: c740ae3b5a57bf46be12edd7894b6a017095b95a3f7217e2cc4b9402cc9b00b1`.
+     End the Japanese part with 「APK と署名証明書の SHA-256 は上の英語の節にあります。」 How to check them, and how
+     to move from a 0.x debug build, are in the README.
+   - Add "Package `io.github.yuubiz.folirel`, version X.Y.Z (versionCode), built from `<commit>`" only when the package
+     or the signing key changes.
+   - Never put a personal name or e-mail address in the notes; the project signs as `yuu-biz`.
 6. Open the release page in a private browser window and check the file name, the checksum and the notes.
 
 ## 6. Android developer verification
