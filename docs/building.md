@@ -164,6 +164,7 @@ Libraries included in the app:
 | Protocol Buffers (repackaged inside DataStore) | with DataStore 1.2.1 | BSD-3-Clause | DataStore's file format |
 | AndroidX Browser | 1.10.0 | Apache-2.0 | Custom Tabs |
 | OkHttp (with Okio) | 5.5.0 | Apache-2.0 | HTTP client |
+| Public Suffix List (data file inside OkHttp) | with OkHttp 5.5.0 | MPL-2.0 | Shipped inside OkHttp; Folirel does not call it |
 | Coil 3 (compose, network-okhttp) | 3.6.3 | Apache-2.0 | Thumbnail loading |
 | jsoup | 1.23.2 | MIT | HTML text extraction, link discovery |
 | kotlinx.coroutines | 1.11.0 | Apache-2.0 | Concurrency |

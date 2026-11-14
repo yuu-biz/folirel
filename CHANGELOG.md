@@ -3,6 +3,11 @@
 Folirel follows [semantic versioning](https://semver.org/) from 1.0.0 on. Versions before 1.0.0 were debug-signed test
 builds; their history is in the git log and the old GitHub Releases.
 
+## 1.0.1
+
+### Fixed
+- Settings > About > Licenses also lists the Public Suffix List that OkHttp ships inside the app, with its licence (MPL-2.0).
+
 ## 1.0.0
 
 The first release signed with the Folirel release key. **It cannot be installed over a 0.x build.** Before you uninstall

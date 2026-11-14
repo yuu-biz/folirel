@@ -21,8 +21,8 @@ android {
         applicationId = "io.github.yuubiz.folirel"
         minSdk = 28
         targetSdk = 37
-        versionCode = 31
-        versionName = "1.0.0"
+        versionCode = 32
+        versionName = "1.0.1"
         // Shown in Settings > About so a build can be traced to its source ("-dirty" = uncommitted changes).
         val gitCommit = try {
             providers.exec { commandLine("git", "describe", "--always", "--dirty", "--abbrev=7", "--match=no-such-tag") }.standardOutput.asText.get().trim()
@@ -211,7 +211,13 @@ androidComponents {
             appLicense.set(rootProject.layout.projectDirectory.file("LICENSE"))
             sharedTexts.set(layout.projectDirectory.dir("licenses"))
             // Vector drawables copied from Material Icons (see the header of each file in res/drawable); not a classpath module.
-            bundled.set(listOf("Material Icons (vector drawables)|github.com/google/material-design-icons|Apache-2.0"))
+            bundled.set(
+                listOf(
+                    "Material Icons (vector drawables)|github.com/google/material-design-icons|Apache-2.0",
+                    // OkHttp ships the Public Suffix List as a data file (assets/PublicSuffixDatabase.list); the list is MPL-2.0, not Apache.
+                    "Public Suffix List (data file bundled by OkHttp)|publicsuffix.org|MPL-2.0",
+                ),
+            )
         }
         variant.sources.assets?.addGeneratedSourceDirectory(catalog, LicenseCatalogTask::outputDir)
     }
@@ -352,7 +358,9 @@ abstract class LicenseCatalogTask : DefaultTask() {
 
     private companion object {
         val LICENSE_FILE = Regex("(?i)(LICENSE|LICENCE|NOTICE|COPYING)([._-][^/]*)?")
-        val LICENSE_TITLES = mapOf("Apache-2.0" to "Apache License 2.0", "MIT" to "MIT License", "BSD-3-Clause" to "BSD 3-Clause License")
+        val LICENSE_TITLES = mapOf(
+            "Apache-2.0" to "Apache License 2.0", "MIT" to "MIT License", "BSD-3-Clause" to "BSD 3-Clause License", "MPL-2.0" to "Mozilla Public License 2.0",
+        )
 
         // Licences whose text carries the library's own copyright line, so the text must come from the library's LICENSE file.
         val OWN_TEXT = setOf("MIT", "BSD-3-Clause")

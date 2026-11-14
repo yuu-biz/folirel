@@ -23,6 +23,7 @@ class LicenseCatalogTest {
         val first = groups.first()
         assertEquals(listOf("Folirel"), first.libraries.map { it.name })
         assertTrue(first.text.body.contains("MIT License") && first.text.body.contains("Permission is hereby granted"))
+        assertTrue(first.text.body.contains("Copyright (c) 2026 yuu-biz"))
     }
 
     @Test
@@ -46,6 +47,11 @@ class LicenseCatalogTest {
         }
         // The copied Material Icons drawables are not a library on the classpath but are listed too.
         assertEquals("Apache License 2.0", groupOf("github.com/google/material-design-icons").text.title)
+        // OkHttp's Public Suffix List data file is under the MPL, not under OkHttp's Apache licence.
+        groupOf("publicsuffix.org").let {
+            assertEquals("Mozilla Public License 2.0", it.text.title)
+            assertTrue(it.text.body.contains("Mozilla Public License Version 2.0"))
+        }
     }
 
     @Test
